@@ -24,7 +24,6 @@ A tool to elevate privilege with Windows Tokens
   (Tokens) > StealToken 1008 regedit.exe <br/>
   
 * #### BypassUAC
-  * **Optional Parameters:** Process ID, Command
   * **Parameters:** Process ID
   * **Optional Parameters:** Command
   * **Example:** <br/>
