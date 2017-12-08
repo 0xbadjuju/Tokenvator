@@ -1,0 +1,5 @@
+C:\Users\0xbadjuju\Documents\GitHub\Tokenvators\Tokenvators\obj\Debug\ResolveAssemblyReference.cache
+C:\Users\0xbadjuju\Documents\GitHub\Tokenvators\Tokenvators\bin\Debug\Tokenvators.exe
+C:\Users\0xbadjuju\Documents\GitHub\Tokenvators\Tokenvators\bin\Debug\Tokenvators.pdb
+C:\Users\0xbadjuju\Documents\GitHub\Tokenvators\Tokenvators\obj\Debug\Tokenvators.exe
+C:\Users\0xbadjuju\Documents\GitHub\Tokenvators\Tokenvators\obj\Debug\Tokenvators.pdb
