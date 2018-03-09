@@ -93,6 +93,7 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         public virtual Boolean ImpersonateUser(Int32 processId)
         {
+            Console.WriteLine("[*] Impersonating {0}", processId);
             GetPrimaryToken((UInt32)processId, "");
             if (hExistingToken == IntPtr.Zero)
             {
@@ -110,7 +111,7 @@ namespace Tokenvator
                 GetError("DuplicateTokenEx: ");
                 return false;
             }
-            Console.WriteLine(" [+] Duplicate Token Handle: " + phNewToken.ToInt32());
+            Console.WriteLine(" [+] Duplicate Token Handle: {0}", phNewToken.ToInt32());
             if (!Unmanaged.ImpersonateLoggedOnUser(phNewToken))
             {
                 GetError("ImpersonateLoggedOnUser: ");
@@ -164,7 +165,7 @@ namespace Tokenvator
         {
             Console.WriteLine("[+] Getting NT AUTHORITY\\SYSTEM privileges");
             GetSystem();
-            Console.WriteLine(" [*] Running as: " + WindowsIdentity.GetCurrent().Name);
+            Console.WriteLine(" [*] Running as: {0}", WindowsIdentity.GetCurrent().Name);
             
             Services services = new Services("TrustedInstaller");
             if (!services.StartService())

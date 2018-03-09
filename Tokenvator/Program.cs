@@ -34,13 +34,15 @@ namespace Tokenvator
                         case "listprivileges":
                             Unmanaged.OpenProcessToken(Process.GetCurrentProcess().Handle, Constants.TOKEN_ALL_ACCESS, out currentProcessToken);
                             Tokens.EnumerateTokenPrivileges(currentProcessToken);
+                            Unmanaged.CloseHandle(currentProcessToken);
                             break;
                         case "setprivilege":
                             Unmanaged.OpenProcessToken(Process.GetCurrentProcess().Handle, Constants.TOKEN_ALL_ACCESS, out currentProcessToken);
                             Tokens.SetTokenPrivilege(ref currentProcessToken, input);
+                            Unmanaged.CloseHandle(currentProcessToken);
                             break;
                         case "getsystem":
-                            if (String.Empty == NextItem(ref input))
+                            if ("getsystem" == NextItem(ref input))
                             {
                                 new Tokens().GetSystem();
                             }
@@ -50,7 +52,7 @@ namespace Tokenvator
                             }
                             break;
                         case "gettrustedinstaller":
-                            if (String.Empty != NextItem(ref input))
+                            if ("gettrustedinstaller" == NextItem(ref input))
                             {
                                 new Tokens().GetTrustedInstaller();
                             }
@@ -77,6 +79,20 @@ namespace Tokenvator
                             {
                                 new RestrictedToken().BypassUAC(processID, command);
                             }
+                            break;
+                        case "whoami":
+                            Console.WriteLine(System.Security.Principal.WindowsIdentity.GetCurrent().Name);
+                            break;
+                        case "run":
+                            Process process = new Process();
+                            process.StartInfo.FileName = NextItem(ref input);
+                            process.StartInfo.Arguments = input;
+                            process.StartInfo.UseShellExecute = false;
+                            process.StartInfo.RedirectStandardError = true;
+                            process.StartInfo.RedirectStandardOutput = true;
+                            process.Start();
+                            Console.WriteLine(process.StandardOutput.ReadToEnd());
+                            process.WaitForExit();
                             break;
                         case "exit":
                             return;
@@ -113,10 +129,10 @@ namespace Tokenvator
         private static Boolean GetProcessID(String input, out Int32 processID, out String command)
         {
             String name = NextItem(ref input);
-            command = "";
-            if (String.IsNullOrEmpty(input))
+            command = String.Empty;
+            if (!String.IsNullOrEmpty(input))
             {
-                command = "cmd.exe";
+                command = input;
             }
 
             processID = 0;
@@ -136,10 +152,11 @@ namespace Tokenvator
         
         ////////////////////////////////////////////////////////////////////////////////
         // Pops an item from the input and returns the item - only used in inital menu
+        // Taken from FowlPlay
         ////////////////////////////////////////////////////////////////////////////////
         public static String NextItem(ref String input)
         {
-            String option = "";
+            String option = String.Empty;
             String[] options = input.Split(new String[] { " " }, StringSplitOptions.RemoveEmptyEntries);
             if (options.Length > 1)
             {
