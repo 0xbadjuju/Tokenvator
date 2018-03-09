@@ -164,6 +164,13 @@ namespace Tokenvator
         );
 
         [DllImport("advapi32.dll")]
+        public static extern Boolean PrivilegeCheck(
+            IntPtr ClientToken,
+            Structs._PRIVILEGE_SET RequiredPrivileges,
+            out IntPtr pfResult
+        );
+
+        [DllImport("advapi32.dll")]
         public static extern Boolean GetTokenInformation(
             IntPtr TokenHandle, 
             Enums._TOKEN_INFORMATION_CLASS TokenInformationClass, 

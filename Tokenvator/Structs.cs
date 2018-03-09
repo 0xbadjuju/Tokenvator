@@ -107,5 +107,18 @@ namespace Tokenvator
         {
             public SID_AND_ATTRIBUTES Label;
         }
+
+        public const Int32 PRIVILEGE_SET_ALL_NECESSARY = 1;
+
+        private const Int32 ANYSIZE_ARRAY = 1;
+        [StructLayout(LayoutKind.Sequential)]
+        public struct _PRIVILEGE_SET
+        {
+            public UInt32 PrivilegeCount;
+            public UInt32 Control;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = ANYSIZE_ARRAY)]
+            public _LUID_AND_ATTRIBUTES[] Privilege;
+        }
+        
     }
 }

