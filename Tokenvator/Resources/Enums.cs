@@ -140,5 +140,51 @@ namespace Tokenvator
             MaxTokenInfoClass
         }
 
+        public enum _SID_NAME_USE
+        {
+            SidTypeUser = 1,
+            SidTypeGroup,
+            SidTypeDomain,
+            SidTypeAlias,
+            SidTypeWellKnownGroup,
+            SidTypeDeletedAccount,
+            SidTypeInvalid,
+            SidTypeUnknown,
+            SidTypeComputer,
+            SidTypeLabel
+        }
+
+        internal enum CRED_FLAGS : uint
+        {
+            NONE = 0x0,
+            PROMPT_NOW = 0x2,
+            USERNAME_TARGET = 0x4
+        }
+
+        internal enum CRED_PERSIST : uint
+        {
+            Session = 1,
+            LocalMachine,
+            Enterprise
+        }
+
+        internal enum CRED_TYPE : uint
+        {
+            Generic = 1,
+            DomainPassword,
+            DomainCertificate,
+            DomainVisiblePassword,
+            GenericCertificate,
+            DomainExtended,
+            Maximum,
+            MaximumEx = Maximum + 1000,
+        }
+
+        internal enum TOKEN_ELEVATION_TYPE
+        {
+            TokenElevationTypeDefault = 1,
+            TokenElevationTypeFull,
+            TokenElevationTypeLimited
+        }
     }
 }

