@@ -78,13 +78,13 @@ C:\> <br/>
   * **Parameters:** Username
   * **Optional Parameters:** -
   * **Examples:** <br/>
-  (Tokens) > Find_User_Processes<br/> 
+  (Tokens) > Find_User_Processes domain\user<br/> 
   
 * #### Find_User_Processes_WMI
   * **Parameters:** Username
   * **Optional Parameters:** -
   * **Examples:** <br/>
-  (Tokens) > Find_User_Processes_WMI<br/> 
+  (Tokens) > Find_User_Processes_WMI domain\user<br/> 
 
 * #### List_User_Sessions
   * **Parameters:** -
