@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Management;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -267,7 +268,14 @@ namespace Tokenvator
                 }
             }
             Console.WriteLine("[*] Discovered {0} processes", users.Count);
-            return users;
+
+            Dictionary<UInt32, String> sorted = new Dictionary<UInt32, String>();
+            foreach (var user in users.OrderBy(u => u.Value))
+            {
+                sorted.Add(user.Key, user.Value);
+            }
+            
+            return sorted;
         }
 
         ////////////////////////////////////////////////////////////////////////////////
