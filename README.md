@@ -104,11 +104,11 @@ C:\> <br/>
   * **Examples:** <br/>
   (Tokens) > RevertToSelf<br/> 
   
-* #### run
+* #### Run
   * **Parameters:** Command
   * **Optional Parameters:** -
   * **Examples:** <br/>
-  (Tokens) > run cmd.exe<br/> 
+  (Tokens) > Run cmd.exe<br/> 
 
 ### Author, Contributors, and License
 
