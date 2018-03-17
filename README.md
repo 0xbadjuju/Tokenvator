@@ -103,6 +103,12 @@ C:\> <br/>
   * **Optional Parameters:** -
   * **Examples:** <br/>
   (Tokens) > RevertToSelf<br/> 
+  
+* #### run
+  * **Parameters:** Command
+  * **Optional Parameters:** -
+  * **Examples:** <br/>
+  (Tokens) > run cmd.exe<br/> 
 
 ### Author, Contributors, and License
 
