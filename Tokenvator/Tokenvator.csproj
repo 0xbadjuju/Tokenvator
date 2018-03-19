@@ -73,21 +73,21 @@
     <Compile Include="Resources\Enums.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Resources\Unmanaged\advapi32.cs" />
-    <Compile Include="Resources\Unmanaged\ntsecapi.cs" />
-    <Compile Include="Resources\Unmanaged\crypt32.cs" />
-    <Compile Include="Resources\Unmanaged\kernel32.cs" />
-    <Compile Include="Resources\Unmanaged\ntdll.cs" />
-    <Compile Include="Resources\Unmanaged\secur32.cs" />
-    <Compile Include="Resources\Unmanaged\vaultcli.cs" />
-    <Compile Include="Resources\Unmanaged\winbase.cs" />
-    <Compile Include="Resources\Unmanaged\wincrypt.cs" />
-    <Compile Include="Resources\Unmanaged\winnt.cs" />
+    <Compile Include="Resources\Unmanaged\Libraries\advapi32.cs" />
+    <Compile Include="Resources\Unmanaged\Headers\ntsecapi.cs" />
+    <Compile Include="Resources\Unmanaged\Libraries\crypt32.cs" />
+    <Compile Include="Resources\Unmanaged\Libraries\kernel32.cs" />
+    <Compile Include="Resources\Unmanaged\Libraries\ntdll.cs" />
+    <Compile Include="Resources\Unmanaged\Libraries\secur32.cs" />
+    <Compile Include="Resources\Unmanaged\Libraries\vaultcli.cs" />
+    <Compile Include="Resources\Unmanaged\Headers\winbase.cs" />
+    <Compile Include="Resources\Unmanaged\Headers\wincrypt.cs" />
+    <Compile Include="Resources\Unmanaged\Headers\winnt.cs" />
     <Compile Include="RestrictedToken.cs" />
     <Compile Include="Resources\Services.cs" />
     <Compile Include="Resources\Structs.cs" />
     <Compile Include="Tokens.cs" />
-    <Compile Include="Resources\Unmanaged\wtsapi32.cs" />
+    <Compile Include="Resources\Unmanaged\Headers\wtsapi32.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="sgKey.snk" />
@@ -125,7 +125,7 @@
     </BootstrapperPackage>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Resources\Unmanaged\netapi32.cs" />
+    <Compile Include="Resources\Unmanaged\Libraries\netapi32.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

@@ -54,6 +54,10 @@ namespace Tokenvator
         private Dictionary<String, UInt32> users;
         private Dictionary<UInt32, String> processes;
 
+        private IntPtr hProcess;
+        private Int32 processID;
+        private String command; 
+
         internal void Run()
         {
             try
@@ -64,13 +68,33 @@ namespace Tokenvator
                 switch (NextItem(ref input))
                 {
                     case "list_privileges":
-                        kernel32.OpenProcessToken(Process.GetCurrentProcess().Handle, Constants.TOKEN_ALL_ACCESS, out currentProcessToken);
+                        if (GetProcessID(input, out processID, out command))
+                        {
+                            hProcess = kernel32.OpenProcess(Constants.PROCESS_QUERY_INFORMATION, false, (UInt32)processID);
+                            Console.WriteLine("[*] Recieved Handle {0}", hProcess.ToInt64());
+                        }
+                        else
+                        {
+                            hProcess = Process.GetCurrentProcess().Handle;
+                        }
+
+                        kernel32.OpenProcessToken(hProcess, Constants.TOKEN_ALL_ACCESS, out currentProcessToken);
                         Tokens.EnumerateTokenPrivileges(currentProcessToken);
                         kernel32.CloseHandle(currentProcessToken);
                         break;
                     case "set_privilege":
-                        kernel32.OpenProcessToken(Process.GetCurrentProcess().Handle, Constants.TOKEN_ALL_ACCESS, out currentProcessToken);
-                        Tokens.SetTokenPrivilege(ref currentProcessToken, input);
+                        if (GetProcessID(input, out processID, out command))
+                        {
+                            hProcess = kernel32.OpenProcess(Constants.PROCESS_QUERY_INFORMATION, false, (UInt32)processID);
+                            Console.WriteLine("[*] Recieved Handle {0}", hProcess.ToInt64());
+                        }
+                        else
+                        {
+                            hProcess = Process.GetCurrentProcess().Handle;
+                        }
+                        
+                        kernel32.OpenProcessToken(hProcess, Constants.TOKEN_ALL_ACCESS, out currentProcessToken);
+                        Tokens.SetTokenPrivilege(ref currentProcessToken, command);
                         kernel32.CloseHandle(currentProcessToken);
                         break;
                     case "list_processes":
@@ -134,20 +158,11 @@ namespace Tokenvator
                         }
                         else
                         {
-                            Console.WriteLine("RevertToSelf failed");
+                            Console.WriteLine("[-] RevertToSelf failed");
                         }
                         break;
                     case "run":
-                        Process process = new Process();
-                        process.StartInfo.FileName = NextItem(ref input);
-                        process.StartInfo.Arguments = input;
-                        process.StartInfo.UseShellExecute = false;
-                        process.StartInfo.RedirectStandardError = true;
-                        process.StartInfo.RedirectStandardOutput = true;
-                        process.Start();
-                        Console.WriteLine(process.StandardOutput.ReadToEnd());
-                        Console.WriteLine(process.StandardError.ReadToEnd());
-                        process.WaitForExit();
+                        Run(input);
                         break;
                     case "exit":
                         System.Environment.Exit(0);
@@ -318,6 +333,23 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         //
         ////////////////////////////////////////////////////////////////////////////////
+        public static void Run(String input)
+        {
+            Process process = new Process();
+            process.StartInfo.FileName = NextItem(ref input);
+            process.StartInfo.Arguments = input;
+            process.StartInfo.UseShellExecute = false;
+            process.StartInfo.RedirectStandardError = true;
+            process.StartInfo.RedirectStandardOutput = true;
+            process.Start();
+            Console.WriteLine(process.StandardOutput.ReadToEnd());
+            Console.WriteLine(process.StandardError.ReadToEnd());
+            process.WaitForExit();
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        //
+        ////////////////////////////////////////////////////////////////////////////////
         public static void Help()
         {
             String[,] options = new String[,] { 
@@ -330,10 +362,11 @@ namespace Tokenvator
                 {"Find_User_Processes", "-", "User"}, {"Find_User_Processes_WMI", "-", "User"},
                 {"List_User_Sessions", "-", "-"},
                 {"WhoAmI", "-", "-"}, {"RevertToSelf", "-", "-"},
+                {"Run", "-", "Command"},
                 {"", "", ""}
             };
 
-            for (Int32 i = 0; i < 15; i++)
+            for (Int32 i = 0; i < 16; i++)
             {
                 Console.WriteLine("{0,-25}{1,-20}{2,-20}", options[i, 0], options[i, 1], options[i, 2]);
             }

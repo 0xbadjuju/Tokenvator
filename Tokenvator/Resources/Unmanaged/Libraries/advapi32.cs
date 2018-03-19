@@ -166,8 +166,8 @@ namespace Tokenvator
         [DllImport("advapi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         public static extern bool LookupAccountSid(
             String lpSystemName,
-            [MarshalAs(UnmanagedType.LPArray)] 
-            Byte[] Sid,
+            //[MarshalAs(UnmanagedType.LPArray)] 
+            IntPtr Sid,
             StringBuilder lpName,
             ref UInt32 cchName,
             StringBuilder ReferencedDomainName,
