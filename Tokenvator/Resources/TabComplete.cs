@@ -125,7 +125,8 @@ namespace Tokenvator
         private void ResetLine()
         {
             Console.SetCursorPosition(context.Length, Console.CursorTop);
-            //Console.Write(new string(' ', Console.WindowWidth));
+            //This is needed for backspaces
+            Console.Write(new String(' ', Console.WindowWidth/2));
             Console.SetCursorPosition(0, Console.CursorTop);
             Console.Write(context);
             Console.SetCursorPosition(context.Length, Console.CursorTop);
