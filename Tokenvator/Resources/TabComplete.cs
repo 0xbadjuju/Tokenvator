@@ -16,7 +16,7 @@ namespace Tokenvator
         private List<String> namespaces;
 
         private List<String> scrollback = new List<string>();
-        private Int32 scollbackPosition = 0;
+        private Int32 scrollbackPosition = 0;
 
         private List<String> options = new List<String>();
 
@@ -62,43 +62,17 @@ namespace Tokenvator
                         }
                         break;
                     case ConsoleKey.UpArrow:
-                        try
+                        if (scrollbackPosition > 0 && scrollback.Count > 0)
                         {
-                            if (scollbackPosition > 0)
-                            {
-                                scollbackPosition--;
-                                stringBuilder.Remove(0, stringBuilder.Length);
-                                stringBuilder.Append(scrollback[scollbackPosition]);
-                                ResetLine();
-                                Console.Write(stringBuilder.ToString());
-                            }
-                        }
-                        catch (Exception)
-                        {
-                            if (scollbackPosition < scrollback.Count)
-                            {
-                                scollbackPosition++;
-                            }
+                            stringBuilder.Remove(0, stringBuilder.Length);
+                            stringBuilder.Append(scrollback[scrollbackPosition--]);
                         }
                         break;
                     case ConsoleKey.DownArrow:
-                        try
+                        if (scrollbackPosition + 1 < scrollback.Count)
                         {
-                            if (scollbackPosition < scrollback.Count)
-                            {
-                                scollbackPosition++;
-                                stringBuilder.Remove(0, stringBuilder.Length);
-                                stringBuilder.Append(scrollback[scollbackPosition]);
-                                ResetLine();
-                                Console.Write(stringBuilder.ToString());
-                            }
-                        }
-                        catch (Exception)
-                        {
-                            if (scollbackPosition > 0)
-                            {
-                                scollbackPosition--;
-                            }
+                            stringBuilder.Remove(0, stringBuilder.Length);
+                            stringBuilder.Append(scrollback[scrollbackPosition++]);
                         }
                         break;
                     case ConsoleKey.LeftArrow:
@@ -150,12 +124,11 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         private void ResetLine()
         {
-            Int32 line = Console.CursorTop;
             Console.SetCursorPosition(context.Length, Console.CursorTop);
-            Console.Write(new string(' ', Console.WindowWidth - context.Length));
-            Console.SetCursorPosition(0, line);
+            //Console.Write(new string(' ', Console.WindowWidth));
+            Console.SetCursorPosition(0, Console.CursorTop);
             Console.Write(context);
-            Console.SetCursorPosition(context.Length, line);
+            Console.SetCursorPosition(context.Length, Console.CursorTop);
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -184,7 +157,7 @@ namespace Tokenvator
             }
             else
             {
-                var key = keyDown.KeyChar;
+                Char key = keyDown.KeyChar;
                 stringBuilder.Append(key);
             }
         }

@@ -26,21 +26,28 @@ namespace Tokenvator
                 {
                     using (System.IO.StreamWriter streamWriter = new System.IO.StreamWriter(memeoryStream))
                     {
-                        streamWriter.Write(String.Join(" ", args));
-                        streamWriter.Flush();
                         using (System.IO.StreamReader streamReader = new System.IO.StreamReader(memeoryStream))
                         {
-                            memeoryStream.Seek(0, System.IO.SeekOrigin.Begin);
-                            Console.SetIn(streamReader);
+                            String[] commands = String.Join(" ", args).Split(new String[] { ";" }, StringSplitOptions.RemoveEmptyEntries);
+                            Int32 offset = 0;
+                            foreach (String command in commands)
+                            {
+                                streamWriter.Write(command.Trim());
+                                streamWriter.Flush();
+                               
+                                memeoryStream.Seek(offset, System.IO.SeekOrigin.Begin);
+                                Console.SetIn(streamReader);
 
-                            new MainLoop().Run();
+                                new MainLoop(false).Run();
+                                offset += command.Trim().Length;
+                            }
                         }
                     }
                 }
                 return;
             }
 
-            MainLoop mainLoop = new MainLoop();
+            MainLoop mainLoop = new MainLoop(true);
             while (true)
             {
                 mainLoop.Run();
@@ -74,10 +81,15 @@ namespace Tokenvator
         private String command;
 
         private TabComplete console;
+        private Boolean activateTabs;
 
-        public MainLoop()
+        public MainLoop(Boolean activateTabs)
         {
-            console = new TabComplete(context, options);
+            this.activateTabs = activateTabs;
+            if (activateTabs)
+            {
+                console = new TabComplete(context, options);
+            }
         }
 
         internal void Run()
@@ -85,7 +97,15 @@ namespace Tokenvator
             try
             {
                 Console.Write(context);
-                String input = console.ReadLine();//Console.ReadLine();
+                String input;
+                if (activateTabs)
+                {
+                    input = console.ReadLine();
+                }
+                else
+                {
+                    input = Console.ReadLine();
+                }
 
                 switch (NextItem(ref input))
                 {
