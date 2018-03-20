@@ -16,6 +16,7 @@ namespace Tokenvator
     class Program
     {
         ////////////////////////////////////////////////////////////////////////////////
+        // Put a loop here for chained commands - split on ;
         ////////////////////////////////////////////////////////////////////////////////
         static void Main(string[] args)
         {
@@ -50,20 +51,41 @@ namespace Tokenvator
 
     class MainLoop
     {
+        private static String context = "(Tokens) > ";
+        private static String[,] options = new String[,] { 
+                {"GetSystem", "Command", "-"}, {"GetTrustedInstaller", "Command", "-"},
+                {"Steal_Token", "Command", "ProcessID"},
+                {"BypassUAC", "ProcessID", "Command"},
+                {"List_Privileges", "ProcessID", "-"}, {"Set_Privileges", "ProcessID", "Privilege"},
+                {"List_Processes", "-", "-"}, {"List_Processes_WMI", "-", "-"},
+                {"Find_User_Processes", "-", "User"}, {"Find_User_Processes_WMI", "-", "User"},
+                {"List_User_Sessions", "-", "-"},
+                {"WhoAmI", "-", "-"}, {"RevertToSelf", "-", "-"},
+                {"Run", "-", "Command"},
+                {"", "", ""}
+            };
+
         private IntPtr currentProcessToken;
         private Dictionary<String, UInt32> users;
         private Dictionary<UInt32, String> processes;
 
         private IntPtr hProcess;
         private Int32 processID;
-        private String command; 
+        private String command;
+
+        private TabComplete console;
+
+        public MainLoop()
+        {
+            console = new TabComplete(context, options);
+        }
 
         internal void Run()
         {
             try
             {
-                Console.Write("(Tokens) > ");
-                String input = Console.ReadLine();
+                Console.Write(context);
+                String input = console.ReadLine();//Console.ReadLine();
 
                 switch (NextItem(ref input))
                 {
@@ -352,21 +374,9 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         public static void Help()
         {
-            String[,] options = new String[,] { 
-                {"Name", "Optional", "Required"}, {"----", "--------", "--------"}, 
-                {"GetSystem", "Command", "-"}, {"GetTrustedInstaller", "Command", "-"},
-                {"Steal_Token", "Command", "ProcessID"},
-                {"BypassUAC", "ProcessID", "Command"},
-                {"List_Privileges", "ProcessID", "-"}, {"Set_Privileges", "ProcessID", "Privilege"},
-                {"List_Processes", "-", "-"}, {"List_Processes_WMI", "-", "-"},
-                {"Find_User_Processes", "-", "User"}, {"Find_User_Processes_WMI", "-", "User"},
-                {"List_User_Sessions", "-", "-"},
-                {"WhoAmI", "-", "-"}, {"RevertToSelf", "-", "-"},
-                {"Run", "-", "Command"},
-                {"", "", ""}
-            };
-
-            for (Int32 i = 0; i < 16; i++)
+            Console.WriteLine("{0,-25}{1,-20}{2,-20}", "Name", "Optional", "Required");
+            Console.WriteLine("{0,-25}{1,-20}{2,-20}", "----", "--------", "--------"); 
+            for (Int32 i = 0; i < options.GetLength(0); i++)
             {
                 Console.WriteLine("{0,-25}{1,-20}{2,-20}", options[i, 0], options[i, 1], options[i, 2]);
             }

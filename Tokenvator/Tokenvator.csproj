@@ -125,6 +125,7 @@
     </BootstrapperPackage>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Resources\TabComplete.cs" />
     <Compile Include="Resources\Unmanaged\Libraries\netapi32.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
