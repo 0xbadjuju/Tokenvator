@@ -143,16 +143,11 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         public Boolean GetSystem(String newProcess)
         {
-            //SecurityIdentifier systemSID = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
+            SecurityIdentifier securityIdentifier = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
+            NTAccount systemAccount = (NTAccount)securityIdentifier.Translate(typeof(NTAccount));
 
-            IntPtr domain;
-            netapi32.NetJoinStatus joinStatus;
-            netapi32.NetGetJoinInformation(null, out domain, out joinStatus);
-            String domainName = Marshal.PtrToStringUni(domain);
-            String LocalSystemNTAccount = String.Format("{0}\\{1}$", domainName, Environment.MachineName);
-
-            Console.WriteLine("[*] Searching for {0}", LocalSystemNTAccount);
-            processes = Enumeration.EnumerateUserProcesses(false, LocalSystemNTAccount);
+            Console.WriteLine("[*] Searching for {0}", systemAccount.ToString());
+            processes = Enumeration.EnumerateUserProcesses(false, systemAccount.ToString());
             
             foreach (UInt32 process in processes.Keys)
             {
@@ -169,14 +164,11 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         public Boolean GetSystem()
         {
-            IntPtr domain;
-            netapi32.NetJoinStatus joinStatus;
-            netapi32.NetGetJoinInformation(null, out domain, out joinStatus);
-            String domainName = Marshal.PtrToStringUni(domain);
-            String LocalSystemNTAccount = String.Format("{0}\\{1}$", domainName, Environment.MachineName);
+            SecurityIdentifier securityIdentifier = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
+            NTAccount systemAccount = (NTAccount)securityIdentifier.Translate(typeof(NTAccount));
 
-            Console.WriteLine("[*] Searching for {0}", LocalSystemNTAccount);
-            processes = Enumeration.EnumerateUserProcesses(false, LocalSystemNTAccount);
+            Console.WriteLine("[*] Searching for {0}", systemAccount.ToString());
+            processes = Enumeration.EnumerateUserProcesses(false, systemAccount.ToString());
             
             foreach (UInt32 process in processes.Keys)
             {
