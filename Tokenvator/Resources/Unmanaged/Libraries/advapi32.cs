@@ -9,7 +9,7 @@ namespace Tokenvator
 {
     class advapi32
     {
-        [DllImport("advapi32.dll")]
+        [DllImport("advapi32.dll", SetLastError=true)]
         public static extern Boolean AdjustTokenPrivileges(
             IntPtr TokenHandle,
             Boolean DisableAllPrivileges,
@@ -19,7 +19,7 @@ namespace Tokenvator
             out UInt32 ReturnLengthInBytes
         );
 
-        [DllImport("advapi32.dll")]
+        [DllImport("advapi32.dll", SetLastError=true)]
         public static extern Boolean AllocateAndInitializeSid(
             ref Structs.SidIdentifierAuthority pIdentifierAuthority,
             byte nSubAuthorityCount,
@@ -40,7 +40,7 @@ namespace Tokenvator
             out IntPtr ptrSid
         );
 
-        [DllImport("advapi32.dll")]
+        [DllImport("advapi32.dll", SetLastError=true)]
         public static extern Boolean CreateProcessAsUser(
             IntPtr hToken,
             IntPtr lpApplicationName,
@@ -55,7 +55,7 @@ namespace Tokenvator
             out Structs._PROCESS_INFORMATION lpProcessInfo
         );
 
-        [DllImport("advapi32.dll")]
+        [DllImport("advapi32.dll", SetLastError=true)]
         public static extern Boolean CreateProcessAsUserW(
             IntPtr hToken,
             IntPtr lpApplicationName,
@@ -70,7 +70,7 @@ namespace Tokenvator
             out Structs._PROCESS_INFORMATION lpProcessInfo
         );  
 
-        [DllImport("advapi32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
+        [DllImport("advapi32.dll", SetLastError=true, CharSet=CharSet.Unicode)]
 		public static extern bool CreateProcessWithLogonW(
 			String userName,
 			String domain,
@@ -85,7 +85,7 @@ namespace Tokenvator
 			out Structs._PROCESS_INFORMATION processInformation
         );
 
-        [DllImport("advapi32.dll")]
+        [DllImport("advapi32.dll", SetLastError=true)]
         public static extern Boolean CreateProcessWithTokenW(
             IntPtr hToken, 
             Enums.LOGON_FLAGS dwLogonFlags, 
@@ -98,7 +98,7 @@ namespace Tokenvator
             out Structs._PROCESS_INFORMATION lpProcessInfo
         );
 
-        [DllImport("advapi32.dll")]
+        [DllImport("advapi32.dll", SetLastError=true)]
         public static extern Boolean CredEnumerateW(
             String Filter,
             Int32 Flags,
@@ -106,12 +106,12 @@ namespace Tokenvator
             out IntPtr Credentials
         );
 
-        [DllImport("advapi32.dll")]
+        [DllImport("advapi32.dll", SetLastError=true)]
         public static extern Boolean CredFree(
             IntPtr Buffer
         );
 
-        [DllImport("advapi32.dll")]
+        [DllImport("advapi32.dll", SetLastError=true)]
         public static extern Boolean CredReadW(
             String target,
             Enums.CRED_TYPE type,
@@ -119,13 +119,13 @@ namespace Tokenvator
             out IntPtr credentialPtr
         );
 
-        [DllImport("advapi32.dll")]
+        [DllImport("advapi32.dll", SetLastError=true)]
         public static extern Boolean CredWriteW(
             ref Structs._CREDENTIAL userCredential,
             UInt32 flags
         );
 
-        [DllImport("advapi32.dll")]
+        [DllImport("advapi32.dll", SetLastError=true)]
         public static extern Boolean DuplicateTokenEx(
             IntPtr hExistingToken,
             UInt32 dwDesiredAccess,
@@ -135,7 +135,7 @@ namespace Tokenvator
             out IntPtr phNewToken
         );
 
-        [DllImport("advapi32.dll")]
+        [DllImport("advapi32.dll", SetLastError=true)]
         public static extern Boolean GetTokenInformation(
             IntPtr TokenHandle,
             Enums._TOKEN_INFORMATION_CLASS TokenInformationClass,
@@ -144,7 +144,7 @@ namespace Tokenvator
             out UInt32 ReturnLength
         );
 
-        [DllImport("advapi32.dll")]
+        [DllImport("advapi32.dll", SetLastError=true)]
         public static extern Boolean GetTokenInformation(
             IntPtr TokenHandle,
             Enums._TOKEN_INFORMATION_CLASS TokenInformationClass,
@@ -153,17 +153,17 @@ namespace Tokenvator
             out UInt32 ReturnLength
         );
 
-        [DllImport("advapi32.dll")]
+        [DllImport("advapi32.dll", SetLastError=true)]
         public static extern Boolean ImpersonateLoggedOnUser(
             IntPtr hToken
         );
 
-        [DllImport("advapi32.dll")]
+        [DllImport("advapi32.dll", SetLastError=true)]
         public static extern Boolean ImpersonateSelf(
             Enums.SECURITY_IMPERSONATION_LEVEL ImpersonationLevel
         );
 
-        [DllImport("advapi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        [DllImport("advapi32.dll", SetLastError=true, CharSet = CharSet.Auto)]
         public static extern bool LookupAccountSid(
             String lpSystemName,
             //[MarshalAs(UnmanagedType.LPArray)] 
@@ -175,7 +175,7 @@ namespace Tokenvator
             out Enums._SID_NAME_USE peUse
         );
 
-        [DllImport("advapi32.dll")]
+        [DllImport("advapi32.dll", SetLastError=true)]
         public static extern Boolean LookupPrivilegeName(
             String lpSystemName,
             IntPtr lpLuid,
@@ -183,21 +183,21 @@ namespace Tokenvator
             ref Int32 cchName
         );
 
-        [DllImport("advapi32.dll")]
+        [DllImport("advapi32.dll", SetLastError=true)]
         public static extern Boolean LookupPrivilegeValue(
             String lpSystemName,
             String lpName,
             ref Structs._LUID luid
         );
 
-        [DllImport("advapi32.dll")]
+        [DllImport("advapi32.dll", SetLastError=true)]
         public static extern Boolean PrivilegeCheck(
             IntPtr ClientToken,
             Structs._PRIVILEGE_SET RequiredPrivileges,
             out IntPtr pfResult
         );
         
-        [DllImport("advapi32.dll", CharSet = CharSet.Auto)]
+        [DllImport("advapi32.dll", SetLastError=true, CharSet = CharSet.Auto)]
         public static extern int RegOpenKeyEx(
             UIntPtr hKey,
             String subKey,
@@ -206,7 +206,7 @@ namespace Tokenvator
             out UIntPtr hkResult
         );
 
-        [DllImport("advapi32.dll", SetLastError = true)]
+        [DllImport("advapi32.dll", SetLastError=true)]
         public static extern uint RegQueryValueEx(
             UIntPtr hKey,
             String lpValueName,
@@ -216,7 +216,7 @@ namespace Tokenvator
             ref Int32 lpcbData
         );
 
-        [DllImport("advapi32.dll")]
+        [DllImport("advapi32.dll", SetLastError=true)]
         public static extern Int32 RegQueryInfoKey(
             UIntPtr hKey,
             StringBuilder lpClass,
@@ -232,7 +232,7 @@ namespace Tokenvator
             IntPtr lpftLastWriteTime
         );
 
-        [DllImport("advapi32.dll")]
+        [DllImport("advapi32.dll", SetLastError=true)]
         public static extern Boolean RevertToSelf();
     }
 } 

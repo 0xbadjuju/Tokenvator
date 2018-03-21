@@ -51,6 +51,16 @@ namespace Tokenvator
             SetTokenPrivilege(ref currentProcessToken, Constants.SE_DEBUG_NAME);
         }
 
+        protected Tokens(Boolean rt)
+        {
+            phNewToken = new IntPtr();
+            hExistingToken = new IntPtr();
+            processes = new Dictionary<UInt32, String>();
+
+            currentProcessToken = new IntPtr();
+            kernel32.OpenProcessToken(Process.GetCurrentProcess().Handle, Constants.TOKEN_ALL_ACCESS, out currentProcessToken);
+        }
+
         public void Dispose()
         {
             kernel32.CloseHandle(phNewToken);
