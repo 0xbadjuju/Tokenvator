@@ -85,10 +85,11 @@ namespace Tokenvator
             {
                 return false;
             }
+            Structs._SECURITY_ATTRIBUTES securityAttributes = new Structs._SECURITY_ATTRIBUTES();
             if (!advapi32.DuplicateTokenEx(
                         hExistingToken,
                         (UInt32)Enums.ACCESS_MASK.MAXIMUM_ALLOWED,
-                        IntPtr.Zero,
+                        ref securityAttributes,
                         Enums._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,
                         Enums.TOKEN_TYPE.TokenPrimary,
                         out phNewToken
@@ -127,10 +128,11 @@ namespace Tokenvator
             {
                 return false;
             }
+            Structs._SECURITY_ATTRIBUTES securityAttributes = new Structs._SECURITY_ATTRIBUTES();
             if (!advapi32.DuplicateTokenEx(
                         hExistingToken,
                         (UInt32)Enums.ACCESS_MASK.MAXIMUM_ALLOWED,
-                        IntPtr.Zero,
+                        ref securityAttributes,
                         Enums._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,
                         Enums.TOKEN_TYPE.TokenPrimary,
                         out phNewToken

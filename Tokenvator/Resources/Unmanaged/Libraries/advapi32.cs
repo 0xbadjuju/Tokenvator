@@ -129,7 +129,7 @@ namespace Tokenvator
         public static extern Boolean DuplicateTokenEx(
             IntPtr hExistingToken,
             UInt32 dwDesiredAccess,
-            IntPtr lpTokenAttributes,
+            ref Structs._SECURITY_ATTRIBUTES lpTokenAttributes,
             Enums._SECURITY_IMPERSONATION_LEVEL ImpersonationLevel,
             Enums.TOKEN_TYPE TokenType,
             out IntPtr phNewToken

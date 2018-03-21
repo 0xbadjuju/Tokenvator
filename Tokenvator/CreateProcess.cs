@@ -11,8 +11,6 @@ namespace Tokenvator
         public static Boolean CreateProcessWithLogonW(IntPtr phNewToken, String name, String arguments)
         {
             Console.WriteLine("[*] CreateProcessWithLogonW");
-            IntPtr lpProcessName = Marshal.StringToHGlobalUni(name);
-            IntPtr lpProcessArgs = Marshal.StringToHGlobalUni(name);
             Structs._STARTUPINFO startupInfo = new Structs._STARTUPINFO();
             startupInfo.cb = (UInt32)Marshal.SizeOf(typeof(Structs._STARTUPINFO));
             Structs._PROCESS_INFORMATION processInformation = new Structs._PROCESS_INFORMATION();
@@ -25,7 +23,7 @@ namespace Tokenvator
                 arguments,
                 0x04000000,
                 IntPtr.Zero,
-                "C:\\Windows\\System32",
+                Environment.SystemDirectory,
                 ref startupInfo,
                 out processInformation
             ))
@@ -33,6 +31,7 @@ namespace Tokenvator
                 Console.WriteLine(" [-] Function CreateProcessWithLogonW failed: " + Marshal.GetLastWin32Error());
                 return false;
             }
+            
             Console.WriteLine(" [+] Created process: " + processInformation.dwProcessId);
             Console.WriteLine(" [+] Created thread: " + processInformation.dwThreadId);
             return true;

