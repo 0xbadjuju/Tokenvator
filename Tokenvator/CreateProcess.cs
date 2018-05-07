@@ -11,11 +11,23 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         public static Boolean CreateProcessWithLogonW(IntPtr phNewToken, String name, String arguments)
         {
-            name = FindFilePath(name);
-            if (String.Empty == name)
+            if (name.Contains("\\"))
             {
-                Console.WriteLine("[-] Unable to find file");
-                return false;
+                name = System.IO.Path.GetFullPath(name);
+                if (!System.IO.File.Exists(name))
+                {
+                    Console.WriteLine("[-] File Not Found");
+                    return false;
+                }
+            }
+            else
+            {
+                name = FindFilePath(name);
+                if (String.Empty == name)
+                {
+                    Console.WriteLine("[-] Unable to find file");
+                    return false;
+                }
             }
 
             Console.WriteLine("[*] CreateProcessWithLogonW");
@@ -50,16 +62,28 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         public static Boolean CreateProcessWithTokenW(IntPtr phNewToken, String name, String arguments)
         {
-            name = FindFilePath(name);
-            if (String.Empty == name)
+            if (name.Contains("\\"))
             {
-                Console.WriteLine("[-] Unable to find file");
-                return false;
+                name = System.IO.Path.GetFullPath(name);
+                if (!System.IO.File.Exists(name))
+                {
+                    Console.WriteLine("[-] File Not Found");
+                    return false;
+                }
+            }
+            else
+            {
+                name = FindFilePath(name);
+                if (String.Empty == name)
+                {
+                    Console.WriteLine("[-] Unable to find file");
+                    return false;
+                }
             }
             
             Console.WriteLine("[*] CreateProcessWithTokenW");
             IntPtr lpProcessName = Marshal.StringToHGlobalUni(name);
-            IntPtr lpProcessArgs = Marshal.StringToHGlobalUni(name);
+            IntPtr lpProcessArgs = Marshal.StringToHGlobalUni(arguments);
             Structs._STARTUPINFO startupInfo = new Structs._STARTUPINFO();
             startupInfo.cb = (UInt32)Marshal.SizeOf(typeof(Structs._STARTUPINFO));
             Structs._PROCESS_INFORMATION processInformation = new Structs._PROCESS_INFORMATION();
