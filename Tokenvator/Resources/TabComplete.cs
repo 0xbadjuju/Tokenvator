@@ -13,9 +13,8 @@ namespace Tokenvator
     class TabComplete
     {        
         private static Assembly assembly = Assembly.GetExecutingAssembly();
-        private List<String> namespaces;
 
-        private List<String> scrollback = new List<string>();
+        private List<String> scrollback = new List<String>();
         private Int32 scrollbackPosition = 0;
 
         private List<String> options = new List<String>();
@@ -50,6 +49,7 @@ namespace Tokenvator
                     case ConsoleKey.Enter:
                         Console.WriteLine();
                         scrollback.Add(stringBuilder.ToString());
+                        scrollbackPosition++;
                         return stringBuilder.ToString();
                     case ConsoleKey.Tab:
                         if (hold == input.Key)
@@ -65,25 +65,38 @@ namespace Tokenvator
                         if (scrollbackPosition > 0 && scrollback.Count > 0)
                         {
                             stringBuilder.Remove(0, stringBuilder.Length);
-                            stringBuilder.Append(scrollback[scrollbackPosition--]);
+                            stringBuilder.Append(scrollback[--scrollbackPosition]);
                         }
                         break;
                     case ConsoleKey.DownArrow:
                         if (scrollbackPosition + 1 < scrollback.Count)
                         {
                             stringBuilder.Remove(0, stringBuilder.Length);
-                            stringBuilder.Append(scrollback[scrollbackPosition++]);
+                            stringBuilder.Append(scrollback[++scrollbackPosition]);
+                        }
+                        else
+                        {
+                            stringBuilder.Remove(0, stringBuilder.Length);
                         }
                         break;
                     case ConsoleKey.LeftArrow:
-                        Console.SetCursorPosition(Console.CursorLeft - 1,Console.CursorTop);
-                        break;
+                        Console.SetCursorPosition(Console.CursorLeft - 1, Console.CursorTop);
+                        continue;
                     case ConsoleKey.RightArrow:
                         Console.SetCursorPosition(Console.CursorLeft + 1, Console.CursorTop);
+                        continue;
+                    case ConsoleKey.Escape:
+                        stringBuilder.Remove(0, stringBuilder.Length);
                         break;
                     default:
-                        KeyInput(stringBuilder, input);
-                        break;
+                        if (KeyInput(stringBuilder, input))
+                        {
+                            break;
+                        }
+                        else
+                        {
+                            continue;
+                        }
                 }
                 ResetLine();
                 Console.Write(stringBuilder.ToString());
@@ -101,12 +114,22 @@ namespace Tokenvator
 
             if (doubleTab)
             {
-                Console.WriteLine("\n" + String.Join(" ", options.ToArray()) + "\n");
+                //Console.WriteLine("\n" + String.Join("\n", options.ToArray()) + "\n");
+                for (Int32 i = 0; i < MainLoop.options.GetLength(0); i++)
+                {
+                    if (String.Equals(input.Trim(), MainLoop.options[i, 0], StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        Console.WriteLine();
+                        Console.WriteLine("{0,-25}{1,-20}{2,-20}", "Name", "Optional", "Required");
+                        Console.WriteLine("{0,-25}{1,-20}{2,-20}", "----", "--------", "--------");
+                        Console.WriteLine("{0,-25}{1,-20}{2,-20}", MainLoop.options[i, 0], MainLoop.options[i, 1], MainLoop.options[i, 2]);
+                        Console.WriteLine();
+                    }
+                }
                 return;
             }
 
             String candidate = options.FirstOrDefault(i => i != input && i.StartsWith(input, true, System.Globalization.CultureInfo.InvariantCulture));
-
 
             if (string.IsNullOrEmpty(candidate))
             {
@@ -135,31 +158,52 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         // Read key input
         ////////////////////////////////////////////////////////////////////////////////
-        private void KeyInput(StringBuilder stringBuilder, ConsoleKeyInfo keyDown)
+        private Boolean KeyInput(StringBuilder stringBuilder, ConsoleKeyInfo keyDown)
         {
-            String input = stringBuilder.ToString();
-            if (ConsoleKey.Backspace == keyDown.Key && 0 <= input.Length)
+            Int32 position = Console.CursorLeft;
+            if (ConsoleKey.Backspace == keyDown.Key)
             {
                 try
                 {
-                    stringBuilder.Remove(stringBuilder.Length - 1, 1);
-                    ResetLine();
-                    input = input.Remove(input.Length - 1);
+                    stringBuilder.Remove(Console.CursorLeft - context.Length - 1, 1);
                 }
-                catch (IndexOutOfRangeException)
-                {
+                catch { }
+                ResetLine();
+                Console.Write(stringBuilder.ToString());
+                Console.SetCursorPosition(position -1, Console.CursorTop);
+                return false;
+            }
 
-                }
-                catch (ArgumentOutOfRangeException)
+            if (ConsoleKey.Delete == keyDown.Key)
+            {
+                try
                 {
-
+                    stringBuilder.Remove(position - context.Length + 1, 1);
                 }
-                Console.Write(input);
+                catch { }
+                ResetLine();
+                Console.Write(stringBuilder.ToString());
+                Console.SetCursorPosition(position, Console.CursorTop);
+                return false;
+            }
+
+            Char key = keyDown.KeyChar;
+            if (Console.CursorLeft < (stringBuilder.Length + context.Length))
+            {
+                try
+                {
+                    stringBuilder.Insert(position - context.Length, key);
+                }
+                catch { }
+                ResetLine();
+                Console.Write(stringBuilder.ToString());
+                Console.SetCursorPosition(position + 1, Console.CursorTop);
+                return false;
             }
             else
             {
-                Char key = keyDown.KeyChar;
                 stringBuilder.Append(key);
+                return true;
             }
         }
     }

@@ -142,6 +142,14 @@ namespace Tokenvator
             public IntPtr TargetAlias;
             public IntPtr UserName;
         }
-        
+
+        public struct _SID
+        {
+            byte Revision;
+            byte SubAuthorityCount;
+            SidIdentifierAuthority IdentifierAuthority;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 1)]
+            ulong[] SubAuthority;
+        }
     }
 }

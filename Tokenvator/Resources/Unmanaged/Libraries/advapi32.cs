@@ -34,6 +34,21 @@ namespace Tokenvator
             out IntPtr pSid
         );
 
+        [DllImport("advapi32.dll", SetLastError = true)]
+        public static extern Boolean AllocateAndInitializeSid(
+            ref Structs.SidIdentifierAuthority pIdentifierAuthority,
+            byte nSubAuthorityCount,
+            Int32 dwSubAuthority0,
+            Int32 dwSubAuthority1,
+            Int32 dwSubAuthority2,
+            Int32 dwSubAuthority3,
+            Int32 dwSubAuthority4,
+            Int32 dwSubAuthority5,
+            Int32 dwSubAuthority6,
+            Int32 dwSubAuthority7,
+            ref Structs._SID pSid
+        );
+
         [DllImport("advapi32", CharSet = CharSet.Auto, SetLastError = true)]
         public static extern bool ConvertSidToStringSid(
             IntPtr pSID,

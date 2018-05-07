@@ -298,7 +298,7 @@ namespace Tokenvator
         // http://www.leeholmes.com/blog/2010/09/24/adjusting-token-privileges-in-powershell/
         // https://support.microsoft.com/en-us/help/131065/how-to-obtain-a-handle-to-any-process-with-sedebugprivilege
         ////////////////////////////////////////////////////////////////////////////////
-        public static void SetTokenPrivilege(ref IntPtr hToken, String privilege, Boolean bEnable)
+        public static void UnSetTokenPrivilege(ref IntPtr hToken, String privilege)
         {
             Console.WriteLine("[*] Adjusting Token Privilege");
             ////////////////////////////////////////////////////////////////////////////////
@@ -328,16 +328,8 @@ namespace Tokenvator
                 return;
             }
 
-            ////////////////////////////////////////////////////////////////////////////////
-            previousState.PrivilegeCount = 1;
-            if (bEnable)
-            {
-                previousState.Privileges.Attributes |= Constants.SE_PRIVILEGE_ENABLED;
-            }
-            else
-            {
-                previousState.Privileges.Attributes ^= (Constants.SE_PRIVILEGE_ENABLED & previousState.Privileges.Attributes);
-            }
+            previousState.Privileges.Attributes ^= (Constants.SE_PRIVILEGE_ENABLED & previousState.Privileges.Attributes);
+
 
             ////////////////////////////////////////////////////////////////////////////////
             Structs._TOKEN_PRIVILEGES kluge = new Structs._TOKEN_PRIVILEGES();

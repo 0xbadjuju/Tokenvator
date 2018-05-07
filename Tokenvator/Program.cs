@@ -59,11 +59,11 @@ namespace Tokenvator
     class MainLoop
     {
         private static String context = "(Tokens) > ";
-        private static String[,] options = new String[,] { 
+        public static String[,] options = new String[,] { 
                 {"GetSystem", "Command", "-"}, {"GetTrustedInstaller", "Command", "-"},
                 {"Steal_Token", "Command", "ProcessID"},
                 {"BypassUAC", "ProcessID", "Command"},
-                {"List_Privileges", "ProcessID", "-"}, {"Set_Privileges", "ProcessID", "Privilege"},
+                {"List_Privileges", "ProcessID", "-"}, {"Set_Privilege", "ProcessID", "Privilege"},
                 {"List_Processes", "-", "-"}, {"List_Processes_WMI", "-", "-"},
                 {"Find_User_Processes", "-", "User"}, {"Find_User_Processes_WMI", "-", "User"},
                 {"List_User_Sessions", "-", "-"},

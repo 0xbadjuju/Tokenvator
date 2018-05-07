@@ -5,7 +5,7 @@ namespace Tokenvator
 {
     class ntdll
     {
-        [DllImport("ntdll.dll")]
+        [DllImport("ntdll.dll", SetLastError = true)]
         internal static extern int NtFilterToken(
             IntPtr TokenHandle,
             UInt32 Flags,
@@ -15,7 +15,7 @@ namespace Tokenvator
             ref IntPtr hToken
         );
 
-        [DllImport("ntdll.dll")]
+        [DllImport("ntdll.dll", SetLastError=true)]
         internal static extern Int32 NtSetInformationToken(
             IntPtr TokenHandle,
             Int32 TokenInformationClass,
