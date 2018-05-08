@@ -141,35 +141,35 @@ namespace Tokenvator
                         break;
                     case "list_processes":
                         users = Enumeration.EnumerateTokens(false);
-                        Console.WriteLine("{0,-30}{1,-30}", "User", "ProcessID");
-                        Console.WriteLine("{0,-30}{1,-30}", "-----", "---------");
+                        Console.WriteLine("{0,-40}{1,-20}{2}", "User", "Process ID", "Process Name");
+                        Console.WriteLine("{0,-40}{1,-20}{2}", "----", "----------", "------------");
                         foreach (String name in users.Keys)
                         {
-                            Console.WriteLine("{0,-30}{1,-30}", name, users[name]);
+                            Console.WriteLine("{0,-40}{1,-20}{2}", name, users[name], Process.GetProcessById((Int32)users[name]).ProcessName);
                         }
                         break;
                     case "list_processes_wmi":
                         users = Enumeration.EnumerateTokensWMI();
-                        Console.WriteLine("{0,-30}{1,-30}", "User", "ProcessID");
-                        Console.WriteLine("{0,-30}{1,-30}", "-----", "---------");
+                        Console.WriteLine("{0,-40}{1,-20}{2}", "User", "Process ID", "Process Name");
+                        Console.WriteLine("{0,-40}{1,-20}{2}", "----", "----------", "------------");
                         foreach (String name in users.Keys)
                         {
-                            Console.WriteLine("{0,-30}{1,-30}", name, users[name]);
+                            Console.WriteLine("{0,-40}{1,-20}{2}", name, users[name], Process.GetProcessById((Int32)users[name]).ProcessName);
                         }
                         break;
                     case "find_user_processes":
                         processes = Enumeration.EnumerateUserProcesses(false, input);
-                        Console.WriteLine("{0,-30}{1,-30}", "ProcessID", "Name");
-                        Console.WriteLine("{0,-30}{1,-30}", "---------", "----");
+                        Console.WriteLine("{0,-30}{1,-30}", "Process ID", "Process Name");
+                        Console.WriteLine("{0,-30}{1,-30}", "----------", "------------");
                         foreach (UInt32 pid in processes.Keys)
-                        {
+                        { 
                             Console.WriteLine("{0,-30}{1,-30}", pid, processes[pid]);
                         }
                         break;
                     case "find_user_processes_wmi":
                         processes = Enumeration.EnumerateUserProcessesWMI(input);
-                        Console.WriteLine("{0,-30}{1,-30}", "ProcessID", "Name");
-                        Console.WriteLine("{0,-30}{1,-30}", "---------", "----");
+                        Console.WriteLine("{0,-30}{1,-30}", "Process ID", "Process Name");
+                        Console.WriteLine("{0,-30}{1,-30}", "----------", "------------");
                         foreach (UInt32 pid in processes.Keys)
                         {
                             Console.WriteLine("{0,-30}{1,-30}", pid, processes[pid]);
