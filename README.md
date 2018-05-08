@@ -109,6 +109,16 @@ C:\> <br/>
   * **Optional Parameters:** -
   * **Examples:** <br/>
   (Tokens) > Run cmd.exe<br/> 
+  
+* #### Compiling <br/>
+* git clone https://github.com/0xbadjuju/Tokenvator.git <br/>
+* Import the project into Visual Studio. The current target framework is .Net 3.5. <br/>
+* Create a key for Strong Name signing: <br/>
+  * cd Tokenvator\Tokenvator\ <br/>
+  * C:\Program Files\Microsoft SDKs\Windows\v7.0\Bin\x64\sn.exe -k sgKey.snk <br/>
+* Build Solution <br>
+
+
 
 ### Author, Contributors, and License
 
