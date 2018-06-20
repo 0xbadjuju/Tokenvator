@@ -40,6 +40,9 @@ namespace Tokenvator
         [DllImport("kernel32.dll", EntryPoint = "ReadProcessMemory")]
         internal static extern Boolean ReadProcessMemory64(IntPtr hProcess, UInt64 lpBaseAddress, IntPtr lpBuffer, UInt64 nSize, ref UInt32 lpNumberOfBytesRead);
 
+        [DllImport("kernel32.dll")]
+        internal static extern UInt32 SearchPath(String lpPath, String lpFileName, String lpExtension, UInt32 nBufferLength, StringBuilder lpBuffer, ref IntPtr lpFilePart);
+
         [DllImport("kernel32.dll", EntryPoint="VirtualQueryEx")]
         internal static extern Int32 VirtualQueryEx32(IntPtr hProcess, IntPtr lpAddress, out Winnt._MEMORY_BASIC_INFORMATION32 lpBuffer, UInt32 dwLength);
 

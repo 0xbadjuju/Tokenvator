@@ -16,123 +16,212 @@ namespace Tokenvator
     class Program
     {
         ////////////////////////////////////////////////////////////////////////////////
+        // Put a loop here for chained commands - split on ;
         ////////////////////////////////////////////////////////////////////////////////
         static void Main(string[] args)
         {
-            IntPtr currentProcessToken;
-            Dictionary<String, UInt32> users;
-            Dictionary<UInt32, String> processes;
+            if (0 < args.Length)
+            {
+                using (System.IO.MemoryStream memeoryStream = new System.IO.MemoryStream())
+                {
+                    using (System.IO.StreamWriter streamWriter = new System.IO.StreamWriter(memeoryStream))
+                    {
+                        using (System.IO.StreamReader streamReader = new System.IO.StreamReader(memeoryStream))
+                        {
+                            String[] commands = String.Join(" ", args).Split(new String[] { ";" }, StringSplitOptions.RemoveEmptyEntries);
+                            Int32 offset = 0;
+                            foreach (String command in commands)
+                            {
+                                streamWriter.Write(command.Trim());
+                                streamWriter.Flush();
+                               
+                                memeoryStream.Seek(offset, System.IO.SeekOrigin.Begin);
+                                Console.SetIn(streamReader);
+
+                                new MainLoop(false).Run();
+                                offset += command.Trim().Length;
+                            }
+                        }
+                    }
+                }
+                return;
+            }
+
+            MainLoop mainLoop = new MainLoop(true);
             while (true)
             {
-                try
-                {
-                    Console.Write("(Tokens) > ");
-                    String input = Console.ReadLine();
-                    
-                    switch(NextItem(ref input))
-                    {
-                        case "list_privileges":
-                            kernel32.OpenProcessToken(Process.GetCurrentProcess().Handle, Constants.TOKEN_ALL_ACCESS, out currentProcessToken);
-                            Tokens.EnumerateTokenPrivileges(currentProcessToken);
-                            kernel32.CloseHandle(currentProcessToken);
-                            break;
-                        case "set_privilege":
-                            kernel32.OpenProcessToken(Process.GetCurrentProcess().Handle, Constants.TOKEN_ALL_ACCESS, out currentProcessToken);
-                            Tokens.SetTokenPrivilege(ref currentProcessToken, input);
-                            kernel32.CloseHandle(currentProcessToken);
-                            break;
-                        case "list_processes":
-                            users = Enumeration.EnumerateTokens(false);
-                            Console.WriteLine("{0,-30}{1,-30}", "User", "ProcessID");
-                            Console.WriteLine("{0,-30}{1,-30}", "-----", "---------");
-                            foreach (String name in users.Keys)
-                            {
-                                Console.WriteLine("{0,-30}{1,-30}", name, users[name]);
-                            }
-                            break;
-                        case "list_processes_wmi":
-                            users = Enumeration.EnumerateTokensWMI();
-                            Console.WriteLine("{0,-30}{1,-30}", "User", "ProcessID");
-                            Console.WriteLine("{0,-30}{1,-30}", "-----", "---------");
-                            foreach (String name in users.Keys)
-                            {
-                                Console.WriteLine("{0,-30}{1,-30}", name, users[name]);
-                            }
-                            break; 
-                        case "find_user_processes":
-                            processes = Enumeration.EnumerateUserProcesses(false, input);
-                            Console.WriteLine("{0,-30}{1,-30}", "ProcessID", "Name");
-                            Console.WriteLine("{0,-30}{1,-30}", "---------", "----");
-                            foreach (UInt32 pid in processes.Keys)
-                            {
-                                Console.WriteLine("{0,-30}{1,-30}", pid, processes[pid]);
-                            }
-                            break;
-                        case "find_user_processes_wmi":
-                            processes = Enumeration.EnumerateUserProcessesWMI(input);
-                            Console.WriteLine("{0,-30}{1,-30}", "ProcessID", "Name");
-                            Console.WriteLine("{0,-30}{1,-30}", "---------", "----");
-                            foreach (UInt32 pid in processes.Keys)
-                            {
-                                Console.WriteLine("{0,-30}{1,-30}", pid, processes[pid]);
-                            }
-                            break;
-                        case "list_user_sessions":
-                            Enumeration.EnumerateInteractiveUserSessions();
-                            break;
-                        case "getsystem":
-                            GetSystem(input);
-                            break;
-                        case "gettrustedinstaller":
-                            GetTrustedInstaller(input);
-                            break;
-                        case "steal_token":
-                            StealToken(input);
-                            break;
-                        case "bypassuac":
-                            BypassUAC(input);
-                            break;
-                        case "whoami":
-                            Console.WriteLine("[*] Operating as {0}", System.Security.Principal.WindowsIdentity.GetCurrent().Name);
-                            break;
-                        case "reverttoself":
-                            if (advapi32.RevertToSelf())
-                            {
-                                Console.WriteLine("[*] Reverted token to {0}", System.Security.Principal.WindowsIdentity.GetCurrent().Name);
-                            }
-                            else
-                            {
-                                Console.WriteLine("RevertToSelf failed");
-                            }
-                            break;
-                        case "run":
-                            Process process = new Process();
-                            process.StartInfo.FileName = NextItem(ref input);
-                            process.StartInfo.Arguments = input;
-                            process.StartInfo.UseShellExecute = false;
-                            process.StartInfo.RedirectStandardError = true;
-                            process.StartInfo.RedirectStandardOutput = true;
-                            process.Start();
-                            Console.WriteLine(process.StandardOutput.ReadToEnd());
-                            Console.WriteLine(process.StandardError.ReadToEnd());
-                            process.WaitForExit();
-                            break;
-                        case "exit":
-                            return;
-                        default:
-                            Help();
-                            break;
-                    }
-                    Console.WriteLine();
-                }
-                catch (Exception error)
-                {
-                    Console.WriteLine(error.ToString());
-                }
-                finally
-                {
+                mainLoop.Run();
+            }
+        }
 
+    }
+
+    class MainLoop
+    {
+        private static String context = "(Tokens) > ";
+        public static String[,] options = new String[,] { 
+                {"GetSystem", "Command", "-"}, {"GetTrustedInstaller", "Command", "-"},
+                {"Steal_Token", "Command", "ProcessID"},
+                {"BypassUAC", "ProcessID", "Command"},
+                {"List_Privileges", "ProcessID", "-"}, {"Set_Privilege", "ProcessID", "Privilege"},
+                {"List_Processes", "-", "-"}, {"List_Processes_WMI", "-", "-"},
+                {"Find_User_Processes", "-", "User"}, {"Find_User_Processes_WMI", "-", "User"},
+                {"List_User_Sessions", "-", "-"},
+                {"WhoAmI", "-", "-"}, {"RevertToSelf", "-", "-"},
+                {"Run", "-", "Command"},
+                {"", "", ""}
+            };
+
+        private IntPtr currentProcessToken;
+        private Dictionary<String, UInt32> users;
+        private Dictionary<UInt32, String> processes;
+
+        private IntPtr hProcess;
+        private Int32 processID;
+        private String command;
+
+        private TabComplete console;
+        private Boolean activateTabs;
+
+        public MainLoop(Boolean activateTabs)
+        {
+            this.activateTabs = activateTabs;
+            if (activateTabs)
+            {
+                console = new TabComplete(context, options);
+            }
+        }
+
+        internal void Run()
+        {
+            try
+            {
+                Console.Write(context);
+                String input;
+                if (activateTabs)
+                {
+                    input = console.ReadLine();
                 }
+                else
+                {
+                    input = Console.ReadLine();
+                }
+
+                switch (NextItem(ref input))
+                {
+                    case "list_privileges":
+                        if (GetProcessID(input, out processID, out command))
+                        {
+                            hProcess = kernel32.OpenProcess(Constants.PROCESS_QUERY_INFORMATION, false, (UInt32)processID);
+                            Console.WriteLine("[*] Recieved Handle {0}", hProcess.ToInt64());
+                        }
+                        else
+                        {
+                            hProcess = Process.GetCurrentProcess().Handle;
+                        }
+
+                        kernel32.OpenProcessToken(hProcess, Constants.TOKEN_ALL_ACCESS, out currentProcessToken);
+                        Tokens.EnumerateTokenPrivileges(currentProcessToken);
+                        kernel32.CloseHandle(currentProcessToken);
+                        break;
+                    case "set_privilege":
+                        if (GetProcessID(input, out processID, out command))
+                        {
+                            hProcess = kernel32.OpenProcess(Constants.PROCESS_QUERY_INFORMATION, false, (UInt32)processID);
+                            Console.WriteLine("[*] Recieved Handle {0}", hProcess.ToInt64());
+                        }
+                        else
+                        {
+                            hProcess = Process.GetCurrentProcess().Handle;
+                        }
+                        
+                        kernel32.OpenProcessToken(hProcess, Constants.TOKEN_ALL_ACCESS, out currentProcessToken);
+                        Tokens.SetTokenPrivilege(ref currentProcessToken, command);
+                        kernel32.CloseHandle(currentProcessToken);
+                        break;
+                    case "list_processes":
+                        users = Enumeration.EnumerateTokens(false);
+                        Console.WriteLine("{0,-40}{1,-20}{2}", "User", "Process ID", "Process Name");
+                        Console.WriteLine("{0,-40}{1,-20}{2}", "----", "----------", "------------");
+                        foreach (String name in users.Keys)
+                        {
+                            Console.WriteLine("{0,-40}{1,-20}{2}", name, users[name], Process.GetProcessById((Int32)users[name]).ProcessName);
+                        }
+                        break;
+                    case "list_processes_wmi":
+                        users = Enumeration.EnumerateTokensWMI();
+                        Console.WriteLine("{0,-40}{1,-20}{2}", "User", "Process ID", "Process Name");
+                        Console.WriteLine("{0,-40}{1,-20}{2}", "----", "----------", "------------");
+                        foreach (String name in users.Keys)
+                        {
+                            Console.WriteLine("{0,-40}{1,-20}{2}", name, users[name], Process.GetProcessById((Int32)users[name]).ProcessName);
+                        }
+                        break;
+                    case "find_user_processes":
+                        processes = Enumeration.EnumerateUserProcesses(false, input);
+                        Console.WriteLine("{0,-30}{1,-30}", "Process ID", "Process Name");
+                        Console.WriteLine("{0,-30}{1,-30}", "----------", "------------");
+                        foreach (UInt32 pid in processes.Keys)
+                        { 
+                            Console.WriteLine("{0,-30}{1,-30}", pid, processes[pid]);
+                        }
+                        break;
+                    case "find_user_processes_wmi":
+                        processes = Enumeration.EnumerateUserProcessesWMI(input);
+                        Console.WriteLine("{0,-30}{1,-30}", "Process ID", "Process Name");
+                        Console.WriteLine("{0,-30}{1,-30}", "----------", "------------");
+                        foreach (UInt32 pid in processes.Keys)
+                        {
+                            Console.WriteLine("{0,-30}{1,-30}", pid, processes[pid]);
+                        }
+                        break;
+                    case "list_user_sessions":
+                        Enumeration.EnumerateInteractiveUserSessions();
+                        break;
+                    case "getsystem":
+                        GetSystem(input);
+                        break;
+                    case "gettrustedinstaller":
+                        GetTrustedInstaller(input);
+                        break;
+                    case "steal_token":
+                        StealToken(input);
+                        break;
+                    case "bypassuac":
+                        BypassUAC(input);
+                        break;
+                    case "whoami":
+                        Console.WriteLine("[*] Operating as {0}", System.Security.Principal.WindowsIdentity.GetCurrent().Name);
+                        break;
+                    case "reverttoself":
+                        if (advapi32.RevertToSelf())
+                        {
+                            Console.WriteLine("[*] Reverted token to {0}", System.Security.Principal.WindowsIdentity.GetCurrent().Name);
+                        }
+                        else
+                        {
+                            Console.WriteLine("[-] RevertToSelf failed");
+                        }
+                        break;
+                    case "run":
+                        Run(input);
+                        break;
+                    case "exit":
+                        System.Environment.Exit(0);
+                        break;
+                    default:
+                        Help();
+                        break;
+                }
+                Console.WriteLine();
+            }
+            catch (Exception error)
+            {
+                Console.WriteLine(error.ToString());
+            }
+            finally
+            {
+
             }
         }
 
@@ -286,22 +375,28 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         //
         ////////////////////////////////////////////////////////////////////////////////
+        public static void Run(String input)
+        {
+            Process process = new Process();
+            process.StartInfo.FileName = NextItem(ref input);
+            process.StartInfo.Arguments = input;
+            process.StartInfo.UseShellExecute = false;
+            process.StartInfo.RedirectStandardError = true;
+            process.StartInfo.RedirectStandardOutput = true;
+            process.Start();
+            Console.WriteLine(process.StandardOutput.ReadToEnd());
+            Console.WriteLine(process.StandardError.ReadToEnd());
+            process.WaitForExit();
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        //
+        ////////////////////////////////////////////////////////////////////////////////
         public static void Help()
         {
-            String[,] options = new String[,] { 
-                {"Name", "Optional", "Required"}, {"----", "--------", "--------"}, 
-                {"GetSystem", "Command", "-"}, {"GetTrustedInstaller", "Command", "-"},
-                {"Steal_Token", "Command", "ProcessID"},
-                {"BypassUAC", "ProcessID", "Command"},
-                {"List_Privileges", "ProcessID", "-"}, {"Set_Privileges", "ProcessID", "Privilege"},
-                {"List_Processes", "-", "-"}, {"List_Processes_WMI", "-", "-"},
-                {"Find_User_Processes", "-", "User"}, {"Find_User_Processes_WMI", "-", "User"},
-                {"List_User_Sessions", "-", "-"},
-                {"WhoAmI", "-", "-"}, {"RevertToSelf", "-", "-"},
-                {"", "", ""}
-            };
-
-            for (Int32 i = 0; i < 15; i++)
+            Console.WriteLine("{0,-25}{1,-20}{2,-20}", "Name", "Optional", "Required");
+            Console.WriteLine("{0,-25}{1,-20}{2,-20}", "----", "--------", "--------"); 
+            for (Int32 i = 0; i < options.GetLength(0); i++)
             {
                 Console.WriteLine("{0,-25}{1,-20}{2,-20}", options[i, 0], options[i, 1], options[i, 2]);
             }

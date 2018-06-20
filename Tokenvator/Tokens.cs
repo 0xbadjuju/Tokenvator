@@ -51,6 +51,16 @@ namespace Tokenvator
             SetTokenPrivilege(ref currentProcessToken, Constants.SE_DEBUG_NAME);
         }
 
+        protected Tokens(Boolean rt)
+        {
+            phNewToken = new IntPtr();
+            hExistingToken = new IntPtr();
+            processes = new Dictionary<UInt32, String>();
+
+            currentProcessToken = new IntPtr();
+            kernel32.OpenProcessToken(Process.GetCurrentProcess().Handle, Constants.TOKEN_ALL_ACCESS, out currentProcessToken);
+        }
+
         public void Dispose()
         {
             kernel32.CloseHandle(phNewToken);
@@ -75,10 +85,11 @@ namespace Tokenvator
             {
                 return false;
             }
+            Structs._SECURITY_ATTRIBUTES securityAttributes = new Structs._SECURITY_ATTRIBUTES();
             if (!advapi32.DuplicateTokenEx(
                         hExistingToken,
                         (UInt32)Enums.ACCESS_MASK.MAXIMUM_ALLOWED,
-                        IntPtr.Zero,
+                        ref securityAttributes,
                         Enums._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,
                         Enums.TOKEN_TYPE.TokenPrimary,
                         out phNewToken
@@ -117,10 +128,11 @@ namespace Tokenvator
             {
                 return false;
             }
+            Structs._SECURITY_ATTRIBUTES securityAttributes = new Structs._SECURITY_ATTRIBUTES();
             if (!advapi32.DuplicateTokenEx(
                         hExistingToken,
                         (UInt32)Enums.ACCESS_MASK.MAXIMUM_ALLOWED,
-                        IntPtr.Zero,
+                        ref securityAttributes,
                         Enums._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,
                         Enums.TOKEN_TYPE.TokenPrimary,
                         out phNewToken
@@ -143,16 +155,11 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         public Boolean GetSystem(String newProcess)
         {
-            //SecurityIdentifier systemSID = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
+            SecurityIdentifier securityIdentifier = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
+            NTAccount systemAccount = (NTAccount)securityIdentifier.Translate(typeof(NTAccount));
 
-            IntPtr domain;
-            netapi32.NetJoinStatus joinStatus;
-            netapi32.NetGetJoinInformation(null, out domain, out joinStatus);
-            String domainName = Marshal.PtrToStringUni(domain);
-            String LocalSystemNTAccount = String.Format("{0}\\{1}$", domainName, Environment.MachineName);
-
-            Console.WriteLine("[*] Searching for {0}", LocalSystemNTAccount);
-            processes = Enumeration.EnumerateUserProcesses(false, LocalSystemNTAccount);
+            Console.WriteLine("[*] Searching for {0}", systemAccount.ToString());
+            processes = Enumeration.EnumerateUserProcesses(false, systemAccount.ToString());
             
             foreach (UInt32 process in processes.Keys)
             {
@@ -169,14 +176,11 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         public Boolean GetSystem()
         {
-            IntPtr domain;
-            netapi32.NetJoinStatus joinStatus;
-            netapi32.NetGetJoinInformation(null, out domain, out joinStatus);
-            String domainName = Marshal.PtrToStringUni(domain);
-            String LocalSystemNTAccount = String.Format("{0}\\{1}$", domainName, Environment.MachineName);
+            SecurityIdentifier securityIdentifier = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
+            NTAccount systemAccount = (NTAccount)securityIdentifier.Translate(typeof(NTAccount));
 
-            Console.WriteLine("[*] Searching for {0}", LocalSystemNTAccount);
-            processes = Enumeration.EnumerateUserProcesses(false, LocalSystemNTAccount);
+            Console.WriteLine("[*] Searching for {0}", systemAccount.ToString());
+            processes = Enumeration.EnumerateUserProcesses(false, systemAccount.ToString());
             
             foreach (UInt32 process in processes.Keys)
             {
@@ -294,7 +298,7 @@ namespace Tokenvator
         // http://www.leeholmes.com/blog/2010/09/24/adjusting-token-privileges-in-powershell/
         // https://support.microsoft.com/en-us/help/131065/how-to-obtain-a-handle-to-any-process-with-sedebugprivilege
         ////////////////////////////////////////////////////////////////////////////////
-        public static void SetTokenPrivilege(ref IntPtr hToken, String privilege, Boolean bEnable)
+        public static void UnSetTokenPrivilege(ref IntPtr hToken, String privilege)
         {
             Console.WriteLine("[*] Adjusting Token Privilege");
             ////////////////////////////////////////////////////////////////////////////////
@@ -324,16 +328,8 @@ namespace Tokenvator
                 return;
             }
 
-            ////////////////////////////////////////////////////////////////////////////////
-            previousState.PrivilegeCount = 1;
-            if (bEnable)
-            {
-                previousState.Privileges.Attributes |= Constants.SE_PRIVILEGE_ENABLED;
-            }
-            else
-            {
-                previousState.Privileges.Attributes ^= (Constants.SE_PRIVILEGE_ENABLED & previousState.Privileges.Attributes);
-            }
+            previousState.Privileges.Attributes ^= (Constants.SE_PRIVILEGE_ENABLED & previousState.Privileges.Attributes);
+
 
             ////////////////////////////////////////////////////////////////////////////////
             Structs._TOKEN_PRIVILEGES kluge = new Structs._TOKEN_PRIVILEGES();

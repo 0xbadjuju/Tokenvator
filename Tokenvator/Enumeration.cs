@@ -69,10 +69,17 @@ namespace Tokenvator
             }
 
             ntsecapi._SECURITY_LOGON_SESSION_DATA securityLogonSessionData = (ntsecapi._SECURITY_LOGON_SESSION_DATA)Marshal.PtrToStructure(ppLogonSessionData, typeof(ntsecapi._SECURITY_LOGON_SESSION_DATA));
-            if (IntPtr.Zero == securityLogonSessionData.Sid)
+            if (IntPtr.Zero == securityLogonSessionData.Sid || IntPtr.Zero == securityLogonSessionData.UserName.Buffer || IntPtr.Zero == securityLogonSessionData.LogonDomain.Buffer)
             {
                 return false;
             }
+
+            if (Environment.MachineName+"$" == Marshal.PtrToStringUni(securityLogonSessionData.UserName.Buffer) && ConvertSidToName(securityLogonSessionData.Sid, ref userName))
+            {
+                return true;
+
+            }
+
             userName = String.Format("{0}\\{1}", Marshal.PtrToStringUni(securityLogonSessionData.LogonDomain.Buffer), Marshal.PtrToStringUni(securityLogonSessionData.UserName.Buffer));
             return true;
         }
@@ -80,27 +87,8 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         // Converts a SID Byte array to User Name
         ////////////////////////////////////////////////////////////////////////////////
-        public static Boolean ConvertSidToName(Byte[] sid, ref String userName)
+        public static Boolean ConvertSidToName(IntPtr sid, ref String userName)
         {
-            /*
-             * Byte[] sid = new Byte[0];
-            Structs._TOKEN_USER tokenUser = new Structs._TOKEN_USER();
-            tokenUser = (Structs._TOKEN_USER)Marshal.PtrToStructure(tokenInformation, typeof(Structs._TOKEN_USER));
-            Marshal.FreeHGlobal(tokenInformation);
-            // Access violation happens when this removed - no idea why
-            IntPtr ptrSid;
-
-            if (IntPtr.Zero == tokenUser.User.Sid)
-            {
-                Console.WriteLine("ConvertSidToString");
-                return false;
-            }
-            advapi32.ConvertSidToStringSid(tokenUser.User.Sid, out ptrSid);
-            sid = new Byte[dwLength - sizeof(UInt32)];
-            Marshal.Copy(tokenUser.User.Sid, sid, 0, sid.Length);
-            return true;
-            */
-
             StringBuilder lpName = new StringBuilder();
             UInt32 cchName = (UInt32)lpName.Capacity;
             StringBuilder lpReferencedDomainName = new StringBuilder();
@@ -114,12 +102,10 @@ namespace Tokenvator
             {
                 return false;
             }
-
             if (String.IsNullOrEmpty(lpName.ToString()) || String.IsNullOrEmpty(lpReferencedDomainName.ToString()))
             {
                 return false;
             }
-
             userName = lpReferencedDomainName.ToString() + "\\" + lpName.ToString();
             return true;
         }
@@ -154,6 +140,12 @@ namespace Tokenvator
 
                 UInt32 dwLength = 0;
                 Winnt._TOKEN_STATISTICS tokenStatistics = new Winnt._TOKEN_STATISTICS();
+                //Split up impersonation and primary tokens
+                if (Winnt.TOKEN_TYPE.TokenImpersonation == tokenStatistics.TokenType)
+                {
+                    continue;
+                }
+
                 if (!advapi32.GetTokenInformation(hToken, Enums._TOKEN_INFORMATION_CLASS.TokenStatistics, ref tokenStatistics, dwLength, out dwLength))
                 {
                     if (!advapi32.GetTokenInformation(hToken, Enums._TOKEN_INFORMATION_CLASS.TokenStatistics, ref tokenStatistics, dwLength, out dwLength))
@@ -253,12 +245,18 @@ namespace Tokenvator
                 }
                 kernel32.CloseHandle(hToken);
 
+                if (Winnt.TOKEN_TYPE.TokenImpersonation == tokenStatistics.TokenType)
+                {
+                    continue;
+                }
+
+                
                 String userName = String.Empty;
                 if (!ConvertTokenStatisticsToUsername(tokenStatistics, ref userName))
                 {
                     continue;
                 }
-                if (userName == userAccount)
+                if (userName.ToUpper() == userAccount.ToUpper())
                 {
                     users.Add((UInt32)p.Id, p.ProcessName);
                     if (findElevation)
