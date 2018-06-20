@@ -165,12 +165,18 @@ namespace Tokenvator
             {
                 try
                 {
-                    stringBuilder.Remove(Console.CursorLeft - context.Length - 1, 1);
+                    if (Console.CursorLeft - context.Length - 1 >= 0)
+                    {
+                        stringBuilder.Remove(Console.CursorLeft - context.Length - 1, 1);
+                    }
                 }
                 catch { }
                 ResetLine();
                 Console.Write(stringBuilder.ToString());
-                Console.SetCursorPosition(position -1, Console.CursorTop);
+                if (Console.CursorLeft - context.Length - 1 >= 0)
+                {
+                    Console.SetCursorPosition(position - 1, Console.CursorTop);
+                }
                 return false;
             }
 
