@@ -1,5 +1,0 @@
-C:\Users\0xbadjuju\Documents\GitHub\Tokenvator\Tokenvator\bin\Release\Tokenvator.exe
-C:\Users\0xbadjuju\Documents\GitHub\Tokenvator\Tokenvator\bin\Release\Tokenvator.pdb
-C:\Users\0xbadjuju\Documents\GitHub\Tokenvator\Tokenvator\obj\Release\ResolveAssemblyReference.cache
-C:\Users\0xbadjuju\Documents\GitHub\Tokenvator\Tokenvator\obj\Release\Tokenvator.exe
-C:\Users\0xbadjuju\Documents\GitHub\Tokenvator\Tokenvator\obj\Release\Tokenvator.pdb
