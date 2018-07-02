@@ -14,7 +14,8 @@
     <FileAlignment>512</FileAlignment>
     <SignManifests>false</SignManifests>
     <SignAssembly>true</SignAssembly>
-    <AssemblyOriginatorKeyFile>sgKey.snk</AssemblyOriginatorKeyFile>
+    <AssemblyOriginatorKeyFile>
+    </AssemblyOriginatorKeyFile>
     <PublishUrl>publish\</PublishUrl>
     <Install>true</Install>
     <InstallFrom>Disk</InstallFrom>
@@ -88,9 +89,6 @@
     <Compile Include="Resources\Structs.cs" />
     <Compile Include="Tokens.cs" />
     <Compile Include="Resources\Unmanaged\Headers\wtsapi32.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="sgKey.snk" />
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include="Microsoft.Net.Client.3.5">
