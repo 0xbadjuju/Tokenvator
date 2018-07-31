@@ -80,7 +80,6 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Resources\Constants.cs" />
     <Compile Include="Resources\PSExec.cs" />
-    <Compile Include="Resources\Unmanaged\Libraries\fileapi.cs" />
     <Compile Include="Resources\Unmanaged\Headers\Minidumpapiset.cs" />
     <Compile Include="Resources\Unmanaged\Headers\MinWinBase.cs" />
     <Compile Include="Resources\Unmanaged\Headers\Rpcdce.cs" />

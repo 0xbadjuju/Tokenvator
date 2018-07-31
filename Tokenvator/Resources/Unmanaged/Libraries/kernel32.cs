@@ -82,6 +82,9 @@ namespace Unmanaged.Libraries
         public static extern IntPtr CreateToolhelp32Snapshot(UInt32 dwFlags, UInt32 th32ProcessID);
 
         [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern Boolean DisconnectNamedPipe(IntPtr hNamedPipe);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
         public static extern IntPtr GetCurrentThread();
 
         [DllImport("kernel32.dll", SetLastError = true)]
@@ -137,6 +140,33 @@ namespace Unmanaged.Libraries
 
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern Boolean OpenThreadToken(IntPtr ThreadHandle, UInt32 DesiredAccess, Boolean OpenAsSelf, ref IntPtr TokenHandle);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern Boolean ReadFile(
+            IntPtr hFile,
+            Byte[] lpBuffer,
+            UInt32 nNumberOfBytesToRead,
+            ref UInt32 lpNumberOfBytesRead,
+            IntPtr lpOverlapped
+        );
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern Boolean ReadFile(
+            IntPtr hFile,
+            Byte[] lpBuffer,
+            UInt32 nNumberOfBytesToRead,
+            ref UInt32 lpNumberOfBytesRead,
+            ref MinWinBase._OVERLAPPED lpOverlapped
+        );
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern Boolean ReadFile(
+            IntPtr hFile,
+            Byte[] lpBuffer,
+            UInt32 nNumberOfBytesToRead,
+            ref UInt32 lpNumberOfBytesRead,
+            ref System.Threading.NativeOverlapped lpOverlapped
+        );
 
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern Boolean ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, IntPtr lpBuffer, UInt32 nSize, ref UInt32 lpNumberOfBytesRead);
