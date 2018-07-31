@@ -2,9 +2,8 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Management;
-using System.Management.Instrumentation;
-using System.Text;
+
+using Unmanaged.Libraries;
 
 
 
@@ -186,6 +185,9 @@ namespace Tokenvator
                         break;
                     case "steal_token":
                         StealToken(input);
+                        break;
+                    case "steal_pipe_token":
+                        StealPipeToken(input);
                         break;
                     case "bypassuac":
                         BypassUAC(input);
@@ -369,6 +371,21 @@ namespace Tokenvator
                         t.StartProcessAsUser(processID, command);
                     }
                 }
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        //
+        ////////////////////////////////////////////////////////////////////////////////
+        public static void StealPipeToken(String input)
+        {
+            if (input.Contains(@"\\.\pipe\"))
+            {
+                NamedPipes.GetPipeToken(input);
+            }
+            else if (input.Contains("SYSTEM"))
+            {
+                NamedPipes.GetSystem();
             }
         }
 

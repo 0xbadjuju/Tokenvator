@@ -2,6 +2,9 @@
 using System.Runtime.InteropServices;
 using System.Text;
 
+using Unmanaged.Headers;
+using Unmanaged.Libraries;
+
 namespace Tokenvator
 {
     class CreateProcess
@@ -31,9 +34,9 @@ namespace Tokenvator
             }
 
             Console.WriteLine("[*] CreateProcessWithLogonW");
-            Structs._STARTUPINFO startupInfo = new Structs._STARTUPINFO();
-            startupInfo.cb = (UInt32)Marshal.SizeOf(typeof(Structs._STARTUPINFO));
-            Structs._PROCESS_INFORMATION processInformation = new Structs._PROCESS_INFORMATION();
+            Winbase._STARTUPINFO startupInfo = new Winbase._STARTUPINFO();
+            startupInfo.cb = (UInt32)Marshal.SizeOf(typeof(Winbase._STARTUPINFO));
+            Winbase._PROCESS_INFORMATION processInformation = new Winbase._PROCESS_INFORMATION();
             if (!advapi32.CreateProcessWithLogonW(
                 "i",
                 "j",
@@ -84,15 +87,15 @@ namespace Tokenvator
             Console.WriteLine("[*] CreateProcessWithTokenW");
             IntPtr lpProcessName = Marshal.StringToHGlobalUni(name);
             IntPtr lpProcessArgs = Marshal.StringToHGlobalUni(arguments);
-            Structs._STARTUPINFO startupInfo = new Structs._STARTUPINFO();
-            startupInfo.cb = (UInt32)Marshal.SizeOf(typeof(Structs._STARTUPINFO));
-            Structs._PROCESS_INFORMATION processInformation = new Structs._PROCESS_INFORMATION();
+            Winbase._STARTUPINFO startupInfo = new Winbase._STARTUPINFO();
+            startupInfo.cb = (UInt32)Marshal.SizeOf(typeof(Winbase._STARTUPINFO));
+            Winbase._PROCESS_INFORMATION processInformation = new Winbase._PROCESS_INFORMATION();
             if (!advapi32.CreateProcessWithTokenW(
                 phNewToken,
-                Enums.LOGON_FLAGS.NetCredentialsOnly,
+                advapi32.LOGON_FLAGS.NetCredentialsOnly,
                 lpProcessName,
                 lpProcessArgs,
-                Enums.CREATION_FLAGS.NONE,
+                Winbase.CREATION_FLAGS.NONE,
                 IntPtr.Zero,
                 IntPtr.Zero,
                 ref startupInfo,

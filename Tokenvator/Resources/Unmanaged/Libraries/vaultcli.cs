@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 
-namespace Tokenvator
+namespace Unmanaged.Libraries
 {
-    class vaultcli
+    sealed class vaultcli
     {
-        [DllImport("vaultcli.dll", CharSet = CharSet.Auto)]
+        [DllImport("vaultcli.dll", SetLastError = true, CharSet = CharSet.Auto)]
         public static extern Boolean VaultEnumerateItems(
             IntPtr hVault,
             Int32 unknown,
@@ -13,14 +13,14 @@ namespace Tokenvator
             out IntPtr ppVaultGuids
         );
 
-        [DllImport("vaultcli.dll", CharSet = CharSet.Auto)]
+        [DllImport("vaultcli.dll", SetLastError = true, CharSet = CharSet.Auto)]
         public static extern Boolean VaultEnumerateVaults(
             Int32 unknown,
             out Int32 dwVaults,
             out IntPtr ppVaultGuids
         );
 
-        [DllImport("vaultcli.dll", CharSet = CharSet.Auto, EntryPoint="VaultGetItem")]
+        [DllImport("vaultcli.dll", SetLastError = true, CharSet = CharSet.Auto, EntryPoint = "VaultGetItem")]
         public static extern Boolean VaultGetItem7(
             IntPtr hVault,
             ref Guid guid,
@@ -32,7 +32,7 @@ namespace Tokenvator
             out IntPtr hitem
         );
 
-        [DllImport("vaultcli.dll", CharSet = CharSet.Auto, EntryPoint="VaultGetItem")]
+        [DllImport("vaultcli.dll", SetLastError = true, CharSet = CharSet.Auto, EntryPoint = "VaultGetItem")]
         public static extern Boolean VaultGetItem8(
             IntPtr hVault,
             ref Guid guid,
@@ -45,7 +45,7 @@ namespace Tokenvator
             out IntPtr hitem
         );
 
-        [DllImport("vaultcli.dll", CharSet = CharSet.Auto)]
+        [DllImport("vaultcli.dll", SetLastError = true, CharSet = CharSet.Auto)]
         public static extern Boolean VaultOpenVault(
             ref Guid guid,
             Int32 dwVaults,
