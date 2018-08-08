@@ -71,6 +71,11 @@ namespace Unmanaged.Libraries
             out IntPtr pBytesReturned);
 
         [DllImport("wtsapi32.dll", SetLastError = true)]
+        public static extern bool WTSQueryUserToken(
+            UInt32 SessionId,
+            ref IntPtr phToken);
+
+        [DllImport("wtsapi32.dll", SetLastError = true)]
         public static extern int WTSEnumerateSessions(
             IntPtr hServer,
             Int32 Reserved,

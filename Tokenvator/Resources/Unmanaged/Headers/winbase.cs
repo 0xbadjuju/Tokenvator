@@ -66,6 +66,13 @@ namespace Unmanaged.Headers
             PIPE_REJECT_REMOTE_CLIENTS = 0x00000008
         }
 
+        [Flags]
+        public enum LOGON_FLAGS
+        {
+            LOGON_WITH_PROFILE = 0x00000001,
+            LOGON_NETCREDENTIALS_ONLY = 0x00000002
+        }
+
         //https://msdn.microsoft.com/en-us/library/windows/desktop/ms684873(v=vs.85).aspx
         [StructLayout(LayoutKind.Sequential)]
         public struct _PROCESS_INFORMATION

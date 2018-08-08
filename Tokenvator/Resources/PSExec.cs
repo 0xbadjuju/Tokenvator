@@ -142,7 +142,7 @@ namespace Tokenvator
                     return false;
                 }
             }
-            Console.WriteLine("[+] Service Started");
+            Console.WriteLine("[+] Started Service");
             return true;
         }
 
@@ -164,7 +164,7 @@ namespace Tokenvator
                     return false;
                 }
             }
-            Console.WriteLine("[+] Service Stopped");
+            Console.WriteLine("[+] Stopped Service");
             return true;
         }
 

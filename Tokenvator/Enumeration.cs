@@ -77,7 +77,7 @@ namespace Tokenvator
                 return false;
             }
 
-            if (Environment.MachineName+"$" == Marshal.PtrToStringUni(securityLogonSessionData.UserName.Buffer) && ConvertSidToName(securityLogonSessionData.Sid, ref userName))
+            if (Environment.MachineName+"$" == Marshal.PtrToStringUni(securityLogonSessionData.UserName.Buffer) && ConvertSidToName(securityLogonSessionData.Sid, out userName))
             {
                 return true;
 
@@ -90,27 +90,45 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         // Converts a SID Byte array to User Name
         ////////////////////////////////////////////////////////////////////////////////
-        public static Boolean ConvertSidToName(IntPtr sid, ref String userName)
+        public static Boolean ConvertSidToName(IntPtr sid, out String userName)
         {
+            StringBuilder sbUserName = new StringBuilder();
+
             StringBuilder lpName = new StringBuilder();
             UInt32 cchName = (UInt32)lpName.Capacity;
             StringBuilder lpReferencedDomainName = new StringBuilder();
             UInt32 cchReferencedDomainName = (UInt32)lpReferencedDomainName.Capacity;
-            Winnt._SID_NAME_USE sidNameUser;
-            advapi32.LookupAccountSid(String.Empty, sid, lpName, ref cchName, lpReferencedDomainName, ref cchReferencedDomainName, out sidNameUser);
+            advapi32.LookupAccountSid(String.Empty, sid, lpName, ref cchName, lpReferencedDomainName, ref cchReferencedDomainName, out Winnt._SID_NAME_USE sidNameUse);
 
-            lpName.EnsureCapacity((Int32)cchName);
-            lpReferencedDomainName.EnsureCapacity((Int32)cchReferencedDomainName);
-            if (advapi32.LookupAccountSid(String.Empty, sid, lpName, ref cchName, lpReferencedDomainName, ref cchReferencedDomainName, out sidNameUser))
+            lpName.EnsureCapacity((Int32)cchName + 1);
+            lpReferencedDomainName.EnsureCapacity((Int32)cchReferencedDomainName + 1);
+            advapi32.LookupAccountSid(String.Empty, sid, lpName, ref cchName, lpReferencedDomainName, ref cchReferencedDomainName, out sidNameUse);
+
+            if (lpReferencedDomainName.Length > 0)
+            {
+                sbUserName.Append(lpReferencedDomainName);
+            }
+
+            if (sbUserName.Length > 0)
+            {
+                sbUserName.Append(@"\");
+            }
+
+            if (lpName.Length > 0)
+            {
+                sbUserName.Append(lpName);
+            }
+
+            userName = sbUserName.ToString();
+
+            if (String.IsNullOrEmpty(userName))
             {
                 return false;
             }
-            if (String.IsNullOrEmpty(lpName.ToString()) || String.IsNullOrEmpty(lpReferencedDomainName.ToString()))
+            else
             {
-                return false;
+                return true;
             }
-            userName = lpReferencedDomainName.ToString() + "\\" + lpName.ToString();
-            return true;
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -144,7 +162,7 @@ namespace Tokenvator
                 UInt32 dwLength = 0;
                 Winnt._TOKEN_STATISTICS tokenStatistics = new Winnt._TOKEN_STATISTICS();
                 //Split up impersonation and primary tokens
-                if (Winnt.TOKEN_TYPE.TokenImpersonation == tokenStatistics.TokenType)
+                if (Winnt._TOKEN_TYPE.TokenImpersonation == tokenStatistics.TokenType)
                 {
                     continue;
                 }
@@ -248,7 +266,7 @@ namespace Tokenvator
                 }
                 kernel32.CloseHandle(hToken);
 
-                if (Winnt.TOKEN_TYPE.TokenImpersonation == tokenStatistics.TokenType)
+                if (Winnt._TOKEN_TYPE.TokenImpersonation == tokenStatistics.TokenType)
                 {
                     continue;
                 }

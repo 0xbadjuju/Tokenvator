@@ -36,6 +36,26 @@ namespace Unmanaged.Libraries
         );
 
         [DllImport("ntdll.dll", SetLastError = true)]
+        public static extern UInt32 NtDuplicateToken(
+            IntPtr ExistingTokenHandle,
+            Winnt.ACCESS_MASK DesiredAccess,
+            wudfwdm._OBJECT_ATTRIBUTES ObjectAttributes,
+            Boolean EffectiveOnly,
+            Winnt._TOKEN_TYPE TokenType,
+            ref IntPtr NewTokenHandle
+        );
+
+        [DllImport("ntdll.dll", SetLastError = true)]
+        public static extern UInt32 NtDuplicateToken(
+            IntPtr ExistingTokenHandle,
+            UInt32 DesiredAccess,
+            IntPtr ObjectAttributes,
+            Boolean EffectiveOnly,
+            Winnt._TOKEN_TYPE TokenType,
+            ref IntPtr NewTokenHandle
+        );
+
+        [DllImport("ntdll.dll", SetLastError = true)]
         public static extern UInt32 NtFilterToken(
             IntPtr TokenHandle,
             UInt32 Flags,
@@ -72,6 +92,11 @@ namespace Unmanaged.Libraries
         public static extern UInt32 NtUnmapViewOfSection(
             IntPtr hProcess,
             IntPtr baseAddress
+        );
+
+        [DllImport("ntdll.dll", SetLastError = true)]
+        public static extern UInt32 RtlNtStatusToDosError(
+            UInt32 Status
         );
 
         [Flags]

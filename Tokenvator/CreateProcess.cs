@@ -37,21 +37,18 @@ namespace Tokenvator
             Winbase._STARTUPINFO startupInfo = new Winbase._STARTUPINFO();
             startupInfo.cb = (UInt32)Marshal.SizeOf(typeof(Winbase._STARTUPINFO));
             Winbase._PROCESS_INFORMATION processInformation = new Winbase._PROCESS_INFORMATION();
-            if (!advapi32.CreateProcessWithLogonW(
-                "i",
-                "j",
-                "k",
-                0x00000002,
+            if (!advapi32.CreateProcessWithLogonW("i","j","k",
+                Winbase.LOGON_FLAGS.LOGON_NETCREDENTIALS_ONLY,
                 name,
                 arguments,
-                0x04000000,
+                Winbase.CREATION_FLAGS.CREATE_DEFAULT_ERROR_MODE,
                 IntPtr.Zero,
                 Environment.SystemDirectory,
                 ref startupInfo,
                 out processInformation
             ))
             {
-                Console.WriteLine(" [-] Function CreateProcessWithLogonW failed: " + Marshal.GetLastWin32Error());
+                Tokens.GetWin32Error("CreateProcessWithLogonW");
                 return false;
             }
             
@@ -85,24 +82,22 @@ namespace Tokenvator
             }
             
             Console.WriteLine("[*] CreateProcessWithTokenW");
-            IntPtr lpProcessName = Marshal.StringToHGlobalUni(name);
-            IntPtr lpProcessArgs = Marshal.StringToHGlobalUni(arguments);
             Winbase._STARTUPINFO startupInfo = new Winbase._STARTUPINFO();
             startupInfo.cb = (UInt32)Marshal.SizeOf(typeof(Winbase._STARTUPINFO));
             Winbase._PROCESS_INFORMATION processInformation = new Winbase._PROCESS_INFORMATION();
             if (!advapi32.CreateProcessWithTokenW(
                 phNewToken,
-                advapi32.LOGON_FLAGS.NetCredentialsOnly,
-                lpProcessName,
-                lpProcessArgs,
+                Winbase.LOGON_FLAGS.LOGON_NETCREDENTIALS_ONLY,
+                name,
+                arguments,
                 Winbase.CREATION_FLAGS.NONE,
                 IntPtr.Zero,
-                IntPtr.Zero,
+                Environment.CurrentDirectory,
                 ref startupInfo,
                 out processInformation
             ))
             {
-                Console.WriteLine(" [-] Function CreateProcessWithTokenW failed: " + Marshal.GetLastWin32Error());
+                Tokens.GetWin32Error("CreateProcessWithTokenW");
                 return false;
             }
             Console.WriteLine(" [+] Created process: " + processInformation.dwProcessId);

@@ -8,6 +8,8 @@ using QWORD = System.UInt64;
 using ULONGLONG = System.UInt64;
 using LARGE_INTEGER = System.UInt64;
 
+using PSID = System.IntPtr;
+
 using PVOID = System.IntPtr;
 using LPVOID = System.IntPtr;
 using DWORD_PTR = System.IntPtr;
@@ -17,7 +19,11 @@ namespace Unmanaged.Headers
 {
     sealed class Winnt
     {
+        private const DWORD ANYSIZE_ARRAY = 1;
+
         private const DWORD EXCEPTION_MAXIMUM_PARAMETERS = 15;
+
+        public const DWORD PRIVILEGE_SET_ALL_NECESSARY = 1;
 
         [Flags]
         // https://msdn.microsoft.com/en-us/library/windows/desktop/aa366786(v=vs.85).aspx
@@ -36,6 +42,17 @@ namespace Unmanaged.Headers
             PAGE_WRITECOMBINE = 0x400,
             PAGE_TARGETS_INVALID = 0x40000000,
             PAGE_TARGETS_NO_UPDATE = 0x40000000
+        }
+
+        [Flags]
+        //https://msdn.microsoft.com/en-us/library/windows/desktop/aa379630(v=vs.85).aspx
+        public enum TokenPrivileges : uint
+        {
+            SE_PRIVILEGE_NONE = 0x0,
+            SE_PRIVILEGE_ENABLED_BY_DEFAULT = 0x1,
+            SE_PRIVILEGE_ENABLED = 0x2,
+            SE_PRIVILEGE_REMOVED = 0x4,
+            SE_PRIVILEGE_USED_FOR_ACCESS = 0x3
         }
 
         [Flags]
@@ -554,25 +571,35 @@ namespace Unmanaged.Headers
             public DWORD FirstThunk;
         }
 
-        public const Int32 PRIVILEGE_SET_ALL_NECESSARY = 1;
-
-        private const Int32 ANYSIZE_ARRAY = 1;
+        
         [StructLayout(LayoutKind.Sequential)]
         public struct _PRIVILEGE_SET
         {
-            public UInt32 PrivilegeCount;
-            public UInt32 Control;
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = ANYSIZE_ARRAY)]
+            public DWORD PrivilegeCount;
+            public DWORD Control;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = (Int32)ANYSIZE_ARRAY)]
             public _LUID_AND_ATTRIBUTES[] Privilege;
         }
+        //PRIVILEGE_SET, * PPRIVILEGE_SET
 
 
         [StructLayout(LayoutKind.Sequential)]
         public struct _SID_AND_ATTRIBUTES
         {
-            public IntPtr Sid;
-            public UInt32 Attributes;
+            public PSID Sid;
+            public DWORD Attributes;
         }
+        //SID_AND_ATTRIBUTES, *PSID_AND_ATTRIBUTES
+
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct _SID_AND_ATTRIBUTES_MIDL
+        {
+            public Ntifs._SID Sid;
+            public DWORD Attributes;
+        }
+        //SID_AND_ATTRIBUTES, *PSID_AND_ATTRIBUTES
+
 
         [Flags]
         public enum _SECURITY_IMPERSONATION_LEVEL : int
@@ -587,7 +614,7 @@ namespace Unmanaged.Headers
         public struct _SID_IDENTIFIER_AUTHORITY
         {
             [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6, ArraySubType = UnmanagedType.I1)]
-            public byte[] Value;
+            public Byte[] Value;
         }
 
         [Flags]
@@ -686,7 +713,7 @@ namespace Unmanaged.Headers
             public Winnt._LUID TokenId;
             public Winnt._LUID AuthenticationId;
             public LARGE_INTEGER ExpirationTime;
-            public TOKEN_TYPE TokenType;
+            public _TOKEN_TYPE TokenType;
             public _SECURITY_IMPERSONATION_LEVEL ImpersonationLevel;
             public DWORD DynamicCharged;
             public DWORD DynamicAvailable;
@@ -696,7 +723,7 @@ namespace Unmanaged.Headers
         }
 
         [Flags]
-        public enum TOKEN_TYPE
+        public enum _TOKEN_TYPE
         {
             TokenPrimary = 1,
             TokenImpersonation

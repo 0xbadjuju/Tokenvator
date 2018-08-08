@@ -12,6 +12,16 @@ namespace Unmanaged.Libraries
     sealed class advapi32
     {
         [DllImport("advapi32.dll", SetLastError = true)]
+        public static extern Boolean AdjustTokenGroups(
+            IntPtr TokenHandle,
+            Boolean ResetToDefault,
+            ref Ntifs._TOKEN_GROUPS NewState,
+            UInt32 BufferLength,
+            ref Ntifs._TOKEN_GROUPS PreviousState,
+            out UInt32 ReturnLengthInBytes
+        );
+
+        [DllImport("advapi32.dll", SetLastError = true)]
         public static extern Boolean AdjustTokenPrivileges(
             IntPtr TokenHandle,
             Boolean DisableAllPrivileges,
@@ -20,9 +30,7 @@ namespace Unmanaged.Libraries
             ref Winnt._TOKEN_PRIVILEGES PreviousState,
             out UInt32 ReturnLengthInBytes
         );
-
         
-
         [DllImport("advapi32.dll", SetLastError = true)]
         public static extern Boolean AllocateAndInitializeSid(
             ref Winnt._SID_IDENTIFIER_AUTHORITY pIdentifierAuthority,
@@ -47,28 +55,52 @@ namespace Unmanaged.Libraries
         [DllImport("advapi32.dll", SetLastError = true)]
         public static extern IntPtr ControlServiceEx(IntPtr hService, Winsvc.dwControl dwControl, Int32 dwInfoLevel, out Winsvc._SERVICE_STATUS lpServiceStatus);
 
+        [DllImport("advapi32", CharSet = CharSet.Auto, SetLastError = true)]
+        public static extern bool ConvertSidToStringSid(IntPtr Sid, ref IntPtr StringSid);
+
         [DllImport("advapi32.dll", SetLastError = true)]
-        public static extern Boolean CreateProcessAsUser(IntPtr hToken, IntPtr lpApplicationName, IntPtr lpCommandLine, ref Winbase._SECURITY_ATTRIBUTES lpProcessAttributes, ref Winbase._SECURITY_ATTRIBUTES lpThreadAttributes, Boolean bInheritHandles, Winbase.CREATION_FLAGS dwCreationFlags, IntPtr lpEnvironment, IntPtr lpCurrentDirectory, ref Winbase._STARTUPINFO lpStartupInfo, out Winbase._PROCESS_INFORMATION lpProcessInfo);
+        public static extern Boolean CreateProcessAsUser(
+            IntPtr hToken, 
+            String lpApplicationName, 
+            String lpCommandLine, 
+            ref Winbase._SECURITY_ATTRIBUTES lpProcessAttributes,
+            ref Winbase._SECURITY_ATTRIBUTES lpThreadAttributes, 
+            Boolean bInheritHandles, 
+            Winbase.CREATION_FLAGS dwCreationFlags, 
+            IntPtr lpEnvironment, 
+            String lpCurrentDirectory, 
+            ref Winbase._STARTUPINFO lpStartupInfo, 
+            out Winbase._PROCESS_INFORMATION lpProcessInfo);
 
         [DllImport("advapi32.dll", SetLastError = true)]
         public static extern Boolean CreateProcessAsUserW(IntPtr hToken, IntPtr lpApplicationName, IntPtr lpCommandLine, IntPtr lpProcessAttributes, IntPtr lpThreadAttributes, Boolean bInheritHandles, Winbase.CREATION_FLAGS dwCreationFlags, IntPtr lpEnvironment, IntPtr lpCurrentDirectory, ref Winbase._STARTUPINFO lpStartupInfo, out Winbase._PROCESS_INFORMATION lpProcessInfo);
 
         [DllImport("advapi32.dll", SetLastError = true)]
-        public static extern Boolean CreateProcessWithTokenW(IntPtr hToken, LOGON_FLAGS dwLogonFlags, IntPtr lpApplicationName, IntPtr lpCommandLine, Winbase.CREATION_FLAGS dwCreationFlags, IntPtr lpEnvironment, IntPtr lpCurrentDirectory, ref Winbase._STARTUPINFO lpStartupInfo, out Winbase._PROCESS_INFORMATION lpProcessInfo);
+        public static extern Boolean CreateProcessWithTokenW(
+            IntPtr hToken,
+            Winbase.LOGON_FLAGS dwLogonFlags, 
+            String lpApplicationName, 
+            String lpCommandLine, 
+            Winbase.CREATION_FLAGS dwCreationFlags, 
+            IntPtr lpEnvironment, 
+            String lpCurrentDirectory, 
+            ref Winbase._STARTUPINFO lpStartupInfo, 
+            out Winbase._PROCESS_INFORMATION lpProcessInfo
+        );
 
         [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         public static extern Boolean CreateProcessWithLogonW(
-            String userName,
-            String domain,
-            String password,
-            int logonFlags,
-            String applicationName,
-            String commandLine,
-            int creationFlags,
-            IntPtr environment,
-            String currentDirectory,
-            ref Winbase._STARTUPINFO startupInfo,
-            out Winbase._PROCESS_INFORMATION processInformation
+            String lpUsername,
+            String lpDomain,
+            String lpPassword,
+            Winbase.LOGON_FLAGS dwLogonFlags,
+            String lpApplicationName,
+            String lpCommandLine,
+            Winbase.CREATION_FLAGS dwCreationFlags,
+            IntPtr lpEnvironment,
+            String lpCurrentDirectory,
+            ref Winbase._STARTUPINFO lpStartupInfo,
+            out Winbase._PROCESS_INFORMATION lpProcessInformation
         );
 
         [DllImport("advapi32.dll", SetLastError = true)]
@@ -117,10 +149,10 @@ namespace Unmanaged.Libraries
         public static extern Boolean DeleteService(IntPtr hService);
 
         [DllImport("advapi32.dll", SetLastError = true)]
-        public static extern Boolean DuplicateTokenEx(IntPtr hExistingToken, UInt32 dwDesiredAccess, IntPtr lpTokenAttributes, Winnt._SECURITY_IMPERSONATION_LEVEL ImpersonationLevel, Winnt.TOKEN_TYPE TokenType, out IntPtr phNewToken);
+        public static extern Boolean DuplicateTokenEx(IntPtr hExistingToken, UInt32 dwDesiredAccess, IntPtr lpTokenAttributes, Winnt._SECURITY_IMPERSONATION_LEVEL ImpersonationLevel, Winnt._TOKEN_TYPE TokenType, out IntPtr phNewToken);
 
         [DllImport("advapi32.dll", SetLastError = true)]
-        public static extern Boolean DuplicateTokenEx(IntPtr hExistingToken, UInt32 dwDesiredAccess, ref Winbase._SECURITY_ATTRIBUTES lpTokenAttributes, Winnt._SECURITY_IMPERSONATION_LEVEL ImpersonationLevel, Winnt.TOKEN_TYPE TokenType, out IntPtr phNewToken);
+        public static extern Boolean DuplicateTokenEx(IntPtr hExistingToken, UInt32 dwDesiredAccess, ref Winbase._SECURITY_ATTRIBUTES lpTokenAttributes, Winnt._SECURITY_IMPERSONATION_LEVEL ImpersonationLevel, Winnt._TOKEN_TYPE TokenType, out IntPtr phNewToken);
 
         [DllImport("advapi32.dll", SetLastError = true)]
         public static extern Boolean ImpersonateLoggedOnUser(IntPtr hToken);
@@ -132,17 +164,13 @@ namespace Unmanaged.Libraries
         public static extern Boolean ImpersonateSelf(Winnt._SECURITY_IMPERSONATION_LEVEL ImpersonationLevel);
 
         [DllImport("advapi32.dll", SetLastError = true)]
+        public static extern IntPtr FreeSid(IntPtr pSid);
+
+        [DllImport("advapi32.dll", SetLastError = true)]
         public static extern Boolean GetTokenInformation(IntPtr TokenHandle, Winnt._TOKEN_INFORMATION_CLASS TokenInformationClass, IntPtr TokenInformation, UInt32 TokenInformationLength, out UInt32 ReturnLength);
 
         [DllImport("advapi32.dll", SetLastError = true)]
         public static extern Boolean GetTokenInformation(IntPtr TokenHandle, Winnt._TOKEN_INFORMATION_CLASS TokenInformationClass, ref Winnt._TOKEN_STATISTICS TokenInformation, UInt32 TokenInformationLength, out UInt32 ReturnLength);
-
-        [Flags]
-        public enum LOGON_FLAGS
-        {
-            WithProfile = 1,
-            NetCredentialsOnly
-        }
 
         [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Auto)]
         public static extern bool LookupAccountSid(
@@ -151,6 +179,17 @@ namespace Unmanaged.Libraries
             StringBuilder lpName,
             ref UInt32 cchName,
             StringBuilder ReferencedDomainName,
+            ref UInt32 cchReferencedDomainName,
+            out Winnt._SID_NAME_USE peUse
+        );
+
+        [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        public static extern bool LookupAccountSid(
+            String lpSystemName,
+            IntPtr Sid,
+            IntPtr lpName,
+            ref UInt32 cchName,
+            IntPtr ReferencedDomainName,
             ref UInt32 cchReferencedDomainName,
             out Winnt._SID_NAME_USE peUse
         );

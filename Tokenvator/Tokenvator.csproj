@@ -61,6 +61,10 @@
     </Reference>
     <Reference Include="System.DirectoryServices" />
     <Reference Include="System.Management" />
+    <Reference Include="System.Management.Automation, Version=1.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\..\..\..\Windows\assembly\GAC_MSIL\System.Management.Automation\1.0.0.0__31bf3856ad364e35\System.Management.Automation.dll</HintPath>
+    </Reference>
     <Reference Include="System.ServiceProcess" />
     <Reference Include="System.Xml.Linq">
       <RequiredTargetFramework>3.5</RequiredTargetFramework>
@@ -82,6 +86,7 @@
     <Compile Include="Resources\PSExec.cs" />
     <Compile Include="Resources\Unmanaged\Headers\Minidumpapiset.cs" />
     <Compile Include="Resources\Unmanaged\Headers\MinWinBase.cs" />
+    <Compile Include="Resources\Unmanaged\Headers\Ntifs.cs" />
     <Compile Include="Resources\Unmanaged\Headers\Rpcdce.cs" />
     <Compile Include="Resources\Unmanaged\Headers\Subauth.cs" />
     <Compile Include="Resources\Unmanaged\Headers\TlHelp32.cs" />
@@ -91,6 +96,7 @@
     <Compile Include="Resources\Unmanaged\Headers\Winsvc.cs" />
     <Compile Include="Resources\Unmanaged\Headers\Winternl.cs" />
     <Compile Include="Resources\Unmanaged\Headers\Winuser.cs" />
+    <Compile Include="Resources\Unmanaged\Headers\wudfwdm.cs" />
     <Compile Include="Resources\Unmanaged\Libraries\advapi32.cs" />
     <Compile Include="Resources\Unmanaged\Headers\ntsecapi.cs" />
     <Compile Include="Resources\Unmanaged\Libraries\crypt32.cs" />

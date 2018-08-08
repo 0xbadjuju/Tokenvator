@@ -5,6 +5,12 @@ namespace Tokenvator
     class Constants
     {
         //Process Security and Access Rights
+        //https://docs.microsoft.com/en-us/windows/desktop/procthread/process-security-and-access-rights
+        internal const UInt32 DELETE                              = 0x00010000;
+        internal const UInt32 READ_CONTROL                        = 0x00020000;
+        internal const UInt32 SYNCHRONIZE                         = 0x00100000;
+        internal const UInt32 WRITE_DAC                           = 0x00040000;
+        internal const UInt32 WRITE_OWNER                         = 0x00080000;
         //https://msdn.microsoft.com/en-us/library/windows/desktop/ms684880%28v=vs.85%29.aspx?f=255&MSPPError=-2147217396
         internal const UInt32 PROCESS_ALL_ACCESS                  = 0;
         internal const UInt32 PROCESS_CREATE_PROCESS              = 0x0080;
@@ -19,12 +25,17 @@ namespace Tokenvator
         internal const UInt32 PROCESS_VM_OPERATION                = 0x0008;
         internal const UInt32 PROCESS_VM_READ                     = 0x0010;
         internal const UInt32 PROCESS_VM_WRITE                    = 0x0020;
-        internal const UInt32 SYNCHRONIZE                         = 0x00100000;
 
         //Token 
+        
+        //https://docs.microsoft.com/en-us/windows/desktop/secauthz/standard-access-rights
+        internal const UInt32 STANDARD_RIGHTS_ALL         = (DELETE | READ_CONTROL | WRITE_DAC | WRITE_OWNER | SYNCHRONIZE);
+        internal const UInt32 STANDARD_RIGHTS_EXECUTE     = READ_CONTROL;
+        internal const UInt32 STANDARD_RIGHTS_READ        = READ_CONTROL;
+        internal const UInt32 STANDARD_RIGHTS_REQUIRED    = (DELETE | READ_CONTROL | WRITE_DAC | WRITE_OWNER);//0x000F0000;
+        internal const UInt32 STANDARD_RIGHTS_WRITE       = READ_CONTROL;
+
         //http://www.pinvoke.net/default.aspx/advapi32.openprocesstoken
-        internal const UInt32 STANDARD_RIGHTS_REQUIRED    = 0x000F0000;
-        internal const UInt32 STANDARD_RIGHTS_READ        = 0x00020000;
         internal const UInt32 TOKEN_ASSIGN_PRIMARY        = 0x0001;
         internal const UInt32 TOKEN_DUPLICATE             = 0x0002;
         internal const UInt32 TOKEN_IMPERSONATE           = 0x0004;
@@ -34,23 +45,17 @@ namespace Tokenvator
         internal const UInt32 TOKEN_ADJUST_GROUPS         = 0x0040;
         internal const UInt32 TOKEN_ADJUST_DEFAULT        = 0x0080;
         internal const UInt32 TOKEN_ADJUST_SESSIONID      = 0x0100;
-        internal const UInt32 TOKEN_READ = (STANDARD_RIGHTS_READ | TOKEN_QUERY);
-        internal const UInt32 TOKEN_ALL_ACCESS = (STANDARD_RIGHTS_REQUIRED | TOKEN_ASSIGN_PRIMARY |
-            TOKEN_DUPLICATE | TOKEN_IMPERSONATE | TOKEN_QUERY | TOKEN_QUERY_SOURCE |
-            TOKEN_ADJUST_PRIVILEGES | TOKEN_ADJUST_GROUPS | TOKEN_ADJUST_DEFAULT |
-            TOKEN_ADJUST_SESSIONID);
-        internal const UInt32 TOKEN_ALT = (TOKEN_ASSIGN_PRIMARY | TOKEN_DUPLICATE | TOKEN_IMPERSONATE | TOKEN_QUERY);
-
-        //TOKEN_PRIVILEGES
-        //https://msdn.microsoft.com/en-us/library/windows/desktop/aa379630(v=vs.85).aspx
-        internal const UInt32 SE_PRIVILEGE_ENABLED            = 0x2;
-        internal const UInt32 SE_PRIVILEGE_ENABLED_BY_DEFAULT = 0x1;
-        internal const UInt32 SE_PRIVILEGE_REMOVED            = 0x4;
-        internal const UInt32 SE_PRIVILEGE_USED_FOR_ACCESS    = 0x3;
+        internal const UInt32 TOKEN_EXECUTE               = (STANDARD_RIGHTS_EXECUTE | TOKEN_IMPERSONATE);
+        internal const UInt32 TOKEN_READ                  = (STANDARD_RIGHTS_READ | TOKEN_QUERY);
+        internal const UInt32 TOKEN_WRITE                 = (STANDARD_RIGHTS_READ | TOKEN_ADJUST_PRIVILEGES | TOKEN_ADJUST_GROUPS | TOKEN_ADJUST_DEFAULT);
+        internal const UInt32 TOKEN_ALL_ACCESS            = (STANDARD_RIGHTS_REQUIRED | TOKEN_ASSIGN_PRIMARY | TOKEN_DUPLICATE | TOKEN_IMPERSONATE | TOKEN_QUERY | TOKEN_QUERY_SOURCE | TOKEN_ADJUST_PRIVILEGES | TOKEN_ADJUST_GROUPS | TOKEN_ADJUST_DEFAULT | TOKEN_ADJUST_SESSIONID);
+        internal const UInt32 TOKEN_ALT                   = (TOKEN_ASSIGN_PRIMARY | TOKEN_DUPLICATE | TOKEN_IMPERSONATE | TOKEN_QUERY);
+        internal const UInt32 TOKEN_ALT2                  = (TOKEN_ASSIGN_PRIMARY | TOKEN_DUPLICATE | TOKEN_QUERY | TOKEN_ADJUST_DEFAULT | TOKEN_ADJUST_SESSIONID);
 
         internal const Int32 ANYSIZE_ARRAY = 1;
 
         //https://msdn.microsoft.com/en-us/library/windows/desktop/aa446619(v=vs.85).aspx
+        //https://docs.microsoft.com/en-us/windows/desktop/secauthz/privilege-constants
         internal const String SE_ASSIGNPRIMARYTOKEN_NAME  = "SeAssignPrimaryTokenPrivilege";
         internal const String SE_BACKUP_NAME              = "SeBackupPrivilege";
         internal const String SE_DEBUG_NAME               = "SeDebugPrivilege";

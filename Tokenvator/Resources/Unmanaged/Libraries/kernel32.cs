@@ -2,6 +2,8 @@
 using System.Runtime.InteropServices;
 using System.Text;
 
+using Microsoft.Win32.SafeHandles;
+
 using Unmanaged.Headers;
 
 namespace Unmanaged.Libraries
@@ -139,7 +141,7 @@ namespace Unmanaged.Libraries
         public static extern IntPtr OpenThread(uint dwDesiredAccess, bool bInheritHandle, uint dwThreadId);
 
         [DllImport("kernel32.dll", SetLastError = true)]
-        public static extern Boolean OpenThreadToken(IntPtr ThreadHandle, UInt32 DesiredAccess, Boolean OpenAsSelf, ref IntPtr TokenHandle);
+        public static extern Boolean OpenThreadToken(IntPtr ThreadHandle, UInt32 DesiredAccess, Boolean OpenAsSelf, out IntPtr TokenHandle);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern Boolean ReadFile(
@@ -187,6 +189,9 @@ namespace Unmanaged.Libraries
 
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern Boolean SetThreadContext(IntPtr hThread, IntPtr lpContext);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern Boolean TerminateProcess(IntPtr hProcess, UInt32 uExitCode);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern IntPtr VirtualAlloc(IntPtr lpAddress, UInt32 dwSize, UInt32 flAllocationType, Winnt.MEMORY_PROTECTION_CONSTANTS flProtect);
