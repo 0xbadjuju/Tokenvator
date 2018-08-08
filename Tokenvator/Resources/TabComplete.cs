@@ -80,10 +80,12 @@ namespace Tokenvator
                         }
                         break;
                     case ConsoleKey.LeftArrow:
-                        Console.SetCursorPosition(Console.CursorLeft - 1, Console.CursorTop);
+                        if (Console.CursorLeft - context.Length - 1 >= 0)
+                            Console.SetCursorPosition(Console.CursorLeft - 1, Console.CursorTop);
                         continue;
                     case ConsoleKey.RightArrow:
-                        Console.SetCursorPosition(Console.CursorLeft + 1, Console.CursorTop);
+                        if (Console.CursorLeft < context.Length + stringBuilder.Length)
+                            Console.SetCursorPosition(Console.CursorLeft + 1, Console.CursorTop);
                         continue;
                     case ConsoleKey.Escape:
                         stringBuilder.Remove(0, stringBuilder.Length);
@@ -170,7 +172,10 @@ namespace Tokenvator
                         stringBuilder.Remove(Console.CursorLeft - context.Length - 1, 1);
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.Message);
+                }
                 ResetLine();
                 Console.Write(stringBuilder.ToString());
                 if (Console.CursorLeft - context.Length - 1 >= 0)
@@ -186,7 +191,10 @@ namespace Tokenvator
                 {
                     stringBuilder.Remove(position - context.Length + 1, 1);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.Message);
+                }
                 ResetLine();
                 Console.Write(stringBuilder.ToString());
                 Console.SetCursorPosition(position, Console.CursorTop);
