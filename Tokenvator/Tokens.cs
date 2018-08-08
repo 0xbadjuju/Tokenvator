@@ -19,7 +19,7 @@ namespace Tokenvator
 
         internal delegate Boolean Create(IntPtr phNewToken, String newProcess, String arguments); 
 
-        private static List<String> validPrivileges = new List<string> { "SeAssignPrimaryTokenPrivilege", 
+        public static List<String> validPrivileges = new List<string> { "SeAssignPrimaryTokenPrivilege", 
             "SeAuditPrivilege", "SeBackupPrivilege", "SeChangeNotifyPrivilege", "SeCreateGlobalPrivilege", 
             "SeCreatePagefilePrivilege", "SeCreatePermanentPrivilege", "SeCreateSymbolicLinkPrivilege", 
             "SeCreateTokenPrivilege", "SeDebugPrivilege", "SeEnableDelegationPrivilege", 

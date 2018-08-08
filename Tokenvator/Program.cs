@@ -63,18 +63,36 @@ namespace Tokenvator
     class MainLoop
     {
         private static String context = "(Tokens) > ";
-        public static String[,] options = new String[,] { 
-                {"GetSystem", "Command", "-"}, {"GetTrustedInstaller", "Command", "-"},
-                {"Steal_Token", "Command", "ProcessID"},
-                {"BypassUAC", "ProcessID", "Command"},
-                {"List_Privileges", "ProcessID", "-"}, {"Set_Privilege", "ProcessID", "Privilege"},
-                {"List_Processes", "-", "-"}, {"List_Processes_WMI", "-", "-"},
-                {"Find_User_Processes", "-", "User"}, {"Find_User_Processes_WMI", "-", "User"},
-                {"List_User_Sessions", "-", "-"},
-                {"WhoAmI", "-", "-"}, {"RevertToSelf", "-", "-"},
-                {"Run", "-", "Command"},
-                {"", "", ""}
-            };
+        public static String[,] options = new String[,] {
+            {"Info", "-", "-"},
+
+            {"List_Privileges", "ProcessID", "-"},
+            {"Enable_Privilege", "ProcessID", "Privilege"},
+            {"Disable_Privilege", "ProcessID", "Privilege"},
+            {"Remove_Privilege", "ProcessID", "Privilege"},
+            {"Nuke_Privileges", "ProcessID", "-"},
+
+            {"Terminate", "ProcessID", "-"},
+
+            {"GetSystem", "Command", "-"},
+            {"GetTrustedInstaller", "Command", "-"},
+            {"Steal_Token", "Command", "ProcessID"},
+            {"Steal_Pipe_Token", "Command", "PipeName"},
+            {"BypassUAC", "ProcessID", "Command"},
+
+            {"Sample_Processes", "-", "-"},
+            {"Sample_Processes_WMI", "-", "-"},
+
+            {"Find_User_Processes", "-", "User"},
+            {"Find_User_Processes_WMI", "-", "User"},
+
+            {"Sessions", "-", "-"},
+            {"WhoAmI", "-", "-"},
+            {"RevertToSelf", "-", "-"},
+            {"Run", "-", "Command"},
+            {"RunPowerShell", "-", "Command"},
+            {"", "", ""}
+        };
 
         private IntPtr currentProcessToken;
         private Dictionary<String, UInt32> users;
@@ -261,6 +279,13 @@ namespace Tokenvator
                         break;
                     case "exit":
                         Environment.Exit(0);
+                        break;
+                    case "help":
+                        if ("privileges" == NextItem(ref input))
+                            foreach (String item in Tokens.validPrivileges)
+                                Console.WriteLine(item);
+                        else
+                            Help();
                         break;
                     default:
                         Help();
@@ -579,6 +604,10 @@ namespace Tokenvator
             {
                 Console.WriteLine("{0,-25}{1,-20}{2,-20}", options[i, 0], options[i, 1], options[i, 2]);
             }
+            Console.WriteLine("e.g. (Tokens)> Steal_Token 27015");
+            Console.WriteLine("e.g. (Tokens)> Steal_Token 27015 cmd.exe");
+            Console.WriteLine("e.g. (Tokens)> Enable_Privilege SeDebugPrivilege");
+            Console.WriteLine("e.g. (Tokens)> Enable_Privilege 27015 SeDebugPrivilege");
         }
     }
 }
