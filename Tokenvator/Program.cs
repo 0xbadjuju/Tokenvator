@@ -246,6 +246,11 @@ namespace Tokenvator
                             Console.WriteLine("{0,-30}{1,-30}", pid, processes[pid]);
                         }
                         break;
+                    case "list_filters":
+                        Filters filters = new Filters();
+                        filters.First();
+                        filters.Next();
+                        break;
                     case "sessions":
                         Enumeration.EnumerateInteractiveUserSessions();
                         break;
@@ -565,6 +570,8 @@ namespace Tokenvator
                 Console.WriteLine(obj.ToString());
             }
         }
+
+
 
         ////////////////////////////////////////////////////////////////////////////////
         //
