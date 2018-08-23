@@ -78,6 +78,7 @@
   <ItemGroup>
     <Compile Include="CreateProcess.cs" />
     <Compile Include="Enumeration.cs" />
+    <Compile Include="FilterInstance.cs" />
     <Compile Include="Filters.cs" />
     <Compile Include="NamedPipes.cs" />
     <Compile Include="Resources\CheckPrivileges.cs" />

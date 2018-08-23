@@ -1,7 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Runtime.InteropServices;
 
 using Unmanaged.Headers;
@@ -9,22 +6,21 @@ using Unmanaged.Libraries;
 
 namespace Tokenvator
 {
-    class Filters
+    class Filters : IDisposable
     {
-        private Int32 count;
-        private IntPtr hFilters;
-
+        protected IntPtr hFilters;
         private FltUserStructures._FILTER_AGGREGATE_BASIC_INFORMATION info;
 
         internal Filters()
         {
             Console.WriteLine();
-            Console.WriteLine("{0,8} {1,9} {2,8} {3,-10}", "Frame ID", "Instances", "Altitude", "Name");
-            Console.WriteLine("{0,8} {1,9} {2,8} {3,-10}", "--------", "---------", "--------", "----");
         }
 
-        internal void First()
+        internal virtual void First()
         {
+            Console.WriteLine("{0,8} {1,9} {2,8} {3,-10}", "Frame ID", "Instances", "Altitude", "Filter Name");
+            Console.WriteLine("{0,8} {1,9} {2,8} {3,-10}", "--------", "---------", "--------", "-----------");
+
             UInt32 dwBytesReturned = 0;
             UInt32 result = fltlib.FilterFindFirst(FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, IntPtr.Zero, 0, ref dwBytesReturned, ref hFilters);
 
@@ -39,8 +35,13 @@ namespace Tokenvator
             Marshal.FreeHGlobal(lpBuffer);
         }
 
-        internal void Next()
+        internal virtual void Next()
         {
+            if (IntPtr.Zero == hFilters)
+            {
+                return;
+            }
+
             UInt32 result = 0;
             do
             {
@@ -59,7 +60,7 @@ namespace Tokenvator
 
         private static void Print(IntPtr baseAddress)
         {
-            FltUserStructures._FILTER_AGGREGATE_BASIC_INFORMATION info = (FltUserStructures._FILTER_AGGREGATE_BASIC_INFORMATION)Marshal.PtrToStructure(baseAddress, typeof(FltUserStructures._FILTER_AGGREGATE_BASIC_INFORMATION));
+            var info = (FltUserStructures._FILTER_AGGREGATE_BASIC_INFORMATION)Marshal.PtrToStructure(baseAddress, typeof(FltUserStructures._FILTER_AGGREGATE_BASIC_INFORMATION));
 
             UInt32 offset = 0;
             do
@@ -67,15 +68,55 @@ namespace Tokenvator
                 IntPtr lpAltitude = new IntPtr(baseAddress.ToInt64() + info.FilterAltitudeBufferOffset);
                 String altitude = Marshal.PtrToStringUni(lpAltitude, info.FilterAltitudeLength / 2);
 
+                String alarm = "";
+                if (UInt32.TryParse(altitude, out UInt32 dwAltitude))
+                {
+                    if (320000 <= dwAltitude && 329998 >= dwAltitude)
+                    {
+                        alarm = "[!] Anti-Virus";
+                    }
+
+                    else if (140000 <= dwAltitude && 149999 >= dwAltitude)
+                    {
+                        alarm = "[*] Encryption";
+                    }
+
+                    else if (80000 <= dwAltitude && 89999 >= dwAltitude)
+                    {
+                        alarm = "[!] Security Enhancer";
+
+                    }
+                }
+
                 IntPtr lpName = new IntPtr(baseAddress.ToInt64() + info.FilterNameBufferOffset);
                 String name = Marshal.PtrToStringUni(lpName, info.FilterNameLength / 2);
 
-                Console.WriteLine("{0,8} {1,9} {2,8} {3,-10}", info.FrameID, info.NumberOfInstances, altitude, name);
+                Console.WriteLine("{0,8} {1,9} {2,8} {3,-20} {4,-15}", info.FrameID, info.NumberOfInstances, altitude, name, alarm);
 
-                offset = info.NextEntryOffset;
-                info = (FltUserStructures._FILTER_AGGREGATE_BASIC_INFORMATION)Marshal.PtrToStructure(new IntPtr(baseAddress.ToInt64() + offset), typeof(FltUserStructures._FILTER_AGGREGATE_BASIC_INFORMATION));
+                IntPtr updatedBase = new IntPtr(baseAddress.ToInt64() + info.NextEntryOffset);
+                info = (FltUserStructures._FILTER_AGGREGATE_BASIC_INFORMATION)Marshal.PtrToStructure(updatedBase, typeof(FltUserStructures._FILTER_AGGREGATE_BASIC_INFORMATION));
             }
             while (0 != offset);
+        }
+
+        internal static void FilterDetach(String filterName, String volumeName)
+        {
+            fltlib.FilterDetach(filterName, volumeName, String.Empty);
+        }
+
+        internal static void Unload(String filterName)
+        {
+            fltlib.FilterUnload(filterName);
+        }
+
+        ~Filters()
+        {
+            Dispose();
+        }
+
+        public virtual void Dispose()
+        {
+            fltlib.FilterFindClose(hFilters);
         }
     }
 }

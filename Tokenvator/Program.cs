@@ -247,9 +247,21 @@ namespace Tokenvator
                         }
                         break;
                     case "list_filters":
-                        Filters filters = new Filters();
-                        filters.First();
-                        filters.Next();
+                        using (Filters filters = new Filters())
+                        {
+                            filters.First();
+                            filters.Next();
+                        }
+                        break;
+                    case "list_filter_instances":
+                        using (FilterInstance filterInstance = new FilterInstance(NextItem(ref input)))
+                        {
+                            filterInstance.First();
+                            filterInstance.Next();
+                        }
+                        break;
+                    case "unload_filter":
+                        Filters.Unload(NextItem(ref input));
                         break;
                     case "sessions":
                         Enumeration.EnumerateInteractiveUserSessions();
