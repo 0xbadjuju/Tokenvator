@@ -64,34 +64,41 @@ namespace Tokenvator
     {
         private static String context = "(Tokens) > ";
         public static String[,] options = new String[,] {
-            {"Info", "-", "-"},
+            {"Info", "-", "-", "-"},
+            {"Help", "Command", "-", "Help List_Filter_Instances"},
 
-            {"List_Privileges", "ProcessID", "-"},
-            {"Enable_Privilege", "ProcessID", "Privilege"},
-            {"Disable_Privilege", "ProcessID", "Privilege"},
-            {"Remove_Privilege", "ProcessID", "Privilege"},
-            {"Nuke_Privileges", "ProcessID", "-"},
+            {"List_Privileges", "ProcessID", "-", "List_Privileges 2180"},
+            {"Enable_Privilege", "ProcessID", "Privilege", "Enable_Privilege 2180 SeShutdownPrivilege"},
+            {"Disable_Privilege", "ProcessID", "Privilege", "Disable_Privilege 2180 SeShutdownPrivilege"},
+            {"Remove_Privilege", "ProcessID", "Privilege", "Remove_Privilege 2180 SeShutdownPrivilege"},
+            {"Nuke_Privileges", "ProcessID", "-", "Nuke_Privileges 2180"},
 
-            {"Terminate", "ProcessID", "-"},
+            {"Terminate", "ProcessID", "-", "Terminate 2180"},
 
-            {"GetSystem", "Command", "-"},
-            {"GetTrustedInstaller", "Command", "-"},
-            {"Steal_Token", "Command", "ProcessID"},
-            {"Steal_Pipe_Token", "Command", "PipeName"},
-            {"BypassUAC", "ProcessID", "Command"},
+            {"GetSystem", "Command", "-", "GetSystem | GetSystem cmd.exe /c powershell.exe"},
+            {"GetTrustedInstaller", "Command", "-", "GetTrustedInstaller | cmd.exe /c powershell.exe"},
+            {"Steal_Token", "Command", "ProcessID", "Steal_Token 2180 | Steal_Token 2180 cmd.exe"},
+            {"Steal_Pipe_Token", "Command", "PipeName", @"Steal_Pipe_Token \\.\pipe\tokenvator | Steal_Pipe_Token \\.\pipe\tokenvator cmd.exe"},
+            {"BypassUAC", "ProcessID", "Command", "BypassUAC cmd.exe| BypassUAC 892 cmd.exe"},
 
-            {"Sample_Processes", "-", "-"},
-            {"Sample_Processes_WMI", "-", "-"},
+            {"Sample_Processes", "-", "-", "Sample_Processes"},
+            {"Sample_Processes_WMI", "-", "-", "Sample_Processes"},
 
-            {"Find_User_Processes", "-", "User"},
-            {"Find_User_Processes_WMI", "-", "User"},
+            {"Find_User_Processes", "-", "User", "Find_User_Processes Administrator"},
+            {"Find_User_Processes_WMI", "-", "User", "Find_User_Processes_WMI Administrator"},
 
-            {"Sessions", "-", "-"},
-            {"WhoAmI", "-", "-"},
-            {"RevertToSelf", "-", "-"},
-            {"Run", "-", "Command"},
-            {"RunPowerShell", "-", "Command"},
-            {"", "", ""}
+            {"List_Filters", "-", "-", "List_Filters"},
+            {"List_Filter_Instances", "-", "FilterName", "List_Filter_Instances vsepflt"},
+            {"Detach_Filter", "InstanceName", "FilterName, VolumeName", @"Detach_Filter vsepflt \Device\Mup vsepflt Instance"},
+            {"Unload_Filter", "-", "FilterName", "Unload_Filter vsepflt"},
+
+
+            {"Sessions", "-", "-", "Sessions"},
+            {"WhoAmI", "-", "-", "WhoAmI"},
+            {"RevertToSelf", "-", "-", "RevertToSelf"},
+            {"Run", "-", "Command", "Run ipconfig"},
+            {"RunPowerShell", "-", "Command", "RunPowerShell Get-ChildItem"},
+            {"", "", "", ""}
         };
 
         private IntPtr currentProcessToken;
@@ -301,9 +308,9 @@ namespace Tokenvator
                         Environment.Exit(0);
                         break;
                     case "help":
-                        if ("privileges" == NextItem(ref input))
-                            foreach (String item in Tokens.validPrivileges)
-                                Console.WriteLine(item);
+                        String item = NextItem(ref input);
+                        if ("help" != item)
+                            Help(item);
                         else
                             Help();
                         break;
@@ -628,10 +635,39 @@ namespace Tokenvator
             {
                 Console.WriteLine("{0,-25}{1,-20}{2,-20}", options[i, 0], options[i, 1], options[i, 2]);
             }
+            Console.WriteLine("e.g. (Tokens)> Help List_Filter_Instances");
+            Console.WriteLine("e.g. (Tokens)> Help Privileges");
+            Console.WriteLine("");
             Console.WriteLine("e.g. (Tokens)> Steal_Token 27015");
             Console.WriteLine("e.g. (Tokens)> Steal_Token 27015 cmd.exe");
             Console.WriteLine("e.g. (Tokens)> Enable_Privilege SeDebugPrivilege");
             Console.WriteLine("e.g. (Tokens)> Enable_Privilege 27015 SeDebugPrivilege");
+        }
+
+        public static void Help(String input)
+        {
+            if ("privileges" == input.ToLower())
+            {
+                foreach (String item in Tokens.validPrivileges)
+                {
+                    Console.WriteLine(item);
+                }
+                return;
+            }
+
+            Console.WriteLine("{0,-25}{1,-20}{2,-20}", "Name", "Optional", "Required");
+            Console.WriteLine("{0,-25}{1,-20}{2,-20}", "----", "--------", "--------");
+            for (Int32 i = 0; i < options.GetLength(0); i++)
+            {
+                if (input.ToLower() == options[i, 0].ToLower())
+                {
+                    Console.WriteLine("{0,-25}{1,-20}{2,-20}", options[i, 0], options[i, 1], options[i, 2]);
+                    Console.WriteLine(" ");
+                    Console.WriteLine("e.g. (Tokens)> {0}", options[i, 3]);
+                    return;
+                }
+            }
+            
         }
     }
 }
