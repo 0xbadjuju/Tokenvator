@@ -260,6 +260,9 @@ namespace Tokenvator
                             filterInstance.Next();
                         }
                         break;
+                    case "detach_filter":
+                        Filters.FilterDetach(input);
+                        break;
                     case "unload_filter":
                         Filters.Unload(NextItem(ref input));
                         break;
@@ -429,9 +432,11 @@ namespace Tokenvator
         public static void GetSystem(String input, IntPtr hToken)
         {
             CheckPrivileges.CheckTokenPrivilege(hToken, "SeDebugPrivilege", out Boolean exists, out Boolean enabled);
+            String item = NextItem(ref input);
+
             if (exists)
             {
-                if ("getsystem" == NextItem(ref input))
+                if ("getsystem" == item)
                 {
 
                     using (Tokens t = new Tokens())
@@ -443,19 +448,19 @@ namespace Tokenvator
                 {
                     using (Tokens t = new Tokens())
                     {
-                        t.GetSystem(input);
+                        t.GetSystem(item + " " + input);
                     }
                 }
             }
             else
             {
-                if ("getsystem" == NextItem(ref input))
+                if ("getsystem" == item)
                 {
                     NamedPipes.GetSystem();
                 }
                 else
                 {
-                    NamedPipes.GetSystem(input, NextItem(ref input));
+                    NamedPipes.GetSystem(input, item + " " + input);
                 }
             }
         }
@@ -498,7 +503,7 @@ namespace Tokenvator
             }
             else
             {
-                String name = "";//System.Security.Principal.WindowsIdentity.GetCurrent().Name;
+                String name = WindowsIdentity.GetCurrent().Name;
                 Dictionary<UInt32, String> uacUsers = Enumeration.EnumerateUserProcesses(true, name);
                 foreach (UInt32 pid in uacUsers.Keys)
                 {

@@ -29,13 +29,7 @@ namespace Tokenvator
                 {
                     if (ImpersonateUser())
                     {
-                        String arguments = "";
-                        if (command.Contains(' '))
-                        {
-                            String[] commandAndArguments = command.Split(new String[] { " " }, StringSplitOptions.RemoveEmptyEntries);
-                            command = commandAndArguments.First();
-                            arguments = String.Join(" ", commandAndArguments.Skip(1).Take(commandAndArguments.Length - 1).ToArray());
-                        }
+                        FindExe(ref command, out String arguments);
 
                         if (CreateProcess.CreateProcessWithLogonW(phNewToken, command, arguments))
                         {

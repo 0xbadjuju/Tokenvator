@@ -189,7 +189,8 @@ namespace Tokenvator
             {
                 try
                 {
-                    stringBuilder.Remove(position - context.Length + 1, 1);
+                    if (position - context.Length + 1 < stringBuilder.Length)
+                        stringBuilder.Remove(position - context.Length + 1, 1);
                 }
                 catch (Exception ex)
                 {

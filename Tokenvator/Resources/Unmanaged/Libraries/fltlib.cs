@@ -10,7 +10,7 @@ namespace Unmanaged.Libraries
 {
     class fltlib
     {
-        [DllImport("FltLib.dll", SetLastError = true)]
+        [DllImport("FltLib.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         public static extern UInt32 FilterDetach(String lpFilterName, String lpVolumeName, String lpInstanceName);
 
         [DllImport("FltLib.dll", SetLastError = true)]
@@ -56,7 +56,7 @@ namespace Unmanaged.Libraries
             out UInt32 lpBytesReturned
         );
 
-        [DllImport("FltLib.dll", SetLastError = true)]
+        [DllImport("FltLib.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         public static extern UInt32 FilterUnload(String lpFilterName);
     }
 }

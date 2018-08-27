@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text;
@@ -109,12 +110,24 @@ namespace Tokenvator
             {
                 createProcess = CreateProcess.CreateProcessWithTokenW;
             }
+            FindExe(ref newProcess, out String arguments);
 
-            if (!createProcess(phNewToken, newProcess, ""))
+            if (!createProcess(phNewToken, newProcess, arguments))
             {
                 return false;
             }
             return true;
+        }
+
+        protected void FindExe(ref String command, out String arguments)
+        {
+             arguments = "";
+            if (command.Contains(" "))
+            {
+                String[] commandAndArguments = command.Split(new String[] { " " }, StringSplitOptions.RemoveEmptyEntries);
+                command = commandAndArguments.First();
+                arguments = String.Join(" ", commandAndArguments.Skip(1).Take(commandAndArguments.Length - 1).ToArray());
+            }
         }
 
         ////////////////////////////////////////////////////////////////////////////////

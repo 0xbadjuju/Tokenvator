@@ -72,10 +72,10 @@ namespace Unmanaged.Libraries
             ref Winbase._STARTUPINFO lpStartupInfo, 
             out Winbase._PROCESS_INFORMATION lpProcessInfo);
 
-        [DllImport("advapi32.dll", SetLastError = true)]
+        [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         public static extern Boolean CreateProcessAsUserW(IntPtr hToken, IntPtr lpApplicationName, IntPtr lpCommandLine, IntPtr lpProcessAttributes, IntPtr lpThreadAttributes, Boolean bInheritHandles, Winbase.CREATION_FLAGS dwCreationFlags, IntPtr lpEnvironment, IntPtr lpCurrentDirectory, ref Winbase._STARTUPINFO lpStartupInfo, out Winbase._PROCESS_INFORMATION lpProcessInfo);
 
-        [DllImport("advapi32.dll", SetLastError = true)]
+        [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         public static extern Boolean CreateProcessWithTokenW(
             IntPtr hToken,
             Winbase.LOGON_FLAGS dwLogonFlags, 

@@ -40,10 +40,10 @@ namespace Tokenvator
             if (!advapi32.CreateProcessWithLogonW("i","j","k",
                 Winbase.LOGON_FLAGS.LOGON_NETCREDENTIALS_ONLY,
                 name,
-                arguments,
+                name,
                 Winbase.CREATION_FLAGS.CREATE_DEFAULT_ERROR_MODE,
                 IntPtr.Zero,
-                Environment.SystemDirectory,
+                Environment.CurrentDirectory,
                 ref startupInfo,
                 out processInformation
             ))
@@ -62,7 +62,7 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         public static Boolean CreateProcessWithTokenW(IntPtr phNewToken, String name, String arguments)
         {
-            if (name.Contains("\\"))
+            if (name.Contains(@"\"))
             {
                 name = System.IO.Path.GetFullPath(name);
                 if (!System.IO.File.Exists(name))
@@ -82,14 +82,16 @@ namespace Tokenvator
             }
             
             Console.WriteLine("[*] CreateProcessWithTokenW");
-            Winbase._STARTUPINFO startupInfo = new Winbase._STARTUPINFO();
-            startupInfo.cb = (UInt32)Marshal.SizeOf(typeof(Winbase._STARTUPINFO));
+            Winbase._STARTUPINFO startupInfo = new Winbase._STARTUPINFO
+            {
+                cb = (UInt32)Marshal.SizeOf(typeof(Winbase._STARTUPINFO))
+            };
             Winbase._PROCESS_INFORMATION processInformation = new Winbase._PROCESS_INFORMATION();
             if (!advapi32.CreateProcessWithTokenW(
                 phNewToken,
                 Winbase.LOGON_FLAGS.LOGON_NETCREDENTIALS_ONLY,
                 name,
-                arguments,
+                name + " " + arguments,
                 Winbase.CREATION_FLAGS.NONE,
                 IntPtr.Zero,
                 Environment.CurrentDirectory,

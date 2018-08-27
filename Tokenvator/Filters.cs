@@ -99,14 +99,34 @@ namespace Tokenvator
             while (0 != offset);
         }
 
-        internal static void FilterDetach(String filterName, String volumeName)
+        internal static void FilterDetach(String input)
         {
-            fltlib.FilterDetach(filterName, volumeName, String.Empty);
+            String filterName = MainLoop.NextItem(ref input);
+            String volumeName = MainLoop.NextItem(ref input);
+            String instanceName = input;
+            if (volumeName == instanceName)
+            {
+                instanceName = String.Empty;
+            }
+
+            UInt32 result = fltlib.FilterDetach(filterName, volumeName, instanceName);
+            if (0 != result)
+            {
+                Console.WriteLine("FilterDetach Failed: 0x{0}", result.ToString("X4"));
+            }
         }
 
         internal static void Unload(String filterName)
         {
-            fltlib.FilterUnload(filterName);
+            UInt32 result = fltlib.FilterUnload(filterName);
+            if (0 != result)
+            {
+                if (2147943714 == result)
+                {
+                    Console.WriteLine("Privilege Not Held");
+                }
+                Console.WriteLine("FilterUnload Failed: 0x{0}", result.ToString("X4"));
+            }
         }
 
         ~Filters()
