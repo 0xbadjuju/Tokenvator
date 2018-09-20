@@ -95,10 +95,6 @@ namespace Tokenvator
 
             if (IntPtr.Zero != hToken)
             {
-                Tokens.EnumerateTokenPrivileges(hToken);
-                CheckPrivileges.GetElevationType(hToken, out Winnt._TOKEN_TYPE type);
-                CheckPrivileges.PrintElevation(hToken);
-
                 advapi32.ImpersonateLoggedOnUser(hToken);
 
                 kernel32.CloseHandle(hToken);

@@ -528,10 +528,7 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         public static void StealToken(String input)
         {
-            Int32 processID;
-            String command;
-
-            if (GetProcessID(input, out processID, out command))
+            if (GetProcessID(input, out Int32 processID, out String command))
             {
                 if (String.IsNullOrEmpty(command))
                 {
@@ -555,11 +552,9 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         public static void StealPipeToken(String input)
         {
-            String pipeName;
-            String command;
-            if (GetPipeName(input, out pipeName, out command))
+            if (GetPipeName(input, out String pipeName, out String command))
             {
-                if (String.IsNullOrEmpty(command))
+                if (pipeName.ToLower() == command.ToLower())
                 {
                     NamedPipes.GetPipeToken(pipeName);
                 }
