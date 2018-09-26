@@ -2,6 +2,9 @@
 using System.Runtime.InteropServices;
 using System.Text;
 
+using Unmanaged.Headers;
+using Unmanaged.Libraries;
+
 namespace Tokenvator
 {
     class CreateProcess
@@ -31,24 +34,21 @@ namespace Tokenvator
             }
 
             Console.WriteLine("[*] CreateProcessWithLogonW");
-            Structs._STARTUPINFO startupInfo = new Structs._STARTUPINFO();
-            startupInfo.cb = (UInt32)Marshal.SizeOf(typeof(Structs._STARTUPINFO));
-            Structs._PROCESS_INFORMATION processInformation = new Structs._PROCESS_INFORMATION();
-            if (!advapi32.CreateProcessWithLogonW(
-                "i",
-                "j",
-                "k",
-                0x00000002,
+            Winbase._STARTUPINFO startupInfo = new Winbase._STARTUPINFO();
+            startupInfo.cb = (UInt32)Marshal.SizeOf(typeof(Winbase._STARTUPINFO));
+            Winbase._PROCESS_INFORMATION processInformation = new Winbase._PROCESS_INFORMATION();
+            if (!advapi32.CreateProcessWithLogonW("i","j","k",
+                Winbase.LOGON_FLAGS.LOGON_NETCREDENTIALS_ONLY,
                 name,
-                arguments,
-                0x04000000,
+                name,
+                Winbase.CREATION_FLAGS.CREATE_DEFAULT_ERROR_MODE,
                 IntPtr.Zero,
-                Environment.SystemDirectory,
+                Environment.CurrentDirectory,
                 ref startupInfo,
                 out processInformation
             ))
             {
-                Console.WriteLine(" [-] Function CreateProcessWithLogonW failed: " + Marshal.GetLastWin32Error());
+                Tokens.GetWin32Error("CreateProcessWithLogonW");
                 return false;
             }
             
@@ -62,7 +62,7 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         public static Boolean CreateProcessWithTokenW(IntPtr phNewToken, String name, String arguments)
         {
-            if (name.Contains("\\"))
+            if (name.Contains(@"\"))
             {
                 name = System.IO.Path.GetFullPath(name);
                 if (!System.IO.File.Exists(name))
@@ -82,24 +82,24 @@ namespace Tokenvator
             }
             
             Console.WriteLine("[*] CreateProcessWithTokenW");
-            IntPtr lpProcessName = Marshal.StringToHGlobalUni(name);
-            IntPtr lpProcessArgs = Marshal.StringToHGlobalUni(arguments);
-            Structs._STARTUPINFO startupInfo = new Structs._STARTUPINFO();
-            startupInfo.cb = (UInt32)Marshal.SizeOf(typeof(Structs._STARTUPINFO));
-            Structs._PROCESS_INFORMATION processInformation = new Structs._PROCESS_INFORMATION();
+            Winbase._STARTUPINFO startupInfo = new Winbase._STARTUPINFO
+            {
+                cb = (UInt32)Marshal.SizeOf(typeof(Winbase._STARTUPINFO))
+            };
+            Winbase._PROCESS_INFORMATION processInformation = new Winbase._PROCESS_INFORMATION();
             if (!advapi32.CreateProcessWithTokenW(
                 phNewToken,
-                Enums.LOGON_FLAGS.NetCredentialsOnly,
-                lpProcessName,
-                lpProcessArgs,
-                Enums.CREATION_FLAGS.NONE,
+                Winbase.LOGON_FLAGS.LOGON_NETCREDENTIALS_ONLY,
+                name,
+                name + " " + arguments,
+                Winbase.CREATION_FLAGS.NONE,
                 IntPtr.Zero,
-                IntPtr.Zero,
+                Environment.CurrentDirectory,
                 ref startupInfo,
                 out processInformation
             ))
             {
-                Console.WriteLine(" [-] Function CreateProcessWithTokenW failed: " + Marshal.GetLastWin32Error());
+                Tokens.GetWin32Error("CreateProcessWithTokenW");
                 return false;
             }
             Console.WriteLine(" [+] Created process: " + processInformation.dwProcessId);

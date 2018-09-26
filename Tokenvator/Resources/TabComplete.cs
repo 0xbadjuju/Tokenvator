@@ -80,10 +80,12 @@ namespace Tokenvator
                         }
                         break;
                     case ConsoleKey.LeftArrow:
-                        Console.SetCursorPosition(Console.CursorLeft - 1, Console.CursorTop);
+                        if (Console.CursorLeft - context.Length - 1 >= 0)
+                            Console.SetCursorPosition(Console.CursorLeft - 1, Console.CursorTop);
                         continue;
                     case ConsoleKey.RightArrow:
-                        Console.SetCursorPosition(Console.CursorLeft + 1, Console.CursorTop);
+                        if (Console.CursorLeft < context.Length + stringBuilder.Length)
+                            Console.SetCursorPosition(Console.CursorLeft + 1, Console.CursorTop);
                         continue;
                     case ConsoleKey.Escape:
                         stringBuilder.Remove(0, stringBuilder.Length);
@@ -165,12 +167,21 @@ namespace Tokenvator
             {
                 try
                 {
-                    stringBuilder.Remove(Console.CursorLeft - context.Length - 1, 1);
+                    if (Console.CursorLeft - context.Length - 1 >= 0)
+                    {
+                        stringBuilder.Remove(Console.CursorLeft - context.Length - 1, 1);
+                    }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.Message);
+                }
                 ResetLine();
                 Console.Write(stringBuilder.ToString());
-                Console.SetCursorPosition(position -1, Console.CursorTop);
+                if (Console.CursorLeft - context.Length - 1 >= 0)
+                {
+                    Console.SetCursorPosition(position - 1, Console.CursorTop);
+                }
                 return false;
             }
 
@@ -178,9 +189,13 @@ namespace Tokenvator
             {
                 try
                 {
-                    stringBuilder.Remove(position - context.Length + 1, 1);
+                    if (position - context.Length + 1 < stringBuilder.Length)
+                        stringBuilder.Remove(position - context.Length + 1, 1);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.Message);
+                }
                 ResetLine();
                 Console.Write(stringBuilder.ToString());
                 Console.SetCursorPosition(position, Console.CursorTop);

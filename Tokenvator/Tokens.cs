@@ -2,11 +2,12 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Management;
 using System.Runtime.InteropServices;
-using System.Security;
 using System.Security.Principal;
 using System.Text;
+
+using Unmanaged.Headers;
+using Unmanaged.Libraries;
 
 namespace Tokenvator
 {
@@ -17,9 +18,9 @@ namespace Tokenvator
         private IntPtr currentProcessToken;
         private Dictionary<UInt32, String> processes;
 
-        private delegate Boolean Create(IntPtr phNewToken, String newProcess, String arguments); 
+        internal delegate Boolean Create(IntPtr phNewToken, String newProcess, String arguments); 
 
-        private static List<String> validPrivileges = new List<string> { "SeAssignPrimaryTokenPrivilege", 
+        public static List<String> validPrivileges = new List<string> { "SeAssignPrimaryTokenPrivilege", 
             "SeAuditPrivilege", "SeBackupPrivilege", "SeChangeNotifyPrivilege", "SeCreateGlobalPrivilege", 
             "SeCreatePagefilePrivilege", "SeCreatePermanentPrivilege", "SeCreateSymbolicLinkPrivilege", 
             "SeCreateTokenPrivilege", "SeDebugPrivilege", "SeEnableDelegationPrivilege", 
@@ -48,7 +49,7 @@ namespace Tokenvator
 
             currentProcessToken = new IntPtr();
             kernel32.OpenProcessToken(Process.GetCurrentProcess().Handle, Constants.TOKEN_ALL_ACCESS, out currentProcessToken);
-            SetTokenPrivilege(ref currentProcessToken, Constants.SE_DEBUG_NAME);
+            SetTokenPrivilege(ref currentProcessToken, Constants.SE_DEBUG_NAME, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED);
         }
 
         protected Tokens(Boolean rt)
@@ -85,17 +86,17 @@ namespace Tokenvator
             {
                 return false;
             }
-            Structs._SECURITY_ATTRIBUTES securityAttributes = new Structs._SECURITY_ATTRIBUTES();
+            Winbase._SECURITY_ATTRIBUTES securityAttributes = new Winbase._SECURITY_ATTRIBUTES();
             if (!advapi32.DuplicateTokenEx(
                         hExistingToken,
-                        (UInt32)Enums.ACCESS_MASK.MAXIMUM_ALLOWED,
+                        (UInt32)Winnt.ACCESS_MASK.MAXIMUM_ALLOWED,
                         ref securityAttributes,
-                        Enums._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,
-                        Enums.TOKEN_TYPE.TokenPrimary,
+                        Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,
+                        Winnt._TOKEN_TYPE.TokenPrimary,
                         out phNewToken
             ))
             {
-                GetError("DuplicateTokenEx: ");
+                GetWin32Error("DuplicateTokenEx: ");
                 return false;
             }
             Console.WriteLine(" [+] Duplicate Token Handle: " + phNewToken.ToInt32());
@@ -109,12 +110,24 @@ namespace Tokenvator
             {
                 createProcess = CreateProcess.CreateProcessWithTokenW;
             }
+            FindExe(ref newProcess, out String arguments);
 
-            if (!createProcess(phNewToken, newProcess, ""))
+            if (!createProcess(phNewToken, newProcess, arguments))
             {
                 return false;
             }
             return true;
+        }
+
+        protected void FindExe(ref String command, out String arguments)
+        {
+             arguments = "";
+            if (command.Contains(" "))
+            {
+                String[] commandAndArguments = command.Split(new String[] { " " }, StringSplitOptions.RemoveEmptyEntries);
+                command = commandAndArguments.First();
+                arguments = String.Join(" ", commandAndArguments.Skip(1).Take(commandAndArguments.Length - 1).ToArray());
+            }
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -128,25 +141,26 @@ namespace Tokenvator
             {
                 return false;
             }
-            Structs._SECURITY_ATTRIBUTES securityAttributes = new Structs._SECURITY_ATTRIBUTES();
+            Winbase._SECURITY_ATTRIBUTES securityAttributes = new Winbase._SECURITY_ATTRIBUTES();
             if (!advapi32.DuplicateTokenEx(
                         hExistingToken,
-                        (UInt32)Enums.ACCESS_MASK.MAXIMUM_ALLOWED,
+                        (UInt32)Winnt.ACCESS_MASK.MAXIMUM_ALLOWED,
                         ref securityAttributes,
-                        Enums._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,
-                        Enums.TOKEN_TYPE.TokenPrimary,
+                        Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,
+                        Winnt._TOKEN_TYPE.TokenPrimary,
                         out phNewToken
             ))
             {
-                GetError("DuplicateTokenEx: ");
+                GetWin32Error("DuplicateTokenEx: ");
                 return false;
             }
             Console.WriteLine(" [+] Duplicate Token Handle: {0}", phNewToken.ToInt32());
             if (!advapi32.ImpersonateLoggedOnUser(phNewToken))
             {
-                GetError("ImpersonateLoggedOnUser: ");
+                GetWin32Error("ImpersonateLoggedOnUser: ");
                 return false;
             }
+            Console.WriteLine("[+] Operating as {0}", System.Security.Principal.WindowsIdentity.GetCurrent().Name);
             return true;
         }
 
@@ -204,13 +218,13 @@ namespace Tokenvator
             Services services = new Services("TrustedInstaller");
             if (!services.StartService())
             {
-                GetError("StartService");
+                GetWin32Error("StartService");
                 return false;
             }
 
             if (!StartProcessAsUser((Int32)services.GetServiceProcessId(), newProcess))
             {
-                GetError("StartProcessAsUser");
+                GetWin32Error("StartProcessAsUser");
                 return false;
             }
 
@@ -229,13 +243,13 @@ namespace Tokenvator
             Services services = new Services("TrustedInstaller");
             if (!services.StartService())
             {
-                GetError("StartService");
+                GetWin32Error("StartService");
                 return false;
             }
 
             if (!ImpersonateUser((Int32)services.GetServiceProcessId()))
             {
-                GetError("ImpersonateUser");
+                GetWin32Error("ImpersonateUser");
                 return false;
             }
 
@@ -272,20 +286,20 @@ namespace Tokenvator
         {
             IntPtr hToken = new IntPtr();
             Console.WriteLine("[*] Opening Thread Token");
-            if (!kernel32.OpenThreadToken(kernel32.GetCurrentThread(), (Constants.TOKEN_QUERY | Constants.TOKEN_ADJUST_PRIVILEGES), false, ref hToken))
+            if (!kernel32.OpenThreadToken(kernel32.GetCurrentThread(), (Constants.TOKEN_QUERY | Constants.TOKEN_ADJUST_PRIVILEGES), false, out hToken))
             {
                 Console.WriteLine(" [-] OpenTheadToken Failed");
                 Console.WriteLine(" [*] Impersonating Self");
-                if (!advapi32.ImpersonateSelf(Enums.SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation))
+                if (!advapi32.ImpersonateSelf(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation))
                 {
-                    GetError("ImpersonateSelf");
+                    GetWin32Error("ImpersonateSelf");
                     return IntPtr.Zero;
                 }
                 Console.WriteLine(" [+] Impersonated Self");
                 Console.WriteLine(" [*] Retrying");
-                if (!kernel32.OpenThreadToken(kernel32.GetCurrentThread(), (Constants.TOKEN_QUERY | Constants.TOKEN_ADJUST_PRIVILEGES), false, ref hToken))
+                if (!kernel32.OpenThreadToken(kernel32.GetCurrentThread(), (Constants.TOKEN_QUERY | Constants.TOKEN_ADJUST_PRIVILEGES), false, out hToken))
                 {
-                    GetError("OpenThreadToken");
+                    GetWin32Error("OpenThreadToken");
                     return IntPtr.Zero;
                 }
             }
@@ -298,49 +312,45 @@ namespace Tokenvator
         // http://www.leeholmes.com/blog/2010/09/24/adjusting-token-privileges-in-powershell/
         // https://support.microsoft.com/en-us/help/131065/how-to-obtain-a-handle-to-any-process-with-sedebugprivilege
         ////////////////////////////////////////////////////////////////////////////////
-        public static void UnSetTokenPrivilege(ref IntPtr hToken, String privilege)
+        public static void SetTokenPrivilege(ref IntPtr hToken, String privilege, Winnt.TokenPrivileges attribute)
         {
+            if (!validPrivileges.Contains(privilege))
+            {
+                Console.WriteLine("[-] Invalid Privilege Specified");
+                return;
+            }
+
             Console.WriteLine("[*] Adjusting Token Privilege");
             ////////////////////////////////////////////////////////////////////////////////
-            Structs._LUID luid = new Structs._LUID();
+            Winnt._LUID luid = new Winnt._LUID();
             if (!advapi32.LookupPrivilegeValue(null, privilege, ref luid))
             {
-                GetError("LookupPrivilegeValue");
+                GetWin32Error("LookupPrivilegeValue");
                 return;
             }
             Console.WriteLine(" [+] Recieved luid");
 
             ////////////////////////////////////////////////////////////////////////////////
-            Structs._LUID_AND_ATTRIBUTES luidAndAttributes = new Structs._LUID_AND_ATTRIBUTES();
-            luidAndAttributes.Luid = luid;
-            luidAndAttributes.Attributes = 0;
-
-            Structs._TOKEN_PRIVILEGES newState = new Structs._TOKEN_PRIVILEGES();
-            newState.PrivilegeCount = 1;
-            newState.Privileges = luidAndAttributes;
-
-            Structs._TOKEN_PRIVILEGES previousState = new Structs._TOKEN_PRIVILEGES();
-            UInt32 returnLength = 0;
-            Console.WriteLine(" [+] AdjustTokenPrivilege Pass 1");
-            if (!advapi32.AdjustTokenPrivileges(hToken, false, ref newState, (UInt32)Marshal.SizeOf(newState), ref previousState, out returnLength))
+            Winnt._LUID_AND_ATTRIBUTES luidAndAttributes = new Winnt._LUID_AND_ATTRIBUTES
             {
-                GetError("AdjustTokenPrivileges - 1");
+                Luid = luid,
+                Attributes = (uint)attribute
+            };
+            Winnt._TOKEN_PRIVILEGES newState = new Winnt._TOKEN_PRIVILEGES
+            {
+                PrivilegeCount = 1,
+                Privileges = luidAndAttributes
+            };
+            Winnt._TOKEN_PRIVILEGES previousState = new Winnt._TOKEN_PRIVILEGES();
+            Console.WriteLine(" [*] AdjustTokenPrivilege");
+            if (!advapi32.AdjustTokenPrivileges(hToken, false, ref newState, (UInt32)Marshal.SizeOf(newState), ref previousState, out UInt32 returnLength))
+            {
+                GetWin32Error("AdjustTokenPrivileges");
                 return;
             }
 
-            previousState.Privileges.Attributes ^= (Constants.SE_PRIVILEGE_ENABLED & previousState.Privileges.Attributes);
-
-
-            ////////////////////////////////////////////////////////////////////////////////
-            Structs._TOKEN_PRIVILEGES kluge = new Structs._TOKEN_PRIVILEGES();
-            Console.WriteLine(" [+] AdjustTokenPrivilege Pass 2");
-            if (!advapi32.AdjustTokenPrivileges(hToken, false, ref previousState, (UInt32)Marshal.SizeOf(previousState), ref kluge, out returnLength))
-            {
-                GetError("AdjustTokenPrivileges - 2");
-                return;
-            }
-
-            Console.WriteLine(" [+] Adjusted Token to: " + privilege);
+            Console.WriteLine(" [+] Adjusted Privilege: {0}", privilege);
+            Console.WriteLine(" [+] Privilege State: {0}", attribute);
             return;
         }
 
@@ -349,87 +359,48 @@ namespace Tokenvator
         // http://www.leeholmes.com/blog/2010/09/24/adjusting-token-privileges-in-powershell/
         // https://support.microsoft.com/en-us/help/131065/how-to-obtain-a-handle-to-any-process-with-sedebugprivilege
         ////////////////////////////////////////////////////////////////////////////////
-        public static void SetTokenPrivilege(ref IntPtr hToken, String privilege)
+        public static void NukeTokenPrivilege(ref IntPtr hToken)
         {
-            if (!validPrivileges.Contains(privilege))
-            {
-                Console.WriteLine("[-] Invalid Privilege Specified");
-                return;
-            }
-            Console.WriteLine("[*] Adjusting Token Privilege");
-            ////////////////////////////////////////////////////////////////////////////////
-            Structs._LUID luid = new Structs._LUID();
-            if (!advapi32.LookupPrivilegeValue(null, privilege, ref luid))
-            {
-                GetError("LookupPrivilegeValue");
-                return;
-            }
-            Console.WriteLine(" [+] Received luid");
-
-            ////////////////////////////////////////////////////////////////////////////////
-            Structs._LUID_AND_ATTRIBUTES luidAndAttributes = new Structs._LUID_AND_ATTRIBUTES();
-            luidAndAttributes.Luid = luid;
-            luidAndAttributes.Attributes = Constants.SE_PRIVILEGE_ENABLED;
-
-            Structs._TOKEN_PRIVILEGES newState = new Structs._TOKEN_PRIVILEGES();
-            newState.PrivilegeCount = 1;
-            newState.Privileges = luidAndAttributes;
-
-            Structs._TOKEN_PRIVILEGES previousState = new Structs._TOKEN_PRIVILEGES();
-            UInt32 returnLength = 0;
+            Winnt._TOKEN_PRIVILEGES newState = new Winnt._TOKEN_PRIVILEGES();
+            Winnt._TOKEN_PRIVILEGES previousState = new Winnt._TOKEN_PRIVILEGES();
             Console.WriteLine(" [*] AdjustTokenPrivilege");
-            if (!advapi32.AdjustTokenPrivileges(hToken, false, ref newState, (UInt32)Marshal.SizeOf(newState), ref previousState, out returnLength))
+            if (!advapi32.AdjustTokenPrivileges(hToken, true, ref newState, (UInt32)Marshal.SizeOf(typeof(Winnt._TOKEN_PRIVILEGES)), ref previousState, out UInt32 returnLength))
             {
-                GetError("AdjustTokenPrivileges");
-                return;
+                GetWin32Error("AdjustTokenPrivileges");
             }
-
-            Console.WriteLine(" [+] Adjusted Token to: " + privilege);
             return;
         }
 
         ////////////////////////////////////////////////////////////////////////////////
         // Prints the tokens privileges
         ////////////////////////////////////////////////////////////////////////////////
-        public static void EnumerateTokenPrivileges(IntPtr hToken)
+        public static void DisableAndRemoveAllTokenPrivileges(ref IntPtr hToken)
         {
             ////////////////////////////////////////////////////////////////////////////////
-            UInt32 TokenInfLength = 0;
             Console.WriteLine("[*] Enumerating Token Privileges");
-            advapi32.GetTokenInformation(
-                hToken, 
-                Enums._TOKEN_INFORMATION_CLASS.TokenPrivileges, 
-                IntPtr.Zero, 
-                TokenInfLength, 
-                out TokenInfLength
-            );
+            advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrivileges, IntPtr.Zero, 0, out UInt32 TokenInfLength);
 
-            if (TokenInfLength < 0 || TokenInfLength > Int32.MaxValue)  
+            if (TokenInfLength < 0 || TokenInfLength > Int32.MaxValue)
             {
-                GetError("GetTokenInformation - 1 " + TokenInfLength);
+                GetWin32Error("GetTokenInformation - 1 " + TokenInfLength);
                 return;
             }
             Console.WriteLine("[*] GetTokenInformation - Pass 1");
-            IntPtr lpTokenInformation = Marshal.AllocHGlobal((Int32)TokenInfLength) ;
-            
+            IntPtr lpTokenInformation = Marshal.AllocHGlobal((Int32)TokenInfLength);
+
             ////////////////////////////////////////////////////////////////////////////////
-            if (!advapi32.GetTokenInformation(
-                hToken, 
-                Enums._TOKEN_INFORMATION_CLASS.TokenPrivileges, 
-                lpTokenInformation, 
-                TokenInfLength, 
-                out TokenInfLength))
+            if (!advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrivileges, lpTokenInformation, TokenInfLength, out TokenInfLength))
             {
-                GetError("GetTokenInformation - 2" + TokenInfLength);
+                GetWin32Error("GetTokenInformation - 2 " + TokenInfLength);
                 return;
             }
             Console.WriteLine("[*] GetTokenInformation - Pass 2");
-            Structs._TOKEN_PRIVILEGES_ARRAY tokenPrivileges = (Structs._TOKEN_PRIVILEGES_ARRAY)Marshal.PtrToStructure(lpTokenInformation, typeof(Structs._TOKEN_PRIVILEGES_ARRAY));
-            Console.WriteLine("[+] Enumerated " + tokenPrivileges.PrivilegeCount + " Privileges");
-
+            Winnt._TOKEN_PRIVILEGES_ARRAY tokenPrivileges = (Winnt._TOKEN_PRIVILEGES_ARRAY)Marshal.PtrToStructure(lpTokenInformation, typeof(Winnt._TOKEN_PRIVILEGES_ARRAY));
+            Marshal.FreeHGlobal(lpTokenInformation);
+            Console.WriteLine("[+] Enumerated {0} Privileges", tokenPrivileges.PrivilegeCount);
             Console.WriteLine();
-            Console.WriteLine("{0,-30}{1,-30}", "Privilege Name", "Enabled");
-            Console.WriteLine("{0,-30}{1,-30}", "--------------", "-------");
+            Console.WriteLine("{0,-45}{1,-30}", "Privilege Name", "Enabled");
+            Console.WriteLine("{0,-45}{1,-30}", "--------------", "-------");
             ////////////////////////////////////////////////////////////////////////////////
             for (Int32 i = 0; i < tokenPrivileges.PrivilegeCount; i++)
             {
@@ -439,32 +410,112 @@ namespace Tokenvator
                 Marshal.StructureToPtr(tokenPrivileges.Privileges[i].Luid, lpLuid, true);
 
                 advapi32.LookupPrivilegeName(null, lpLuid, null, ref cchName);
-                if (cchName < 0 || cchName > Int32.MaxValue)  
+                if (cchName <= 0 || cchName > Int32.MaxValue)
                 {
-                    GetError("LookupPrivilegeName " + cchName);
-                    return;
+                    GetWin32Error("LookupPrivilegeName Pass 1");
+                    Marshal.FreeHGlobal(lpLuid);
+                    continue;
                 }
 
                 lpName.EnsureCapacity(cchName + 1);
                 if (!advapi32.LookupPrivilegeName(null, lpLuid, lpName, ref cchName))
                 {
-                    Console.WriteLine("[-] Privilege Name Lookup Failed");
+                    GetWin32Error("LookupPrivilegeName Pass 2");
+                    Marshal.FreeHGlobal(lpLuid);
                     continue;
                 }
 
-                Structs._PRIVILEGE_SET privilegeSet = new Structs._PRIVILEGE_SET();
-                privilegeSet.PrivilegeCount = 1;
-                privilegeSet.Control = Structs.PRIVILEGE_SET_ALL_NECESSARY;
-                privilegeSet.Privilege = new Structs._LUID_AND_ATTRIBUTES[] { tokenPrivileges.Privileges[i] };
-
-                IntPtr pfResult;
-                if (!advapi32.PrivilegeCheck(hToken, privilegeSet, out pfResult))
+                Winnt._PRIVILEGE_SET privilegeSet = new Winnt._PRIVILEGE_SET
                 {
-                    Console.WriteLine("[-] Privilege Check Failed");
+                    PrivilegeCount = 1,
+                    Control = Winnt.PRIVILEGE_SET_ALL_NECESSARY,
+                    Privilege = new Winnt._LUID_AND_ATTRIBUTES[] { tokenPrivileges.Privileges[i] }
+                };
+
+                if (!advapi32.PrivilegeCheck(hToken, privilegeSet, out IntPtr pfResult))
+                {
+                    GetWin32Error("PrivilegeCheck");
+                    Marshal.FreeHGlobal(lpLuid);
                     continue;
                 }
-                Console.WriteLine("{0,-30}{1,-30}", lpName.ToString(), Convert.ToBoolean(pfResult.ToInt32()));
+                if (Convert.ToBoolean(pfResult.ToInt32()))
+                {
+                    SetTokenPrivilege(ref hToken, lpName.ToString(), Winnt.TokenPrivileges.SE_PRIVILEGE_NONE);
+                }
+                SetTokenPrivilege(ref hToken, lpName.ToString(), Winnt.TokenPrivileges.SE_PRIVILEGE_REMOVED);
+                Marshal.FreeHGlobal(lpLuid);
+            }
+            Console.WriteLine();
+        }
 
+        ////////////////////////////////////////////////////////////////////////////////
+        // Prints the tokens privileges
+        ////////////////////////////////////////////////////////////////////////////////
+        public static void EnumerateTokenPrivileges(IntPtr hToken)
+        {
+            ////////////////////////////////////////////////////////////////////////////////
+            Console.WriteLine("[*] Enumerating Token Privileges");
+            advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrivileges, IntPtr.Zero, 0, out UInt32 TokenInfLength);
+
+            if (TokenInfLength < 0 || TokenInfLength > Int32.MaxValue)  
+            {
+                GetWin32Error("GetTokenInformation - 1 " + TokenInfLength);
+                return;
+            }
+            Console.WriteLine("[*] GetTokenInformation - Pass 1");
+            IntPtr lpTokenInformation = Marshal.AllocHGlobal((Int32)TokenInfLength) ;
+            
+            ////////////////////////////////////////////////////////////////////////////////
+            if (!advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrivileges, lpTokenInformation, TokenInfLength, out TokenInfLength))
+            {
+                GetWin32Error("GetTokenInformation - 2 " + TokenInfLength);
+                return;
+            }
+            Console.WriteLine("[*] GetTokenInformation - Pass 2");
+            Winnt._TOKEN_PRIVILEGES_ARRAY tokenPrivileges = (Winnt._TOKEN_PRIVILEGES_ARRAY)Marshal.PtrToStructure(lpTokenInformation, typeof(Winnt._TOKEN_PRIVILEGES_ARRAY));
+            Marshal.FreeHGlobal(lpTokenInformation);
+            Console.WriteLine("[+] Enumerated {0} Privileges", tokenPrivileges.PrivilegeCount);
+            Console.WriteLine();
+            Console.WriteLine("{0,-45}{1,-30}", "Privilege Name", "Enabled");
+            Console.WriteLine("{0,-45}{1,-30}", "--------------", "-------");
+            ////////////////////////////////////////////////////////////////////////////////
+            for (Int32 i = 0; i < tokenPrivileges.PrivilegeCount; i++)
+            {
+                StringBuilder lpName = new StringBuilder();
+                Int32 cchName = 0;
+                IntPtr lpLuid = Marshal.AllocHGlobal(Marshal.SizeOf(tokenPrivileges.Privileges[i]));
+                Marshal.StructureToPtr(tokenPrivileges.Privileges[i].Luid, lpLuid, true);
+
+                advapi32.LookupPrivilegeName(null, lpLuid, null, ref cchName);
+                if (cchName <= 0 || cchName > Int32.MaxValue)  
+                {
+                    GetWin32Error("LookupPrivilegeName Pass 1");
+                    Marshal.FreeHGlobal(lpLuid);
+                    continue;
+                }
+
+                lpName.EnsureCapacity(cchName + 1);
+                if (!advapi32.LookupPrivilegeName(null, lpLuid, lpName, ref cchName))
+                {
+                    GetWin32Error("LookupPrivilegeName Pass 2");
+                    Marshal.FreeHGlobal(lpLuid);
+                    continue;
+                }
+
+                Winnt._PRIVILEGE_SET privilegeSet = new Winnt._PRIVILEGE_SET
+                {
+                    PrivilegeCount = 1,
+                    Control = Winnt.PRIVILEGE_SET_ALL_NECESSARY,
+                    Privilege = new Winnt._LUID_AND_ATTRIBUTES[] { tokenPrivileges.Privileges[i] }
+                };
+
+                if (!advapi32.PrivilegeCheck(hToken, privilegeSet, out IntPtr pfResult))
+                {
+                    GetWin32Error("PrivilegeCheck");
+                    Marshal.FreeHGlobal(lpLuid);
+                    continue;
+                }
+                Console.WriteLine("{0,-45}{1,-30}", lpName.ToString(), Convert.ToBoolean(pfResult.ToInt32()));
                 Marshal.FreeHGlobal(lpLuid);
             }
             Console.WriteLine();
@@ -472,9 +523,19 @@ namespace Tokenvator
 
         ////////////////////////////////////////////////////////////////////////////////
         ////////////////////////////////////////////////////////////////////////////////
-        protected static void GetError(String location)
+        public static void GetNtError(String location, UInt32 ntError)
         {
-            Console.WriteLine(" [-] Function " + location + " failed: " + Marshal.GetLastWin32Error());
+            UInt32 win32Error = ntdll.RtlNtStatusToDosError(ntError);
+            Console.WriteLine(" [-] Function {0} failed: ", location);
+            Console.WriteLine(" [-] {0}", new System.ComponentModel.Win32Exception((Int32)win32Error).Message);
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        ////////////////////////////////////////////////////////////////////////////////
+        public static void GetWin32Error(String location)
+        {
+            Console.WriteLine(" [-] Function {0} failed: ", location);
+            Console.WriteLine(" [-] {0}", new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()).Message);
         }
     }
 }

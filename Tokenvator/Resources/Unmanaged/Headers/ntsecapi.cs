@@ -17,7 +17,7 @@ using DWORD_PTR = System.IntPtr;
 using SIZE_T = System.IntPtr;
 using PWSTR = System.IntPtr;
 
-namespace Tokenvator
+namespace Unmanaged.Headers
 {
     class ntsecapi
     {
@@ -41,7 +41,7 @@ namespace Tokenvator
         public struct _SECURITY_LOGON_SESSION_DATA
         {
             public ULONG Size;
-            public Structs._LUID LogonId;
+            public Winnt._LUID LogonId;
             public _LSA_UNICODE_STRING UserName;
             public _LSA_UNICODE_STRING LogonDomain;
             public _LSA_UNICODE_STRING AuthenticationPackage;

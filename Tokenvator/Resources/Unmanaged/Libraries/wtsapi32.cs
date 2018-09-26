@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 
-namespace Tokenvator
+namespace Unmanaged.Libraries
 {
     class wtsapi32
     {
@@ -69,6 +69,11 @@ namespace Tokenvator
             _WTS_INFO_CLASS WTSInfoClass,
             out IntPtr ppBuffer,
             out IntPtr pBytesReturned);
+
+        [DllImport("wtsapi32.dll", SetLastError = true)]
+        public static extern bool WTSQueryUserToken(
+            UInt32 SessionId,
+            ref IntPtr phToken);
 
         [DllImport("wtsapi32.dll", SetLastError = true)]
         public static extern int WTSEnumerateSessions(

@@ -14,24 +14,24 @@ using LPVOID = System.IntPtr;
 using DWORD_PTR = System.IntPtr;
 using SIZE_T = System.IntPtr;
 
-namespace Tokenvator
+namespace Unmanaged.Headers
 {
-    public class Wincrypt
+    sealed class Wincrypt
     {
         [StructLayout(LayoutKind.Sequential)]
-        internal struct _CRYPTOAPI_BLOB 
+        public struct _CRYPTOAPI_BLOB 
         {
             public DWORD cbData;
             public BYTE pbData;
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        internal struct _CRYPTPROTECT_PROMPTSTRUCT
+        public struct _CRYPTPROTECT_PROMPTSTRUCT
         {
-            public DWORD cbSize;
-            public DWORD dwPromptFlags;
-            public HWND hwndApp;
-            public LPCWSTR szPrompt;
+            public  DWORD cbSize;
+            public  DWORD dwPromptFlags;
+            public  HWND hwndApp;
+            public  LPCWSTR szPrompt;
         } 
     }
 }
