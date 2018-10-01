@@ -11,3 +11,4 @@ C:\Users\badjuju\Documents\GitHub\Tokenvator\Tokenvator\obj\Release\Tokenvator.p
 C:\Users\badjuju\Documents\GitHub\Tokenvator\Tokenvator\bin\Release\System.Management.Automation.dll
 C:\Users\badjuju\Documents\GitHub\Tokenvator\Tokenvator\obj\Release\Tokenvator.csproj.CopyComplete
 C:\Users\badjuju\Documents\GitHub\Tokenvator\Tokenvator\bin\Release\Tokenvator.exe.config
+C:\Users\badjuju\Documents\GitHub\Tokenvator\Tokenvator\obj\Release\Tokenvator.csprojAssemblyReference.cache
