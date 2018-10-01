@@ -205,7 +205,6 @@ namespace Tokenvator
 
         public new void Dispose()
         {
-            Console.WriteLine("Disposing Restricted");
             if (IntPtr.Zero != luaToken)
                 kernel32.CloseHandle(luaToken);
             base.Dispose();

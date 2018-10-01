@@ -64,7 +64,6 @@ namespace Tokenvator
 
         public void Dispose()
         {
-            Console.WriteLine("Disposing Tokens");
             if (IntPtr.Zero != phNewToken)  
                 kernel32.CloseHandle(phNewToken);
             if (IntPtr.Zero != hExistingToken)
