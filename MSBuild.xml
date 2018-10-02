@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Target Name="Build">
+    <MSBuild Projects="Tokenvator\Tokenvator.csproj" Properties="Configuration=Debug;Platform=AnyCPU" />
+    <MSBuild Projects="Tokenvator\Tokenvator.csproj" Properties="Configuration=Release;Platform=AnyCPU" />
+    
+    <MSBuild Projects="Tokenvator\Tokenvator.csproj" Properties="Configuration=Debug-Net35;Platform=AnyCPU" />
+    <MSBuild Projects="Tokenvator\Tokenvator.csproj" Properties="Configuration=Release-Net35;Platform=AnyCPU" />
+    
+    <MSBuild Projects="Tokenvator\Tokenvator.csproj" Properties="Configuration=Debug-Net45;Platform=AnyCPU" />
+    <MSBuild Projects="Tokenvator\Tokenvator.csproj" Properties="Configuration=Release-Net45;Platform=AnyCPU" />
+  </Target>
+</Project>
