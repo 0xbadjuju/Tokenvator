@@ -1,5 +1,5 @@
 # Tokenvator
-A tool to elevate privilege with Windows Tokens
+A tool to alter privilege with Windows Tokens
 
 For documentation please see the wiki:<br> 
 https://github.com/0xbadjuju/Tokenvator/wiki
