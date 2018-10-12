@@ -20,7 +20,7 @@ namespace Tokenvator
         {
             Dictionary<String, UInt32> users = new Dictionary<String, UInt32>();
             IntPtr ppSessionInfo = new IntPtr();
-            UInt32 pCount = 0;
+            Int32 pCount = 0;
             wtsapi32.WTSEnumerateSessions(IntPtr.Zero, 0, 1, ref ppSessionInfo, ref pCount);
             for (Int32 i = 0; i < pCount; i++)
             {
