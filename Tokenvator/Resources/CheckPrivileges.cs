@@ -2,8 +2,8 @@
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 
-using Unmanaged.Headers;
-using Unmanaged.Libraries;
+using MonkeyWorks.Unmanaged.Headers;
+using MonkeyWorks.Unmanaged.Libraries;
 
 namespace Tokenvator
 {
@@ -366,12 +366,13 @@ namespace Tokenvator
                         Control = Winnt.PRIVILEGE_SET_ALL_NECESSARY,
                         Privilege = new Winnt._LUID_AND_ATTRIBUTES[] { tokenPrivileges.Privileges[i] }
                     };
-                    if (!advapi32.PrivilegeCheck(hToken, privilegeSet, out IntPtr pfResult))
+
+                    if (!advapi32.PrivilegeCheck(hToken, ref privilegeSet, out Int32 pfResult))
                     {
                         Tokens.GetWin32Error("PrivilegeCheck");
                         continue;
                     }
-                    enabled = Convert.ToBoolean(pfResult.ToInt32());
+                    enabled = Convert.ToBoolean(pfResult);
                 }
                 catch (Exception ex)
                 {

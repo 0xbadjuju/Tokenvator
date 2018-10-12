@@ -3,8 +3,8 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 
-using Unmanaged.Headers;
-using Unmanaged.Libraries;
+using MonkeyWorks.Unmanaged.Headers;
+using MonkeyWorks.Unmanaged.Libraries;
 
 namespace Tokenvator
 {
