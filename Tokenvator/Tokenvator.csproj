@@ -59,7 +59,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug-Net35|AnyCPU'">
     <OutputPath>bin\Debug-Net35\</OutputPath>
-	<TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <DefineConstants>TRACE</DefineConstants>
     <Optimize>true</Optimize>
     <DebugType>pdbonly</DebugType>
@@ -69,7 +69,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release-Net35|AnyCPU'">
     <OutputPath>bin\Release-Net35\</OutputPath>
-	<TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <DefineConstants>TRACE</DefineConstants>
     <Optimize>true</Optimize>
     <DebugType>pdbonly</DebugType>
@@ -79,7 +79,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug-Net45|AnyCPU'">
     <OutputPath>bin\Debug-Net45\</OutputPath>
-	<TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <DefineConstants>TRACE</DefineConstants>
     <Optimize>true</Optimize>
     <DebugType>pdbonly</DebugType>
@@ -89,7 +89,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release-Net45|AnyCPU'">
     <OutputPath>bin\Release-Net45\</OutputPath>
-	<TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <DefineConstants>TRACE</DefineConstants>
     <Optimize>true</Optimize>
     <DebugType>pdbonly</DebugType>
@@ -109,6 +109,7 @@
       <HintPath>..\..\..\..\..\..\Windows\assembly\GAC_MSIL\System.Management.Automation\1.0.0.0__31bf3856ad364e35\System.Management.Automation.dll</HintPath>
     </Reference>
     <Reference Include="System.ServiceProcess" />
+    <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml.Linq">
       <RequiredTargetFramework>3.5</RequiredTargetFramework>
     </Reference>
@@ -128,36 +129,38 @@
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Resources\Constants.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\FltUserStructures.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\Minidumpapiset.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\MinWinBase.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\Ntifs.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\Ntpsapi.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\Ntsecapi.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\ProcessThreadsApi.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\Rpcdce.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\Subauth.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\TlHelp32.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\Winbase.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\Wincon.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\WinCred.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\Wincrypt.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\Windef.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\Winnt.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\Winsvc.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\Winternl.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\Winuser.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\wudfwdm.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\advapi32.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\crypt32.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\dbghelp.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\fltlib.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\kernel32.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\ntdll.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\secur32.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\user32.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\vaultcli.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\wlanapi.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\wtsapi32.cs" />
     <Compile Include="Resources\PSExec.cs" />
-    <Compile Include="Resources\Unmanaged\Headers\FltUserStructures.cs" />
-    <Compile Include="Resources\Unmanaged\Headers\Minidumpapiset.cs" />
-    <Compile Include="Resources\Unmanaged\Headers\MinWinBase.cs" />
-    <Compile Include="Resources\Unmanaged\Headers\Ntifs.cs" />
-    <Compile Include="Resources\Unmanaged\Headers\Rpcdce.cs" />
-    <Compile Include="Resources\Unmanaged\Headers\Subauth.cs" />
-    <Compile Include="Resources\Unmanaged\Headers\TlHelp32.cs" />
-    <Compile Include="Resources\Unmanaged\Headers\Wincon.cs" />
-    <Compile Include="Resources\Unmanaged\Headers\WinCred.cs" />
-    <Compile Include="Resources\Unmanaged\Headers\Windef.cs" />
-    <Compile Include="Resources\Unmanaged\Headers\Winsvc.cs" />
-    <Compile Include="Resources\Unmanaged\Headers\Winternl.cs" />
-    <Compile Include="Resources\Unmanaged\Headers\Winuser.cs" />
-    <Compile Include="Resources\Unmanaged\Headers\wudfwdm.cs" />
-    <Compile Include="Resources\Unmanaged\Libraries\advapi32.cs" />
-    <Compile Include="Resources\Unmanaged\Headers\ntsecapi.cs" />
-    <Compile Include="Resources\Unmanaged\Libraries\crypt32.cs" />
-    <Compile Include="Resources\Unmanaged\Libraries\dbghelp.cs" />
-    <Compile Include="Resources\Unmanaged\Libraries\fltlib.cs" />
-    <Compile Include="Resources\Unmanaged\Libraries\kernel32.cs" />
-    <Compile Include="Resources\Unmanaged\Libraries\ntdll.cs" />
-    <Compile Include="Resources\Unmanaged\Libraries\secur32.cs" />
-    <Compile Include="Resources\Unmanaged\Libraries\user32.cs" />
-    <Compile Include="Resources\Unmanaged\Libraries\vaultcli.cs" />
-    <Compile Include="Resources\Unmanaged\Headers\winbase.cs" />
-    <Compile Include="Resources\Unmanaged\Headers\wincrypt.cs" />
-    <Compile Include="Resources\Unmanaged\Headers\winnt.cs" />
-    <Compile Include="Resources\Unmanaged\Libraries\wlanapi.cs" />
-    <Compile Include="Resources\Unmanaged\Libraries\wtsapi32.cs" />
     <Compile Include="RestrictedToken.cs" />
     <Compile Include="Resources\Services.cs" />
     <Compile Include="Tokens.cs" />
@@ -196,7 +199,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Resources\TabComplete.cs" />
-    <Compile Include="Resources\Unmanaged\Libraries\netapi32.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />

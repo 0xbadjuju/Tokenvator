@@ -6,8 +6,8 @@ using System.Management;
 using System.Runtime.InteropServices;
 using System.Text;
 
-using Unmanaged.Headers;
-using Unmanaged.Libraries;
+using MonkeyWorks.Unmanaged.Headers;
+using MonkeyWorks.Unmanaged.Libraries;
 
 namespace Tokenvator
 {
@@ -24,11 +24,9 @@ namespace Tokenvator
             wtsapi32.WTSEnumerateSessions(IntPtr.Zero, 0, 1, ref ppSessionInfo, ref pCount);
             for (Int32 i = 0; i < pCount; i++)
             {
-                IntPtr j = new IntPtr(ppSessionInfo.ToInt32() + (i * Marshal.SizeOf(typeof(wtsapi32._WTS_SESSION_INFO))));
+                IntPtr j = new IntPtr(ppSessionInfo.ToInt64() + (i * Marshal.SizeOf(typeof(wtsapi32._WTS_SESSION_INFO))));
                 wtsapi32._WTS_SESSION_INFO wtsSessionInfo = (wtsapi32._WTS_SESSION_INFO)Marshal.PtrToStructure(j, typeof(wtsapi32._WTS_SESSION_INFO));
-                IntPtr ppBuffer;
-                IntPtr pBytesReturned;
-                if (!wtsapi32.WTSQuerySessionInformationW(IntPtr.Zero, wtsSessionInfo.SessionId, wtsapi32._WTS_INFO_CLASS.WTSUserName, out ppBuffer, out pBytesReturned))
+                if (!wtsapi32.WTSQuerySessionInformationW(IntPtr.Zero, wtsSessionInfo.SessionId, wtsapi32._WTS_INFO_CLASS.WTSUserName, out IntPtr ppBuffer, out IntPtr pBytesReturned))
                 {
                     Console.WriteLine("[-] {0}", Marshal.GetLastWin32Error());
                     continue;

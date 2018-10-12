@@ -1,0 +1,4 @@
+[submodule "Tokenvator/MonkeyWorks"]
+	path = Tokenvator/Resources/MonkeyWorks
+	url = https://github.com/NetSPI/MonkeyWorks.git
+	branch = master

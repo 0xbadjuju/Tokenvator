@@ -3,8 +3,8 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 
-using Unmanaged.Headers;
-using Unmanaged.Libraries;
+using MonkeyWorks.Unmanaged.Headers;
+using MonkeyWorks.Unmanaged.Libraries;
 
 namespace Tokenvator
 {
@@ -192,7 +192,7 @@ namespace Tokenvator
                 sa.lpSecurityDescriptor = (IntPtr)0;
 
                 
-                if (!kernel32.OpenThreadToken(kernel32.GetCurrentThread(), Constants.TOKEN_ALL_ACCESS, false, out hToken))
+                if (!kernel32.OpenThreadToken(kernel32.GetCurrentThread(), Constants.TOKEN_ALL_ACCESS, false, ref hToken))
                 {
                     Tokens.GetWin32Error("OpenThreadToken");
                     return false;

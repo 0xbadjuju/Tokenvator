@@ -52,7 +52,7 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         public Boolean StopService()
         {
-            Console.WriteLine("[+] Stopping Service " + serviceName);
+            Console.WriteLine("[+] Stopping Service {0}", serviceName);
             if (service.CanStop)
             {
                 service.Stop();

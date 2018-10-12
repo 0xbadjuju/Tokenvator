@@ -6,8 +6,8 @@ using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text;
 
-using Unmanaged.Headers;
-using Unmanaged.Libraries;
+using MonkeyWorks.Unmanaged.Headers;
+using MonkeyWorks.Unmanaged.Libraries;
 
 namespace Tokenvator
 {
@@ -101,7 +101,7 @@ namespace Tokenvator
                 GetWin32Error("DuplicateTokenEx: ");
                 return false;
             }
-            Console.WriteLine(" [+] Duplicate Token Handle: " + phNewToken.ToInt32());
+            Console.WriteLine(" [+] Duplicate Token Handle: 0x{0}", phNewToken.ToString("X4"));
 
             Create createProcess;
             if (0 == Process.GetCurrentProcess().SessionId)
@@ -156,7 +156,7 @@ namespace Tokenvator
                 GetWin32Error("DuplicateTokenEx: ");
                 return false;
             }
-            Console.WriteLine(" [+] Duplicate Token Handle: {0}", phNewToken.ToInt32());
+            Console.WriteLine(" [+] Duplicate Token Handle: 0x{0}", phNewToken.ToString("X4"));
             if (!advapi32.ImpersonateLoggedOnUser(phNewToken))
             {
                 GetWin32Error("ImpersonateLoggedOnUser: ");
@@ -240,7 +240,7 @@ namespace Tokenvator
         {
             Console.WriteLine("[*] Getting NT AUTHORITY\\SYSTEM privileges");
             GetSystem();
-            Console.WriteLine(" [+] Running as: " + WindowsIdentity.GetCurrent().Name);
+            Console.WriteLine(" [+] Running as: {0}", WindowsIdentity.GetCurrent().Name);
 
             Services services = new Services("TrustedInstaller");
             if (!services.StartService())
@@ -269,14 +269,14 @@ namespace Tokenvator
             {
                 return false;
             }
-            Console.WriteLine("[+] Recieved Handle for: " + name + " (" + processId + ")");
-            Console.WriteLine(" [+] Process Handle: " + hProcess.ToInt32());
+            Console.WriteLine("[+] Recieved Handle for: {0} ({1})", name, processId);
+            Console.WriteLine(" [+] Process Handle: 0x{0}", hProcess.ToString("X4"));
 
             if (!kernel32.OpenProcessToken(hProcess, Constants.TOKEN_ALT, out hExistingToken))
             {
                 return false;   
             }
-            Console.WriteLine(" [+] Primary Token Handle: " + hExistingToken.ToInt32());
+            Console.WriteLine(" [+] Primary Token Handle: 0x{0}", hExistingToken.ToString("X4"));
             kernel32.CloseHandle(hProcess);
             return true;
         }
@@ -288,7 +288,7 @@ namespace Tokenvator
         {
             IntPtr hToken = new IntPtr();
             Console.WriteLine("[*] Opening Thread Token");
-            if (!kernel32.OpenThreadToken(kernel32.GetCurrentThread(), (Constants.TOKEN_QUERY | Constants.TOKEN_ADJUST_PRIVILEGES), false, out hToken))
+            if (!kernel32.OpenThreadToken(kernel32.GetCurrentThread(), (Constants.TOKEN_QUERY | Constants.TOKEN_ADJUST_PRIVILEGES), false, ref hToken))
             {
                 Console.WriteLine(" [-] OpenTheadToken Failed");
                 Console.WriteLine(" [*] Impersonating Self");
@@ -299,13 +299,13 @@ namespace Tokenvator
                 }
                 Console.WriteLine(" [+] Impersonated Self");
                 Console.WriteLine(" [*] Retrying");
-                if (!kernel32.OpenThreadToken(kernel32.GetCurrentThread(), (Constants.TOKEN_QUERY | Constants.TOKEN_ADJUST_PRIVILEGES), false, out hToken))
+                if (!kernel32.OpenThreadToken(kernel32.GetCurrentThread(), (Constants.TOKEN_QUERY | Constants.TOKEN_ADJUST_PRIVILEGES), false, ref hToken))
                 {
                     GetWin32Error("OpenThreadToken");
                     return IntPtr.Zero;
                 }
             }
-            Console.WriteLine(" [+] Recieved Thread Token Handle: " + hToken.ToInt32());
+            Console.WriteLine(" [+] Recieved Thread Token Handle: 0x{0}", hToken.ToString("X4"));
             return hToken;
         }
 
@@ -434,13 +434,13 @@ namespace Tokenvator
                     Privilege = new Winnt._LUID_AND_ATTRIBUTES[] { tokenPrivileges.Privileges[i] }
                 };
 
-                if (!advapi32.PrivilegeCheck(hToken, privilegeSet, out IntPtr pfResult))
+                if (!advapi32.PrivilegeCheck(hToken, ref privilegeSet, out Int32 pfResult))
                 {
                     GetWin32Error("PrivilegeCheck");
                     Marshal.FreeHGlobal(lpLuid);
                     continue;
                 }
-                if (Convert.ToBoolean(pfResult.ToInt32()))
+                if (Convert.ToBoolean(pfResult))
                 {
                     SetTokenPrivilege(ref hToken, lpName.ToString(), Winnt.TokenPrivileges.SE_PRIVILEGE_NONE);
                 }
@@ -511,13 +511,13 @@ namespace Tokenvator
                     Privilege = new Winnt._LUID_AND_ATTRIBUTES[] { tokenPrivileges.Privileges[i] }
                 };
 
-                if (!advapi32.PrivilegeCheck(hToken, privilegeSet, out IntPtr pfResult))
+                if (!advapi32.PrivilegeCheck(hToken, ref privilegeSet, out Int32 pfResult))
                 {
                     GetWin32Error("PrivilegeCheck");
                     Marshal.FreeHGlobal(lpLuid);
                     continue;
                 }
-                Console.WriteLine("{0,-45}{1,-30}", lpName.ToString(), Convert.ToBoolean(pfResult.ToInt32()));
+                Console.WriteLine("{0,-45}{1,-30}", lpName.ToString(), Convert.ToBoolean(pfResult));
                 Marshal.FreeHGlobal(lpLuid);
             }
             Console.WriteLine();
