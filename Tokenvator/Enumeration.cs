@@ -26,7 +26,9 @@ namespace Tokenvator
             {
                 IntPtr j = new IntPtr(ppSessionInfo.ToInt64() + (i * Marshal.SizeOf(typeof(wtsapi32._WTS_SESSION_INFO))));
                 wtsapi32._WTS_SESSION_INFO wtsSessionInfo = (wtsapi32._WTS_SESSION_INFO)Marshal.PtrToStructure(j, typeof(wtsapi32._WTS_SESSION_INFO));
-                if (!wtsapi32.WTSQuerySessionInformationW(IntPtr.Zero, wtsSessionInfo.SessionId, wtsapi32._WTS_INFO_CLASS.WTSUserName, out IntPtr ppBuffer, out IntPtr pBytesReturned))
+                IntPtr ppBuffer, pBytesReturned;
+                ppBuffer = pBytesReturned = IntPtr.Zero;
+                if (!wtsapi32.WTSQuerySessionInformationW(IntPtr.Zero, wtsSessionInfo.SessionId, wtsapi32._WTS_INFO_CLASS.WTSUserName, out ppBuffer, out pBytesReturned))
                 {
                     Console.WriteLine("[-] {0}", Marshal.GetLastWin32Error());
                     continue;
@@ -96,7 +98,8 @@ namespace Tokenvator
             UInt32 cchName = (UInt32)lpName.Capacity;
             StringBuilder lpReferencedDomainName = new StringBuilder();
             UInt32 cchReferencedDomainName = (UInt32)lpReferencedDomainName.Capacity;
-            advapi32.LookupAccountSid(String.Empty, sid, lpName, ref cchName, lpReferencedDomainName, ref cchReferencedDomainName, out Winnt._SID_NAME_USE sidNameUse);
+            Winnt._SID_NAME_USE sidNameUse = new Winnt._SID_NAME_USE();
+            advapi32.LookupAccountSid(String.Empty, sid, lpName, ref cchName, lpReferencedDomainName, ref cchReferencedDomainName, out sidNameUse);
 
             lpName.EnsureCapacity((Int32)cchName + 1);
             lpReferencedDomainName.EnsureCapacity((Int32)cchReferencedDomainName + 1);

@@ -29,7 +29,8 @@ namespace Tokenvator
                 {
                     if (ImpersonateUser())
                     {
-                        FindExe(ref command, out String arguments);
+                        String arguments = String.Empty;
+                        FindExe(ref command, out arguments);
 
                         if (CreateProcess.CreateProcessWithLogonW(phNewToken, command, arguments))
                         {

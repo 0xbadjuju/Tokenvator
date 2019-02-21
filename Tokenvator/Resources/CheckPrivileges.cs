@@ -166,7 +166,8 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         public static void GetTokenOwner(IntPtr hToken)
         {
-            advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenOwner, IntPtr.Zero, 0, out UInt32 returnLength);
+            UInt32 returnLength = 0;
+            advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenOwner, IntPtr.Zero, 0, out returnLength);
             IntPtr lpTokenInformation = Marshal.AllocHGlobal((Int32)returnLength);
             Ntifs._TOKEN_OWNER tokenOwner;
             try
@@ -194,7 +195,9 @@ namespace Tokenvator
             }
 
             Console.WriteLine("[+] Owner: ");
-            _ReadSidAndName(tokenOwner.Owner, out String sid, out String account);
+            String sid, account;
+            sid = account = String.Empty;
+            _ReadSidAndName(tokenOwner.Owner, out sid, out account);
             Console.WriteLine("{0,-50} {1}", sid, account);
             return;
         }
@@ -204,7 +207,8 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         public static void GetTokenUser(IntPtr hToken)
         {
-            advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenUser, IntPtr.Zero, 0, out UInt32 returnLength);
+            UInt32 returnLength = 0;
+            advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenUser, IntPtr.Zero, 0, out returnLength);
             IntPtr lpTokenInformation = Marshal.AllocHGlobal((Int32)returnLength);
             Ntifs._TOKEN_USER tokenUser;
             try
@@ -232,7 +236,9 @@ namespace Tokenvator
             }
             
             Console.WriteLine("[+] User: ");
-            _ReadSidAndName(tokenUser.User[0].Sid, out String sid, out String account);
+            String sid, account;
+            sid = account = String.Empty;
+            _ReadSidAndName(tokenUser.User[0].Sid, out sid, out account);
             Console.WriteLine("{0,-50} {1}", sid, account);
             return;
         }
@@ -242,7 +248,8 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         public static Boolean GetTokenGroups(IntPtr hToken)
         {
-            advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenGroups, IntPtr.Zero, 0, out UInt32 returnLength);
+            UInt32 returnLength = 0;
+            advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenGroups, IntPtr.Zero, 0, out returnLength);
             IntPtr lpTokenInformation = Marshal.AllocHGlobal((Int32)returnLength);
             Ntifs._TOKEN_GROUPS tokenGroups;
             try
@@ -268,7 +275,9 @@ namespace Tokenvator
             Console.WriteLine("[+] Enumerated {0} Groups: ", tokenGroups.GroupCount);
             for (Int32 i = 0; i < tokenGroups.GroupCount; i++)
             {
-                _ReadSidAndName(tokenGroups.Groups[i].Sid, out String sid, out String account);
+                String sid, account;
+                sid = account = String.Empty;
+                _ReadSidAndName(tokenGroups.Groups[i].Sid, out sid, out account);
                 Console.WriteLine("{0,-50} {1}", sid, account);
             }
             return true;
@@ -314,7 +323,8 @@ namespace Tokenvator
             exists = false;
             enabled = false;
             ////////////////////////////////////////////////////////////////////////////////
-            advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrivileges, IntPtr.Zero, 0, out UInt32 TokenInfLength);
+            UInt32 TokenInfLength = 0;
+            advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrivileges, IntPtr.Zero, 0, out TokenInfLength);
             if (TokenInfLength <= 0 || TokenInfLength > Int32.MaxValue)
             {
                 Tokens.GetWin32Error("GetTokenInformation - 1 " + TokenInfLength);
@@ -367,7 +377,8 @@ namespace Tokenvator
                         Privilege = new Winnt._LUID_AND_ATTRIBUTES[] { tokenPrivileges.Privileges[i] }
                     };
 
-                    if (!advapi32.PrivilegeCheck(hToken, ref privilegeSet, out Int32 pfResult))
+                    Int32 pfResult = 0;
+                    if (!advapi32.PrivilegeCheck(hToken, ref privilegeSet, out pfResult))
                     {
                         Tokens.GetWin32Error("PrivilegeCheck");
                         continue;
@@ -397,7 +408,8 @@ namespace Tokenvator
             IntPtr lpTokenInformation = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(UInt32)));
             try
             {
-                if (!advapi32.GetTokenInformation(hToken, informationClass, lpTokenInformation, tokenInformationLength, out UInt32 returnLength))
+                UInt32 returnLength = 0;
+                if (!advapi32.GetTokenInformation(hToken, informationClass, lpTokenInformation, tokenInformationLength, out returnLength))
                 {
                     Tokens.GetWin32Error("GetTokenInformation");
                     return false;

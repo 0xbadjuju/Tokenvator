@@ -140,8 +140,9 @@ namespace Tokenvator
                     input = Console.ReadLine();
                 }
 
-                IntPtr tempToken = IntPtr.Zero;
-                kernel32.OpenProcessToken(kernel32.GetCurrentProcess(), Constants.TOKEN_ALL_ACCESS, out IntPtr hToken);
+                IntPtr hToken, tempToken;
+                hToken = tempToken = IntPtr.Zero;
+                kernel32.OpenProcessToken(kernel32.GetCurrentProcess(), Constants.TOKEN_ALL_ACCESS, out hToken);
                 switch (NextItem(ref input))
                 {
                     case "info":
@@ -156,7 +157,8 @@ namespace Tokenvator
                         Console.WriteLine("");
                         CheckPrivileges.GetTokenGroups(hToken);
                         Console.WriteLine("");
-                        CheckPrivileges.GetElevationType(hToken, out Winnt._TOKEN_TYPE tokenType);
+                        Winnt._TOKEN_TYPE tokenType = new Winnt._TOKEN_TYPE();
+                        CheckPrivileges.GetElevationType(hToken, out tokenType);
                         CheckPrivileges.PrintElevation(hToken);
                         break;
                     case "list_privileges":
@@ -438,7 +440,8 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         public static void GetSystem(String input, IntPtr hToken)
         {
-            CheckPrivileges.CheckTokenPrivilege(hToken, "SeDebugPrivilege", out Boolean exists, out Boolean enabled);
+            Boolean exists, enabled;
+            CheckPrivileges.CheckTokenPrivilege(hToken, "SeDebugPrivilege", out exists, out enabled);
             String item = NextItem(ref input);
 
             if (exists)
@@ -528,7 +531,9 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         public static void StealToken(String input)
         {
-            if (GetProcessID(input, out Int32 processID, out String command))
+            Int32 processID = 0;
+            String command = String.Empty;
+            if (GetProcessID(input, out processID, out command))
             {
                 if (String.IsNullOrEmpty(command))
                 {
@@ -552,7 +557,9 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         public static void StealPipeToken(String input)
         {
-            if (GetPipeName(input, out String pipeName, out String command))
+            String pipeName, command;
+            pipeName = command = String.Empty;
+            if (GetPipeName(input, out pipeName, out command))
             {
                 if (pipeName.ToLower() == command.ToLower())
                 {
