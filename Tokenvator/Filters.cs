@@ -8,7 +8,7 @@ namespace Tokenvator
 {
     class Filters : IDisposable
     {
-        protected IntPtr hFilters;
+        protected IntPtr hFilters = IntPtr.Zero;
         private FltUserStructures._FILTER_AGGREGATE_BASIC_INFORMATION info;
 
         internal Filters()
@@ -22,14 +22,14 @@ namespace Tokenvator
             Console.WriteLine("{0,8} {1,9} {2,8} {3,-10}", "--------", "---------", "--------", "-----------");
 
             UInt32 dwBytesReturned = 0;
-            UInt32 result = fltlib.FilterFindFirst(FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, IntPtr.Zero, 0, ref dwBytesReturned, out hFilters);
+            UInt32 result = fltlib.FilterFindFirst(FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, IntPtr.Zero, 0, ref dwBytesReturned, ref hFilters);
 
             if (2147942522 != result || 0 == dwBytesReturned)
             {
                 return;
             }
             IntPtr lpBuffer = Marshal.AllocHGlobal((int)dwBytesReturned);            
-            fltlib.FilterFindFirst(FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, lpBuffer, dwBytesReturned, ref dwBytesReturned, out hFilters);
+            fltlib.FilterFindFirst(FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, lpBuffer, dwBytesReturned, ref dwBytesReturned, ref hFilters);
             
             Print(lpBuffer);
             Marshal.FreeHGlobal(lpBuffer);
@@ -46,12 +46,12 @@ namespace Tokenvator
             do
             {
                 UInt32 lpBytesReturned = 0;
-                if (2147942522 != fltlib.FilterFindNext(hFilters, FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, IntPtr.Zero, 0, ref lpBytesReturned))
+                if (2147942522 != fltlib.FilterFindNext(hFilters, FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, IntPtr.Zero, 0, out lpBytesReturned))
                 {
                     break;
                 }
                 IntPtr lpBuffer = Marshal.AllocHGlobal((Int32)lpBytesReturned);
-                result = fltlib.FilterFindNext(hFilters, FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, lpBuffer, lpBytesReturned, ref lpBytesReturned);
+                result = fltlib.FilterFindNext(hFilters, FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, lpBuffer, lpBytesReturned, out lpBytesReturned);
                                 
                 Print(lpBuffer);
                 Marshal.FreeHGlobal(lpBuffer);
