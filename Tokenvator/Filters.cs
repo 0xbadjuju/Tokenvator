@@ -22,14 +22,14 @@ namespace Tokenvator
             Console.WriteLine("{0,8} {1,9} {2,8} {3,-10}", "--------", "---------", "--------", "-----------");
 
             UInt32 dwBytesReturned = 0;
-            UInt32 result = fltlib.FilterFindFirst(FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, IntPtr.Zero, 0, ref dwBytesReturned, ref hFilters);
+            UInt32 result = fltlib.FilterFindFirst(FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, IntPtr.Zero, 0, ref dwBytesReturned, out hFilters);
 
             if (2147942522 != result || 0 == dwBytesReturned)
             {
                 return;
             }
             IntPtr lpBuffer = Marshal.AllocHGlobal((int)dwBytesReturned);            
-            fltlib.FilterFindFirst(FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, lpBuffer, dwBytesReturned, ref dwBytesReturned, ref hFilters);
+            fltlib.FilterFindFirst(FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, lpBuffer, dwBytesReturned, ref dwBytesReturned, out hFilters);
             
             Print(lpBuffer);
             Marshal.FreeHGlobal(lpBuffer);
