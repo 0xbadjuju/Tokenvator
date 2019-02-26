@@ -133,7 +133,14 @@ namespace Tokenvator
                 String input;
                 if (activateTabs)
                 {
-                    input = console.ReadLine();
+                    try
+                    {
+                        input = console.ReadLine();
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        input = Console.ReadLine();
+                    }
                 }
                 else
                 {
