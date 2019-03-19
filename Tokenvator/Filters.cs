@@ -8,7 +8,7 @@ namespace Tokenvator
 {
     class Filters : IDisposable
     {
-        protected IntPtr hFilters;
+        protected IntPtr hFilters = IntPtr.Zero;
         private FltUserStructures._FILTER_AGGREGATE_BASIC_INFORMATION info;
 
         internal Filters()
@@ -45,7 +45,8 @@ namespace Tokenvator
             UInt32 result = 0;
             do
             {
-                if (2147942522 != fltlib.FilterFindNext(hFilters, FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, IntPtr.Zero, 0, out UInt32 lpBytesReturned))
+                UInt32 lpBytesReturned = 0;
+                if (2147942522 != fltlib.FilterFindNext(hFilters, FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, IntPtr.Zero, 0, out lpBytesReturned))
                 {
                     break;
                 }
@@ -69,7 +70,8 @@ namespace Tokenvator
                 String altitude = Marshal.PtrToStringUni(lpAltitude, info.FilterAltitudeLength / 2);
 
                 String alarm = "";
-                if (UInt32.TryParse(altitude, out UInt32 dwAltitude))
+                UInt32 dwAltitude = 0;
+                if (UInt32.TryParse(altitude, out dwAltitude))
                 {
                     if (320000 <= dwAltitude && 329998 >= dwAltitude)
                     {
