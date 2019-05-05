@@ -4,14 +4,16 @@ using System.Runtime.InteropServices;
 using MonkeyWorks.Unmanaged.Headers;
 using MonkeyWorks.Unmanaged.Libraries;
 
-namespace Tokenvator
+using Tokenvator.Resources;
+
+namespace Tokenvator.MiniFilters
 {
     class Filters : IDisposable
     {
         protected IntPtr hFilters = IntPtr.Zero;
-        private FltUserStructures._FILTER_AGGREGATE_BASIC_INFORMATION info;
+        //private FltUserStructures._FILTER_AGGREGATE_BASIC_INFORMATION info;
 
-        internal Filters()
+        public Filters()
         {
             Console.WriteLine();
         }
@@ -21,8 +23,8 @@ namespace Tokenvator
             Console.WriteLine("{0,8} {1,9} {2,8} {3,-10}", "Frame ID", "Instances", "Altitude", "Filter Name");
             Console.WriteLine("{0,8} {1,9} {2,8} {3,-10}", "--------", "---------", "--------", "-----------");
 
-            UInt32 dwBytesReturned = 0;
-            UInt32 result = fltlib.FilterFindFirst(FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, IntPtr.Zero, 0, ref dwBytesReturned, ref hFilters);
+            uint dwBytesReturned = 0;
+            uint result = fltlib.FilterFindFirst(FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, IntPtr.Zero, 0, ref dwBytesReturned, ref hFilters);
 
             if (2147942522 != result || 0 == dwBytesReturned)
             {
@@ -42,15 +44,15 @@ namespace Tokenvator
                 return;
             }
 
-            UInt32 result = 0;
+            uint result = 0;
             do
             {
-                UInt32 lpBytesReturned = 0;
+                uint lpBytesReturned = 0;
                 if (2147942522 != fltlib.FilterFindNext(hFilters, FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, IntPtr.Zero, 0, out lpBytesReturned))
                 {
                     break;
                 }
-                IntPtr lpBuffer = Marshal.AllocHGlobal((Int32)lpBytesReturned);
+                IntPtr lpBuffer = Marshal.AllocHGlobal((int)lpBytesReturned);
                 result = fltlib.FilterFindNext(hFilters, FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, lpBuffer, lpBytesReturned, out lpBytesReturned);
                                 
                 Print(lpBuffer);
@@ -63,15 +65,15 @@ namespace Tokenvator
         {
             var info = (FltUserStructures._FILTER_AGGREGATE_BASIC_INFORMATION)Marshal.PtrToStructure(baseAddress, typeof(FltUserStructures._FILTER_AGGREGATE_BASIC_INFORMATION));
 
-            UInt32 offset = 0;
+            uint offset = 0;
             do
             {
                 IntPtr lpAltitude = new IntPtr(baseAddress.ToInt64() + info.FilterAltitudeBufferOffset);
-                String altitude = Marshal.PtrToStringUni(lpAltitude, info.FilterAltitudeLength / 2);
+                string altitude = Marshal.PtrToStringUni(lpAltitude, info.FilterAltitudeLength / 2);
 
-                String alarm = "";
-                UInt32 dwAltitude = 0;
-                if (UInt32.TryParse(altitude, out dwAltitude))
+                string alarm = "";
+                uint dwAltitude = 0;
+                if (uint.TryParse(altitude, out dwAltitude))
                 {
                     if (320000 <= dwAltitude && 329998 >= dwAltitude)
                     {
@@ -91,7 +93,7 @@ namespace Tokenvator
                 }
 
                 IntPtr lpName = new IntPtr(baseAddress.ToInt64() + info.FilterNameBufferOffset);
-                String name = Marshal.PtrToStringUni(lpName, info.FilterNameLength / 2);
+                string name = Marshal.PtrToStringUni(lpName, info.FilterNameLength / 2);
 
                 Console.WriteLine("{0,8} {1,9} {2,8} {3,-20} {4,-15}", info.FrameID, info.NumberOfInstances, altitude, name, alarm);
 
@@ -101,26 +103,26 @@ namespace Tokenvator
             while (0 != offset);
         }
 
-        internal static void FilterDetach(String input)
+        internal static void FilterDetach(string input)
         {
-            String filterName = MainLoop.NextItem(ref input);
-            String volumeName = MainLoop.NextItem(ref input);
-            String instanceName = input;
+            string filterName = Misc.NextItem(ref input);
+            string volumeName = Misc.NextItem(ref input);
+            string instanceName = input;
             if (volumeName == instanceName)
             {
-                instanceName = String.Empty;
+                instanceName = string.Empty;
             }
 
-            UInt32 result = fltlib.FilterDetach(filterName, volumeName, instanceName);
+            uint result = fltlib.FilterDetach(filterName, volumeName, instanceName);
             if (0 != result)
             {
                 Console.WriteLine("FilterDetach Failed: 0x{0}", result.ToString("X4"));
             }
         }
 
-        internal static void Unload(String filterName)
+        internal static void Unload(string filterName)
         {
-            UInt32 result = fltlib.FilterUnload(filterName);
+            uint result = fltlib.FilterUnload(filterName);
             if (0 != result)
             {
                 if (2147943714 == result)

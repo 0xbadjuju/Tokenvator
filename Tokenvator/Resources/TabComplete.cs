@@ -14,30 +14,30 @@ namespace Tokenvator
     {        
         private static Assembly assembly = Assembly.GetExecutingAssembly();
 
-        private List<String> scrollback = new List<String>();
-        private Int32 scrollbackPosition = 0;
+        private List<string> scrollback = new List<string>();
+        private int scrollbackPosition = 0;
 
-        private List<String> options = new List<String>();
+        private List<string> options = new List<string>();
 
-        private String context;
+        private string context;
 
         ////////////////////////////////////////////////////////////////////////////////
         // Default constructor
         ////////////////////////////////////////////////////////////////////////////////
-        public TabComplete(String context, String[,] menu)
+        public TabComplete(string context, string[,] menu)
         {
             this.context = context;
 
-            for (Int32 i = 0; i < menu.GetLength(0); i++)
+            for (int i = 0; i < menu.GetLength(0); i++)
             {
-                options.Add((String)menu[i,0]);
+                options.Add((string)menu[i,0]);
             }
         }
 
         ////////////////////////////////////////////////////////////////////////////////
         // Get console input
         ////////////////////////////////////////////////////////////////////////////////
-        public String ReadLine()
+        public string ReadLine()
         {
             StringBuilder stringBuilder = new StringBuilder();
             ConsoleKey hold = ConsoleKey.EraseEndOfFile;
@@ -109,17 +109,17 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         // Process tab inputs and autocomplete
         ////////////////////////////////////////////////////////////////////////////////
-        private void TabInput(StringBuilder stringBuilder, Boolean doubleTab)
+        private void TabInput(StringBuilder stringBuilder, bool doubleTab)
         {
             StringBuilder tempBuilder = new StringBuilder(); ;
-            String input = stringBuilder.ToString();
+            string input = stringBuilder.ToString();
 
             if (doubleTab)
             {
                 //Console.WriteLine("\n" + String.Join("\n", options.ToArray()) + "\n");
-                for (Int32 i = 0; i < MainLoop.options.GetLength(0); i++)
+                for (int i = 0; i < MainLoop.options.GetLength(0); i++)
                 {
-                    if (String.Equals(input.Trim(), MainLoop.options[i, 0], StringComparison.InvariantCultureIgnoreCase))
+                    if (string.Equals(input.Trim(), MainLoop.options[i, 0], StringComparison.InvariantCultureIgnoreCase))
                     {
                         Console.WriteLine();
                         Console.WriteLine("{0,-25}{1,-20}{2,-20}", "Name", "Optional", "Required");
@@ -131,7 +131,7 @@ namespace Tokenvator
                 return;
             }
 
-            String candidate = options.FirstOrDefault(i => i != input && i.StartsWith(input, true, System.Globalization.CultureInfo.InvariantCulture));
+            string candidate = options.FirstOrDefault(i => i != input && i.StartsWith(input, true, System.Globalization.CultureInfo.InvariantCulture));
 
             if (string.IsNullOrEmpty(candidate))
             {
@@ -151,7 +151,7 @@ namespace Tokenvator
         {
             Console.SetCursorPosition(context.Length, Console.CursorTop);
             //This is needed for backspaces
-            Console.Write(new String(' ', Console.WindowWidth/2));
+            Console.Write(new string(' ', Console.WindowWidth/2));
             Console.SetCursorPosition(0, Console.CursorTop);
             Console.Write(context);
             Console.SetCursorPosition(context.Length, Console.CursorTop);
@@ -160,9 +160,9 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         // Read key input
         ////////////////////////////////////////////////////////////////////////////////
-        private Boolean KeyInput(StringBuilder stringBuilder, ConsoleKeyInfo keyDown)
+        private bool KeyInput(StringBuilder stringBuilder, ConsoleKeyInfo keyDown)
         {
-            Int32 position = Console.CursorLeft;
+            int position = Console.CursorLeft;
             if (ConsoleKey.Backspace == keyDown.Key)
             {
                 try
@@ -202,7 +202,7 @@ namespace Tokenvator
                 return false;
             }
 
-            Char key = keyDown.KeyChar;
+            char key = keyDown.KeyChar;
             if (Console.CursorLeft < (stringBuilder.Length + context.Length))
             {
                 try
