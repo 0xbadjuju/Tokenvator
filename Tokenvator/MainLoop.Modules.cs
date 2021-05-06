@@ -75,6 +75,7 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         private static void _BypassUAC(bool remote, int processID, string command, string input, IntPtr hToken)
         {
+            Console.WriteLine("[*] Notice: This no longer working on versions of Windows 10 > 1703");
             if (remote)
             {
                 using (RestrictedToken rt = new RestrictedToken(hToken))
