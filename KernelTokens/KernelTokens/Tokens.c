@@ -95,7 +95,9 @@ VOID AddTokenPrivilege(PRIVILEGES privilege, ULONGLONG output[9])
 	KdPrint(("PEPROCESS Base Address             : 0x%llp\r\n", ptrEProcess));
 	KdPrint(("PEPROCESS Base Address             : 0x%llp\r\n", output[0]));
 
-	PVOID* ptrFastRef = ((char*)ptrEProcess + 0x358);
+	//When originally attempted 0x358
+	//Current version 0x4b8
+	PVOID* ptrFastRef = ((char*)ptrEProcess + 0x4b8);
 	KdPrint(("EX_FAST_REF Base Address           : 0x%llp\r\n", ptrFastRef));
 	output[1] = (uintptr_t)ptrFastRef;
 

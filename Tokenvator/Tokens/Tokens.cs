@@ -35,6 +35,8 @@ namespace Tokenvator.AccessTokens
             "SeTcbPrivilege", "SeTimeZonePrivilege", "SeTrustedCredManAccessPrivilege", 
             "SeUndockPrivilege", "SeUnsolicitedInputPrivilege" };
 
+        List<uint> threads = new List<uint>();
+
         ////////////////////////////////////////////////////////////////////////////////
         // Default Constructor
         ////////////////////////////////////////////////////////////////////////////////
@@ -110,7 +112,7 @@ namespace Tokenvator.AccessTokens
             };
 
             uint status = ntdll.NtSetInformationProcess(
-                kernel32.GetCurrentProcess(), 
+                kernel32.GetCurrentProcess(),
                 ntdll._PROCESS_INFORMATION_CLASS.ProcessAccessToken, 
                 ref processAccessToken, 
                 (uint)Marshal.SizeOf(typeof(ntdll._PROCESS_ACCESS_TOKEN))
@@ -447,34 +449,85 @@ namespace Tokenvator.AccessTokens
             Console.WriteLine("[*] Recieved Token Handle 0x{0}", hExistingToken.ToString("X4"));
             kernel32.CloseHandle(hProcess);
             return true;
+        } 
+
+        ////////////////////////////////////////////////////////////////////////////////
+        // List all process threads
+        ////////////////////////////////////////////////////////////////////////////////
+        public bool ListThreads(int processId)
+        {
+            if (0 == processId)
+            {
+                processId = Process.GetCurrentProcess().Id;
+            }
+
+            IntPtr hSnapshot = kernel32.CreateToolhelp32Snapshot(TiHelp32.TH32CS_SNAPTHREAD, 0);
+
+            if (IntPtr.Zero == hSnapshot)
+            {
+                Misc.GetWin32Error("CreateToolhelp32Snapshot");
+                return false;
+            }
+
+            TiHelp32.tagTHREADENTRY32 threadyEntry32 = new TiHelp32.tagTHREADENTRY32()
+            {
+                dwSize = (uint)Marshal.SizeOf(typeof(TiHelp32.tagTHREADENTRY32))
+            };
+
+            if (!kernel32.Thread32First(hSnapshot, ref threadyEntry32))
+            {
+                Misc.GetWin32Error("Thread32First");
+                return false;
+            }           
+
+            if(threadyEntry32.th32OwnerProcessID == processId)
+                threads.Add(threadyEntry32.th32ThreadID);
+
+            while(kernel32.Thread32Next(hSnapshot, ref threadyEntry32))
+            {
+                if (threadyEntry32.th32OwnerProcessID == processId)
+                    threads.Add(threadyEntry32.th32ThreadID);
+            }
+
+            return true;
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        // Lists the users for threads
+        ////////////////////////////////////////////////////////////////////////////////
+        public void GetThreadUsers()
+        {
+            foreach(uint t in threads)
+            {
+                Console.WriteLine("[*] Thread ID: " + t);
+                if (_OpenThreadToken(t))
+                {
+                    Privileges.GetTokenUser(hWorkingThreadToken);
+                }
+            }
         }
 
         ////////////////////////////////////////////////////////////////////////////////
         // Opens a thread token
         ////////////////////////////////////////////////////////////////////////////////
-        private static IntPtr OpenThreadToken()
+        private bool _OpenThreadToken(uint threadId)
         {
             IntPtr hToken = new IntPtr();
-            Console.WriteLine("[*] Opening Thread Token");
-            if (!kernel32.OpenThreadToken(kernel32.GetCurrentThread(), (Constants.TOKEN_QUERY | Constants.TOKEN_ADJUST_PRIVILEGES), false, ref hToken))
+            IntPtr hThread = kernel32.OpenThread(ProcessThreadsApi.ThreadSecurityRights.THREAD_QUERY_INFORMATION, false, threadId);
+
+            if(IntPtr.Zero == hThread)
             {
-                Console.WriteLine(" [-] OpenTheadToken Failed");
-                Console.WriteLine(" [*] Impersonating Self");
-                if (!advapi32.ImpersonateSelf(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation))
-                {
-                    Misc.GetWin32Error("ImpersonateSelf");
-                    return IntPtr.Zero;
-                }
-                Console.WriteLine(" [+] Impersonated Self");
-                Console.WriteLine(" [*] Retrying");
-                if (!kernel32.OpenThreadToken(kernel32.GetCurrentThread(), (Constants.TOKEN_QUERY | Constants.TOKEN_ADJUST_PRIVILEGES), false, ref hToken))
-                {
-                    Misc.GetWin32Error("OpenThreadToken");
-                    return IntPtr.Zero;
-                }
+                Misc.GetWin32Error("OpenThread");
+                return false;
             }
-            Console.WriteLine(" [+] Recieved Thread Token Handle: 0x{0}", hToken.ToString("X4"));
-            return hToken;
+
+            bool retVal = kernel32.OpenThreadToken(hThread, Constants.TOKEN_QUERY, false, ref hWorkingThreadToken);
+
+            if (!retVal || IntPtr.Zero == hWorkingThreadToken)
+            {
+                return false;
+            }
+            return true;
         }
 
         ////////////////////////////////////////////////////////////////////////////////

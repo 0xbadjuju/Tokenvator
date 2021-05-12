@@ -630,7 +630,7 @@ namespace Tokenvator.AccessTokens
         public void Dispose()
         {
             if (!hDevice.IsInvalid)
-                kernel32.CloseHandle(hDevice);
+                hDevice.Dispose();
         }
 
         ////////////////////////////////////////////////////////////////////////////////

@@ -17,7 +17,8 @@ namespace Tokenvator.AccessTokens
     partial class Tokens : IDisposable
     {
         protected IntPtr hWorkingToken;
-        
+        protected IntPtr hWorkingThreadToken = new IntPtr();
+
         ////////////////////////////////////////////////////////////////////////////////
         // Sets hWorkingToken to currentProcessToken
         ////////////////////////////////////////////////////////////////////////////////

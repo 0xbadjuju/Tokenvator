@@ -31,7 +31,7 @@ namespace Tokenvator
             {
                 if (!td.Connect())
                 {
-                    Console.WriteLine("Driver Connect Failed");
+                    Console.WriteLine("[-] Driver Connect Failed");
                     return;
                 }
 
@@ -75,7 +75,7 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         private static void _BypassUAC(bool remote, int processID, string command, string input, IntPtr hToken)
         {
-            Console.WriteLine("[*] Notice: This no longer working on versions of Windows 10 > 1703");
+            Console.WriteLine("[*] Notice: This no longer working on versions of Windows 10 > 1703f");
             if (remote)
             {
                 using (RestrictedToken rt = new RestrictedToken(hToken))
@@ -290,26 +290,39 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         //
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _Info(bool remote, int processID, IntPtr hToken)
+        private static void _Info(bool remote, int processID, IntPtr hToken, string input)
         {
             using (Tokens t = new Tokens(hToken))
             {
-                if (remote && t.OpenProcessToken(processID))
+                if (remote)
                 {
-                    t.SetWorkingTokenToRemote();
-                    hToken = t.GetWorkingToken();
+                    if (t.OpenProcessToken(processID))
+                    {
+                        t.SetWorkingTokenToRemote();
+                        hToken = t.GetWorkingToken();
+                    }
+                    else
+                    {
+                        return;
+                    }
                 }
-                else
-                {
-                    return;
-                }
-
+                
                 Privileges.GetTokenUser(hToken);
                 Console.WriteLine();
+                
+                if ("all" == Misc.NextItem(ref input))
+                {
+                    t.ListThreads(processID);
+                    t.GetThreadUsers();
+                    Console.WriteLine();
+                }
+
                 Privileges.GetTokenOwner(hToken);
                 Console.WriteLine();
+                
                 Privileges.GetTokenGroups(hToken);
                 Console.WriteLine();
+                
                 Winnt._TOKEN_TYPE tokenType;
                 Privileges.GetElevationType(hToken, out tokenType);
                 Privileges.PrintElevation(hToken);
@@ -321,19 +334,31 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         private static void _InstallDriver(string command)
         {
-            string name = command.Replace(".sys", "");
-            using (PSExec p = new PSExec(name))
+            
+            //string name = command.Replace(".sys", "");
+            string name = Misc.NextItem(ref command);
+            Console.WriteLine(name);
+            Console.WriteLine(command);
+
+            PSExec p = new PSExec(name);
+
+            if (!p.Connect("."))
+                return;
+
+            if (!p.Open())
             {
-                if (!p.Connect("."))
+                if (!p.CreateDriver(command))
+                {
                     return;
-
+                }
                 if (!p.Open())
-                    if (!p.CreateDriver(command))
-                        return;
-
-                if (!p.Start())
+                {
                     return;
+                }
             }
+
+            if (!p.Start())
+                return;
         }
 
 
@@ -701,6 +726,13 @@ namespace Tokenvator
             }
         }
 
+        ////////////////////////////////////////////////////////////////////////////////
+        //
+        ////////////////////////////////////////////////////////////////////////////////
+        private static void _ReadProcessMemory(string input)
+        {
+
+        }
 
         ////////////////////////////////////////////////////////////////////////////////
         //
@@ -740,6 +772,121 @@ namespace Tokenvator
 
             inThread.Abort();
             outThread.Abort();
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        // This is probably going to break on certain consoles - e.g. Hangul || Kanji
+        ////////////////////////////////////////////////////////////////////////////////
+        private static void _RunAsNetOnly(string input)
+        {
+            string[] domain_user;
+            string domain;
+            string username;
+
+            string userInfo = Misc.NextItem(ref input);
+            if (userInfo.Contains("\\"))
+            {
+                domain_user = userInfo
+                    .Split(new string[] { "\\" }, StringSplitOptions.RemoveEmptyEntries);
+                domain = (2 == domain_user.Length) ? domain_user[0] : ".";
+                username = (2 == domain_user.Length) ? domain_user[1] : domain_user[0];
+            }
+            else if (userInfo.Contains("@"))
+            {
+                domain_user = userInfo
+                    .Split(new string[] { "@" }, StringSplitOptions.RemoveEmptyEntries);
+                domain = (2 == domain_user.Length) ? domain_user[1] : ".";
+                username = domain_user[0];
+            }
+            else
+            {
+                domain = ".";
+                username = userInfo;
+            }
+
+            string password = Misc.NextItemPreserveCase(ref input);
+
+            Console.WriteLine("[*] Username: {0}", username);
+            Console.WriteLine("[*] Domain:   {0}", domain);
+            Console.WriteLine("[*] Password: {0}", password);
+
+            string command = Misc.NextItem(ref input);
+
+            if (0 == string.Compare(command, password, true))
+            {
+                bool retVal = advapi32.LogonUser(
+                    username, domain, password,
+                    Winbase.LOGON_TYPE.LOGON32_LOGON_NEW_CREDENTIALS,
+                    Winbase.LOGON_PROVIDER.LOGON32_PROVIDER_DEFAULT,
+                    out IntPtr phToken
+                );
+
+                if (!retVal || IntPtr.Zero == phToken)
+                {
+                    Misc.GetWin32Error("LogonUser");
+                    return;
+                }
+
+                Winbase._SECURITY_ATTRIBUTES securityAttributes = new Winbase._SECURITY_ATTRIBUTES();
+                advapi32.DuplicateTokenEx(
+                    phToken,
+                    (uint)Winnt.ACCESS_MASK.MAXIMUM_ALLOWED, 
+                    ref securityAttributes,
+                    Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,
+                    Winnt._TOKEN_TYPE.TokenImpersonation, 
+                    out IntPtr phNewToken
+                );
+
+                kernel32.CloseHandle(phToken);
+
+                if (!retVal || IntPtr.Zero == phNewToken)
+                {
+                    Misc.GetWin32Error("DuplicateTokenEx");
+                    return;
+                }
+
+                WindowsIdentity newId = new WindowsIdentity(phNewToken);
+                WindowsImpersonationContext impersonatedUser = newId.Impersonate();
+                Console.WriteLine("[*] If you run \"info all\", you should now see a thread token in the primary thread.");
+
+                if (!retVal)
+                {
+                    Misc.GetWin32Error("ImpersonateLoggedOnUser");
+                    return;
+                }
+
+                Console.WriteLine("[+] Operating As: {0}", WindowsIdentity.GetCurrent().Name);
+            }
+            else
+            {
+                Console.WriteLine("[*] Command: {0}", command);
+
+                Winbase._STARTUPINFO startupInfo = new Winbase._STARTUPINFO
+                {
+                    cb = (uint)System.Runtime.InteropServices.Marshal.SizeOf(typeof(Winbase._STARTUPINFO))
+                };
+
+                bool retVal = advapi32.CreateProcessWithLogonW(
+                    username, domain, password,
+                    Winbase.LOGON_FLAGS.LOGON_NETCREDENTIALS_ONLY,
+                    command, 
+                    input,
+                    Winbase.CREATION_FLAGS.CREATE_NEW_PROCESS_GROUP,
+                    IntPtr.Zero, 
+                    Environment.CurrentDirectory,
+                    ref startupInfo,
+                    out Winbase._PROCESS_INFORMATION processInformation
+                );              
+
+                if (!retVal)
+                {
+                    Misc.GetWin32Error("CreateProcessWithLogonW");
+                    return;
+                }
+
+                Console.WriteLine("[+] Process ID: {0}", processInformation.dwProcessId);
+                Console.WriteLine("[+] Thread ID:  {0}", processInformation.dwThreadId);
+            }
         }
 
         ////////////////////////////////////////////////////////////////////////////////

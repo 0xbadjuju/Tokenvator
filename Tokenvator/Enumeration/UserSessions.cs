@@ -6,6 +6,8 @@ using System.Management;
 using System.Runtime.InteropServices;
 using System.Text;
 
+using Tokenvator.Resources;
+
 using MonkeyWorks.Unmanaged.Headers;
 using MonkeyWorks.Unmanaged.Libraries;
 
@@ -63,6 +65,7 @@ namespace Tokenvator.Enumeration
             IntPtr ppLogonSessionData = new IntPtr();
             if (0 != secur32.LsaGetLogonSessionData(lpLuid, out ppLogonSessionData))
             {
+                Misc.GetWin32Error("LsaGetLogonSessionData");
                 return false;
             }
 
@@ -76,14 +79,16 @@ namespace Tokenvator.Enumeration
             {
                 return false;
             }
+            
+            string usernameBuffer = Marshal.PtrToStringUni(securityLogonSessionData.UserName.Buffer);
 
-            if (Environment.MachineName+"$" == Marshal.PtrToStringUni(securityLogonSessionData.UserName.Buffer) && ConvertSidToName(securityLogonSessionData.Sid, out userName))
+            if (Environment.MachineName+"$" == usernameBuffer && ConvertSidToName(securityLogonSessionData.Sid, out userName))
             {
                 return true;
 
             }
 
-            userName = string.Format("{0}\\{1}", Marshal.PtrToStringUni(securityLogonSessionData.LogonDomain.Buffer), Marshal.PtrToStringUni(securityLogonSessionData.UserName.Buffer));
+            userName = string.Format("{0}\\{1}", Marshal.PtrToStringUni(securityLogonSessionData.LogonDomain.Buffer), usernameBuffer);
             return true;
         }
 
@@ -94,16 +99,25 @@ namespace Tokenvator.Enumeration
         {
             StringBuilder sbUserName = new StringBuilder();
 
+            string lpSystemName = string.Empty;
             StringBuilder lpName = new StringBuilder();
             uint cchName = (uint)lpName.Capacity;
             StringBuilder lpReferencedDomainName = new StringBuilder();
             uint cchReferencedDomainName = (uint)lpReferencedDomainName.Capacity;
             Winnt._SID_NAME_USE sidNameUse = new Winnt._SID_NAME_USE();
-            advapi32.LookupAccountSid(string.Empty, sid, lpName, ref cchName, lpReferencedDomainName, ref cchReferencedDomainName, out sidNameUse);
+            advapi32.LookupAccountSid(lpSystemName, sid, lpName, ref cchName, lpReferencedDomainName, ref cchReferencedDomainName, out sidNameUse);
 
             lpName.EnsureCapacity((int)cchName + 1);
             lpReferencedDomainName.EnsureCapacity((int)cchReferencedDomainName + 1);
-            advapi32.LookupAccountSid(string.Empty, sid, lpName, ref cchName, lpReferencedDomainName, ref cchReferencedDomainName, out sidNameUse);
+
+            byte[] bsid = new byte[16];
+            Marshal.Copy(sid, bsid, 0, 16);
+            bool retVal = advapi32.LookupAccountSid(lpSystemName, sid, lpName, ref cchName, lpReferencedDomainName, ref cchReferencedDomainName, out sidNameUse);
+
+            if (!retVal && 0 == lpName.Length)
+            {
+                Misc.GetWin32Error("LookupAccountSid");
+            }
 
             if (lpReferencedDomainName.Length > 0)
             {

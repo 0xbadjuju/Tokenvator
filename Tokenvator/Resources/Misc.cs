@@ -59,6 +59,26 @@ namespace Tokenvator.Resources
         }
 
         ////////////////////////////////////////////////////////////////////////////////
+        // Pops an item from the input and returns the item - only used in inital menu
+        // Taken from FowlPlay
+        ////////////////////////////////////////////////////////////////////////////////
+        public static string NextItemPreserveCase(ref string input)
+        {
+            string option = string.Empty;
+            string[] options = input.Split(new string[] { " " }, StringSplitOptions.RemoveEmptyEntries);
+            if (options.Length > 1)
+            {
+                option = options[0];
+                input = string.Join(" ", options, 1, options.Length - 1);
+            }
+            else
+            {
+                option = input;
+            }
+            return option;
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
         // https://stackoverflow.com/questions/16100/convert-a-string-to-an-enum-in-c-sharp
         ////////////////////////////////////////////////////////////////////////////////
         public static T ParseEnum<T>(string value)

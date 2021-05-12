@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 
+using System.Security.Principal;
+
 using Tokenvator.Resources;
 
 using MonkeyWorks.Unmanaged.Headers;
@@ -172,6 +174,7 @@ namespace Tokenvator.Enumeration
             uint returnLength = 0;
             advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenUser, IntPtr.Zero, 0, out returnLength);
             IntPtr lpTokenInformation = Marshal.AllocHGlobal((int)returnLength);
+
             Ntifs._TOKEN_USER tokenUser;
             try
             {
@@ -181,10 +184,6 @@ namespace Tokenvator.Enumeration
                     return;
                 }
                 tokenUser = (Ntifs._TOKEN_USER)Marshal.PtrToStructure(lpTokenInformation, typeof(Ntifs._TOKEN_USER));
-                if (IntPtr.Zero == tokenUser.User[0].Sid)
-                {
-                    Misc.GetWin32Error("PtrToStructure");
-                }
             }
             catch (Exception ex)
             {
@@ -200,7 +199,7 @@ namespace Tokenvator.Enumeration
             Console.WriteLine("[+] User: ");
             string sid, account;
             sid = account = string.Empty;
-            _ReadSidAndName(tokenUser.User[0].Sid, out sid, out account);
+            _ReadSidAndName(tokenUser.User.Sid, out sid, out account);
             Console.WriteLine("{0,-50} {1}", sid, account);
             return;
         }
@@ -222,6 +221,17 @@ namespace Tokenvator.Enumeration
                     return false;
                 }
                 tokenGroups = (Ntifs._TOKEN_GROUPS)Marshal.PtrToStructure(lpTokenInformation, typeof(Ntifs._TOKEN_GROUPS));
+
+                Console.WriteLine("[+] Enumerated {0} Groups: ", tokenGroups.GroupCount);
+                for (int i = 0; i < tokenGroups.GroupCount; i++)
+                {
+                    string sid, account;
+                    sid = account = string.Empty;
+                    _ReadSidAndName(tokenGroups.Groups[i].Sid, out sid, out account);
+                    Console.WriteLine("{0,-50} {1}", sid, account);
+                }
+                return true;
+
             }
             catch (Exception ex)
             {
@@ -233,16 +243,6 @@ namespace Tokenvator.Enumeration
             {
                 Marshal.FreeHGlobal(lpTokenInformation);
             }
-
-            Console.WriteLine("[+] Enumerated {0} Groups: ", tokenGroups.GroupCount);
-            for (int i = 0; i < tokenGroups.GroupCount; i++)
-            {
-                string sid, account;
-                sid = account = string.Empty;
-                _ReadSidAndName(tokenGroups.Groups[i].Sid, out sid, out account);
-                Console.WriteLine("{0,-50} {1}", sid, account);
-            }
-            return true;
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -255,17 +255,14 @@ namespace Tokenvator.Enumeration
             IntPtr lpSid = IntPtr.Zero;
             try
             {
-                advapi32.ConvertSidToStringSid(pointer, ref lpSid);
-                if (IntPtr.Zero == lpSid)
+                Ntifs._SID structSid = (Ntifs._SID)Marshal.PtrToStructure(pointer, typeof(Ntifs._SID));
+                bool retVal = advapi32.ConvertSidToStringSid(ref structSid, ref lpSid);
+                if (!retVal || IntPtr.Zero == lpSid)
                 {
+                    Misc.GetWin32Error("ConvertSidToStringSid");
                     return;
                 }
                 sid = Marshal.PtrToStringAuto(lpSid);
-
-                if (!UserSessions.ConvertSidToName(pointer, out account))
-                {
-                    return;
-                }
             }
             catch (Exception ex)
             {
@@ -275,6 +272,22 @@ namespace Tokenvator.Enumeration
             {
                 kernel32.LocalFree(lpSid);
             }
+
+            try
+            {
+                account = new SecurityIdentifier(sid).Translate(typeof(NTAccount)).ToString();
+            }
+            catch (IdentityNotMappedException ex)
+            {
+                account = ex.Message;
+            }
+            /*
+            if (!UserSessions.ConvertSidToName(pointer, out account))
+            {
+                return;
+            }
+            */
+
         }
 
         ////////////////////////////////////////////////////////////////////////////////

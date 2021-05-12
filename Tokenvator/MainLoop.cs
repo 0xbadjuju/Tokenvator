@@ -163,10 +163,10 @@ namespace Tokenvator
                         _Help(input);
                         break;
                     case "info":
-                        _Info(remote, processID, hToken);
+                        _Info(remote, processID, hToken, input);
                         break;
                     case "install_driver":
-                        _InstallDriver(command);
+                        _InstallDriver(input);
                         break;
                     case "list_filters":
                         _ListFilters();
@@ -197,6 +197,9 @@ namespace Tokenvator
                         break;
                     case "run":
                         _Run(input);
+                        break;
+                    case "runas":
+                        _RunAsNetOnly(input);
                         break;
                     case "runpowershell":
                         _RunPowerShell(input);

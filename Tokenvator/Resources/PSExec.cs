@@ -23,6 +23,7 @@ namespace Tokenvator
         public PSExec(string serviceName)
         {
             this.serviceName = serviceName;
+            Console.WriteLine("[*] Using Service Name {0}", serviceName);
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -139,7 +140,7 @@ namespace Tokenvator
             if (IntPtr.Zero == hSCObject)
             {
                 Console.WriteLine("[-] Failed to create service");
-                Console.WriteLine(Marshal.GetLastWin32Error());
+                Misc.GetWin32Error("CreateDriver");
                 disposed = true;
                 return false;
             }
@@ -154,12 +155,16 @@ namespace Tokenvator
         ///////////////////////////////////////////////////////////////////////////////
         internal bool Open()
         {
-            hSCObject = advapi32.OpenService(hServiceManager, serviceName, Winsvc.dwDesiredAccess.SERVICE_ALL_ACCESS);
+            hSCObject = advapi32.OpenService(
+                hServiceManager, 
+                serviceName, 
+                Winsvc.dwDesiredAccess.SERVICE_ALL_ACCESS
+            );
 
             if (IntPtr.Zero == hSCObject)
             {
                 Console.WriteLine("[-] Failed to open service");
-                Console.WriteLine(Marshal.GetLastWin32Error());
+                Misc.GetWin32Error("Open");
                 return false;
             }
 
@@ -178,7 +183,7 @@ namespace Tokenvator
                 if (1053 != error)
                 {
                     Console.WriteLine("[-] Failed to start service");
-                    Console.WriteLine(new System.ComponentModel.Win32Exception(error).Message);
+                    Misc.GetWin32Error("Start");
                     return false;
                 }
             }
