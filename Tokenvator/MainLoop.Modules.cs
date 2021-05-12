@@ -8,10 +8,12 @@ using System.Management.Automation.Runspaces;
 using System.Security.Principal;
 using System.Threading;
 
-using Tokenvator.AccessTokens;
-using Tokenvator.Enumeration;
-using Tokenvator.MiniFilters;
 using Tokenvator.Resources;
+using Tokenvator.Plugins.AccessTokens;
+using Tokenvator.Plugins.Enumeration;
+using Tokenvator.Plugins.Execution;
+using Tokenvator.Plugins.MiniFilters;
+using Tokenvator.Plugins.NamedPipes;
 
 using MonkeyWorks.Unmanaged.Headers;
 using MonkeyWorks.Unmanaged.Libraries;
@@ -143,6 +145,15 @@ namespace Tokenvator
         }
 
         ////////////////////////////////////////////////////////////////////////////////
+        // https://github.com/numbnet/Win32-OpenSSH/blob/8dd7423e13ac0b88b3084ec95bc93ea09dec1fef/contrib/win32/win32compat/win32auth.c
+        // https://github.com/bb107/WinSudo/blob/b2cb7700bd2f7ee59e2ef7f9ca20c2a671ce72a8/PrivilegeHelps/Security.cpp
+        ////////////////////////////////////////////////////////////////////////////////
+        private static void _CreateToken()
+        {
+
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
         //
         ////////////////////////////////////////////////////////////////////////////////
         private static void _FindUserProcesses(string input)
@@ -228,7 +239,7 @@ namespace Tokenvator
                     t.SetWorkingTokenToSelf();
 
                     if (!enabled)
-                        t.SetTokenPrivilege(Constants.SE_DEBUG_NAME, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED);
+                        t.SetTokenPrivilege(Winnt.SE_DEBUG_NAME, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED);
 
                     if ("getsystem" == item)
                         t.GetSystem();
@@ -261,7 +272,7 @@ namespace Tokenvator
                     t.SetWorkingTokenToSelf();
 
                     if (!enabled)
-                        t.SetTokenPrivilege(Constants.SE_DEBUG_NAME, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED);
+                        t.SetTokenPrivilege(Winnt.SE_DEBUG_NAME, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED);
 
                     if ("gettrustedinstaller" == item)
                         t.GetTrustedInstaller();
@@ -306,10 +317,14 @@ namespace Tokenvator
                         return;
                     }
                 }
-                
+
+                Console.WriteLine("[*] Primary Token");
                 Privileges.GetTokenUser(hToken);
+                Console.WriteLine();          
+                Privileges.GetTokenOwner(hToken);
                 Console.WriteLine();
-                
+
+                Console.WriteLine("[*] Impersonation Tokens");
                 if ("all" == Misc.NextItem(ref input))
                 {
                     t.ListThreads(processID);
@@ -317,15 +332,16 @@ namespace Tokenvator
                     Console.WriteLine();
                 }
 
-                Privileges.GetTokenOwner(hToken);
-                Console.WriteLine();
-                
+                Console.WriteLine("[*] Primary Token Groups");
                 Privileges.GetTokenGroups(hToken);
                 Console.WriteLine();
-                
-                Winnt._TOKEN_TYPE tokenType;
-                Privileges.GetElevationType(hToken, out tokenType);
-                Privileges.PrintElevation(hToken);
+
+                if ("all" == Misc.NextItem(ref input))
+                {
+                    Winnt._TOKEN_TYPE tokenType;
+                    Privileges.GetElevationType(hToken, out tokenType);
+                    Privileges.PrintElevation(hToken);
+                }
             }
         }
 
@@ -360,7 +376,6 @@ namespace Tokenvator
             if (!p.Start())
                 return;
         }
-
 
         ////////////////////////////////////////////////////////////////////////////////
         //
@@ -663,7 +678,7 @@ namespace Tokenvator
         {
             if (remote)
             {
-                hProcess = kernel32.OpenProcess(Constants.PROCESS_TERMINATE, false, (uint)processID);
+                hProcess = kernel32.OpenProcess(Winnt.PROCESS_TERMINATE, false, (uint)processID);
                 if (IntPtr.Zero == hProcess)
                 {
                     Misc.GetWin32Error("OpenProcess");

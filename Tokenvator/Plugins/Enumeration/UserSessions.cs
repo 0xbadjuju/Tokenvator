@@ -11,7 +11,7 @@ using Tokenvator.Resources;
 using MonkeyWorks.Unmanaged.Headers;
 using MonkeyWorks.Unmanaged.Libraries;
 
-namespace Tokenvator.Enumeration
+namespace Tokenvator.Plugins.Enumeration
 {
     class UserSessions
     {
@@ -240,7 +240,7 @@ namespace Tokenvator.Enumeration
             Dictionary<string, uint> users = new Dictionary<string, uint>();
             foreach (Process p in Process.GetProcesses())
             {
-                IntPtr hProcess = kernel32.OpenProcess(Constants.PROCESS_QUERY_LIMITED_INFORMATION, true, (uint)p.Id);
+                IntPtr hProcess = kernel32.OpenProcess(Winnt.PROCESS_QUERY_LIMITED_INFORMATION, true, (uint)p.Id);
                 if (IntPtr.Zero == hProcess)
                 {
                     continue;
@@ -338,7 +338,7 @@ namespace Tokenvator.Enumeration
             Console.WriteLine("[*] Examining {0} processes", pids.Length);
             foreach (Process p in pids)
             {
-                IntPtr hProcess = kernel32.OpenProcess(Constants.PROCESS_QUERY_LIMITED_INFORMATION, true, (uint)p.Id);
+                IntPtr hProcess = kernel32.OpenProcess(Winnt.PROCESS_QUERY_LIMITED_INFORMATION, true, (uint)p.Id);
                 if (IntPtr.Zero == hProcess)
                 {
                     continue;

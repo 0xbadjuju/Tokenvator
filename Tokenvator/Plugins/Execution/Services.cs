@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Management;
 using System.ServiceProcess;
 
-namespace Tokenvator
+namespace Tokenvator.Plugins.Execution
 {
     class Services
     {

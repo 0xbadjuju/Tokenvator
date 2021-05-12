@@ -5,13 +5,15 @@ using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text;
 
-using Tokenvator.Enumeration;
 using Tokenvator.Resources;
+using Tokenvator.Plugins.Enumeration;
+using Tokenvator.Plugins.Execution;
+
 
 using MonkeyWorks.Unmanaged.Headers;
 using MonkeyWorks.Unmanaged.Libraries;
 
-namespace Tokenvator.AccessTokens
+namespace Tokenvator.Plugins.AccessTokens
 {
     partial class Tokens : IDisposable
     {
@@ -79,7 +81,7 @@ namespace Tokenvator.AccessTokens
             Winbase._SECURITY_ATTRIBUTES securityAttributes = new Winbase._SECURITY_ATTRIBUTES();
             if (!advapi32.DuplicateTokenEx(
                         hExistingToken,
-                        Constants.TOKEN_ALL_ACCESS,
+                        Winnt.TOKEN_ALL_ACCESS,
                         ref securityAttributes,
                         Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityDelegation,
                         Winnt._TOKEN_TYPE.TokenPrimary,
@@ -428,7 +430,7 @@ namespace Tokenvator.AccessTokens
                 return false;
             }
 
-            IntPtr hProcess = kernel32.OpenProcess(Constants.PROCESS_QUERY_INFORMATION, false, (uint)processId);
+            IntPtr hProcess = kernel32.OpenProcess(Winnt.PROCESS_QUERY_INFORMATION, false, (uint)processId);
             if (IntPtr.Zero == hProcess)
             {
                 Misc.GetWin32Error("OpenProcess");
@@ -436,7 +438,7 @@ namespace Tokenvator.AccessTokens
             }
             Console.WriteLine("[*] Recieved Process Handle 0x{0}", hProcess.ToString("X4"));
 
-            if (!kernel32.OpenProcessToken(hProcess, Constants.TOKEN_ALL_ACCESS, out hExistingToken))
+            if (!kernel32.OpenProcessToken(hProcess, Winnt.TOKEN_ALL_ACCESS, out hExistingToken))
             {
                 if (!kernel32.OpenProcessToken(hProcess, (uint)Winnt.ACCESS_MASK.MAXIMUM_ALLOWED, out hExistingToken))
                 {
@@ -521,7 +523,7 @@ namespace Tokenvator.AccessTokens
                 return false;
             }
 
-            bool retVal = kernel32.OpenThreadToken(hThread, Constants.TOKEN_QUERY, false, ref hWorkingThreadToken);
+            bool retVal = kernel32.OpenThreadToken(hThread, Winnt.TOKEN_QUERY, false, ref hWorkingThreadToken);
 
             if (!retVal || IntPtr.Zero == hWorkingThreadToken)
             {

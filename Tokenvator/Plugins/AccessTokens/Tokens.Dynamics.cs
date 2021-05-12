@@ -2,13 +2,13 @@
 using System.Runtime.InteropServices;
 using System.Text;
 
-using Tokenvator.Enumeration;
 using Tokenvator.Resources;
+using Tokenvator.Plugins.Enumeration;
 
 using MonkeyWorks.Unmanaged.Headers;
 using MonkeyWorks.Unmanaged.Libraries;
 
-namespace Tokenvator.AccessTokens
+namespace Tokenvator.Plugins.AccessTokens
 {
     ////////////////////////////////////////////////////////////////////////////////
     // Methods in this partial class use hWorking token which must be set via
@@ -181,7 +181,7 @@ namespace Tokenvator.AccessTokens
         {
             bool exists, enabled;
             SetWorkingTokenToSelf();
-            Privileges.CheckTokenPrivilege(hWorkingToken, Constants.SE_TCB_NAME, out exists, out enabled);
+            Privileges.CheckTokenPrivilege(hWorkingToken, Winnt.SE_TCB_NAME, out exists, out enabled);
 
             if (!exists)
             {
@@ -190,7 +190,7 @@ namespace Tokenvator.AccessTokens
             }
 
             SetWorkingTokenToRemote();
-            if (!enabled && !SetTokenPrivilege(Constants.SE_TCB_NAME, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED))
+            if (!enabled && !SetTokenPrivilege(Winnt.SE_TCB_NAME, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED))
             {
                 Console.WriteLine("[-] Enable SeTcbPrivilege Failed ");
                 return false;

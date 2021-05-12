@@ -10,7 +10,7 @@ using Tokenvator.Resources;
 using MonkeyWorks.Unmanaged.Headers;
 using MonkeyWorks.Unmanaged.Libraries;
 
-namespace Tokenvator.AccessTokens
+namespace Tokenvator.Plugins.AccessTokens
 {
     class TokenDriver : IDisposable
     {

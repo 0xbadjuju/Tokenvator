@@ -5,7 +5,7 @@ using Tokenvator.Resources;
 
 using MonkeyWorks.Unmanaged.Libraries;
 
-namespace Tokenvator
+namespace Tokenvator.Plugins.Enumeration
 {
     class DesktopACL : IDisposable
     {

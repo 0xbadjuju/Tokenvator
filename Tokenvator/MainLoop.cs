@@ -3,8 +3,8 @@ using System.Diagnostics;
 using System.Linq;
 using System.Security.Principal;
 
-using Tokenvator.Enumeration;
-using Tokenvator.MiniFilters;
+using Tokenvator.Plugins.Enumeration;
+using Tokenvator.Plugins.MiniFilters;
 using Tokenvator.Resources;
 
 using MonkeyWorks.Unmanaged.Headers;
@@ -108,12 +108,12 @@ namespace Tokenvator
                 if (!remote)
                 {
                     hProcess = hBackup;
-                    kernel32.OpenProcessToken(hProcess, Constants.TOKEN_ALL_ACCESS, out hToken);
+                    kernel32.OpenProcessToken(hProcess, Winnt.TOKEN_ALL_ACCESS, out hToken);
                     if (IntPtr.Zero == hToken)
                     {
                         Console.WriteLine("[-] Opening Process Token Failed, Opening Thread Token");
                         IntPtr hThread = kernel32.GetCurrentThread();
-                        kernel32.OpenThreadToken(hThread, Constants.TOKEN_ALL_ACCESS, true, ref hToken);
+                        kernel32.OpenThreadToken(hThread, Winnt.TOKEN_ALL_ACCESS, true, ref hToken);
                         if (IntPtr.Zero == hToken)
                         {
                             Console.WriteLine("[-] Opening Thread Token Failed, Recommend RevertToSelf");
@@ -152,6 +152,9 @@ namespace Tokenvator
                         break;
                     case "find_user_processes_wmi":
                         _FindUserProcessesWMI(input);
+                        break;
+                    case "getinfo":
+                        _Info(remote, processID, hToken, input);
                         break;
                     case "getsystem":
                         _GetSystem(input, hToken);

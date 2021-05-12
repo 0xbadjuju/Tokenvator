@@ -8,7 +8,7 @@ using Tokenvator.Resources;
 using MonkeyWorks.Unmanaged.Headers;
 using MonkeyWorks.Unmanaged.Libraries;
 
-namespace Tokenvator.Enumeration
+namespace Tokenvator.Plugins.Enumeration
 {
     class Privileges
     {            

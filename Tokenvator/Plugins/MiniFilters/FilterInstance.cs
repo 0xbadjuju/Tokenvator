@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 using MonkeyWorks.Unmanaged.Headers;
 using MonkeyWorks.Unmanaged.Libraries;
 
-namespace Tokenvator.MiniFilters
+namespace Tokenvator.Plugins.MiniFilters
 {
     class FilterInstance : Filters
     {

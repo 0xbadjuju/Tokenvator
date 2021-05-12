@@ -6,11 +6,12 @@ using System.Security.AccessControl;
 using System.Threading;
 
 using Tokenvator.Resources;
+using Tokenvator.Plugins.Execution;
 
 using MonkeyWorks.Unmanaged.Headers;
 using MonkeyWorks.Unmanaged.Libraries;
 
-namespace Tokenvator
+namespace Tokenvator.Plugins.NamedPipes
 {
     class NamedPipes
     {
@@ -178,7 +179,7 @@ namespace Tokenvator
                 }
                 
                 
-                if (!kernel32.OpenThreadToken(kernel32.GetCurrentThread(), Constants.TOKEN_ALL_ACCESS, false, ref hToken))
+                if (!kernel32.OpenThreadToken(kernel32.GetCurrentThread(), Winnt.TOKEN_ALL_ACCESS, false, ref hToken))
                 {
                     Misc.GetWin32Error("OpenThreadToken");
                     return false;
@@ -187,10 +188,10 @@ namespace Tokenvator
 
                 
                 IntPtr phNewToken = new IntPtr();
-                uint result = ntdll.NtDuplicateToken(hToken, Constants.TOKEN_ALL_ACCESS, IntPtr.Zero, true, Winnt._TOKEN_TYPE.TokenPrimary, ref phNewToken);
+                uint result = ntdll.NtDuplicateToken(hToken, Winnt.TOKEN_ALL_ACCESS, IntPtr.Zero, true, Winnt._TOKEN_TYPE.TokenPrimary, ref phNewToken);
                 if (IntPtr.Zero == phNewToken)
                 {
-                    result = ntdll.NtDuplicateToken(hToken, Constants.TOKEN_ALL_ACCESS, IntPtr.Zero, true, Winnt._TOKEN_TYPE.TokenImpersonation, ref phNewToken);
+                    result = ntdll.NtDuplicateToken(hToken, Winnt.TOKEN_ALL_ACCESS, IntPtr.Zero, true, Winnt._TOKEN_TYPE.TokenImpersonation, ref phNewToken);
                     if (IntPtr.Zero == phNewToken)
                     {
                         Misc.GetNtError("NtDuplicateToken", result);

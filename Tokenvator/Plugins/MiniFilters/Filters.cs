@@ -6,7 +6,7 @@ using MonkeyWorks.Unmanaged.Libraries;
 
 using Tokenvator.Resources;
 
-namespace Tokenvator.MiniFilters
+namespace Tokenvator.Plugins.MiniFilters
 {
     class Filters : IDisposable
     {

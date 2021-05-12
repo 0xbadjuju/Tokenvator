@@ -7,7 +7,7 @@ using MonkeyWorks.Unmanaged.Libraries;
 
 using Tokenvator.Resources;
 
-namespace Tokenvator
+namespace Tokenvator.Plugins.Execution
 {
     sealed class PSExec : IDisposable
     {

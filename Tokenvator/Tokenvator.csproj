@@ -127,22 +127,20 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CreateProcess.cs" />
-    <Compile Include="DesktopACL.cs" />
-    <Compile Include="Enumeration\UserSessions.cs" />
-    <Compile Include="Filters\FilterInstance.cs" />
-    <Compile Include="Filters\Filters.cs" />
+    <Compile Include="Plugins\Execution\CreateProcess.cs" />
+    <Compile Include="Plugins\Enumeration\DesktopACL.cs" />
+    <Compile Include="Plugins\Enumeration\UserSessions.cs" />
+    <Compile Include="Plugins\MiniFilters\FilterInstance.cs" />
+    <Compile Include="Plugins\MiniFilters\Filters.cs" />
     <Compile Include="MainLoop.cs" />
     <Compile Include="MainLoop.Modules.cs" />
     <Compile Include="Resources\Misc.cs" />
     <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\SecurityBaseApi.cs" />
-    <Compile Include="Tokens\Tokens.Dynamics.cs" />
-    <Compile Include="Unused\KernelTokens.cs" />
-    <Compile Include="NamedPipes.cs" />
-    <Compile Include="Enumeration\Privileges.cs" />
+    <Compile Include="Plugins\AccessTokens\Tokens.Dynamics.cs" />
+    <Compile Include="Plugins\NamedPipes\NamedPipes.cs" />
+    <Compile Include="Plugins\Enumeration\Privileges.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Resources\Constants.cs" />
     <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\FltUserStructures.cs" />
     <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\Minidumpapiset.cs" />
     <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\MinWinBase.cs" />
@@ -174,11 +172,11 @@
     <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\vaultcli.cs" />
     <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\wlanapi.cs" />
     <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\wtsapi32.cs" />
-    <Compile Include="Resources\PSExec.cs" />
-    <Compile Include="Tokens\RestrictedToken.cs" />
-    <Compile Include="Resources\Services.cs" />
-    <Compile Include="Tokens\TokenDriver.cs" />
-    <Compile Include="Tokens\Tokens.cs" />
+    <Compile Include="Plugins\Execution\PSExec.cs" />
+    <Compile Include="Plugins\AccessTokens\RestrictedToken.cs" />
+    <Compile Include="Plugins\Execution\Services.cs" />
+    <Compile Include="Plugins\AccessTokens\TokenDriver.cs" />
+    <Compile Include="Plugins\AccessTokens\Tokens.cs" />
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include="Microsoft.Net.Client.3.5">

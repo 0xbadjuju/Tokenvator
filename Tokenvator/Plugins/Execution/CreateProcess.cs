@@ -7,7 +7,7 @@ using Tokenvator.Resources;
 using MonkeyWorks.Unmanaged.Headers;
 using MonkeyWorks.Unmanaged.Libraries;
 
-namespace Tokenvator
+namespace Tokenvator.Plugins.Execution
 {
     static class CreateProcess
     {

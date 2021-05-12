@@ -3,11 +3,12 @@ using System.Runtime.InteropServices;
 using System.Security.Principal;
 
 using Tokenvator.Resources;
+using Tokenvator.Plugins.Execution;
 
 using MonkeyWorks.Unmanaged.Headers;
 using MonkeyWorks.Unmanaged.Libraries;
 
-namespace Tokenvator.AccessTokens
+namespace Tokenvator.Plugins.AccessTokens
 {
     class RestrictedToken : Tokens
     {
@@ -51,7 +52,7 @@ namespace Tokenvator.AccessTokens
         private bool _GetPrimaryToken(uint processId)
         {
             //Originally Set to true
-            IntPtr hProcess = kernel32.OpenProcess(Constants.PROCESS_QUERY_LIMITED_INFORMATION, false, processId);
+            IntPtr hProcess = kernel32.OpenProcess(Winnt.PROCESS_QUERY_LIMITED_INFORMATION, false, processId);
             if (IntPtr.Zero == hProcess)
             {
                 Console.WriteLine(" [-] Unable to Open Process Token: {0}", processId);
@@ -83,7 +84,7 @@ namespace Tokenvator.AccessTokens
             Winbase._SECURITY_ATTRIBUTES securityAttributes = new Winbase._SECURITY_ATTRIBUTES();
             if (!advapi32.DuplicateTokenEx(
                         hExistingToken,
-                        (uint)(Constants.TOKEN_ALL_ACCESS),
+                        (uint)(Winnt.TOKEN_ALL_ACCESS),
                         ref securityAttributes,
                         Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,
                         Winnt._TOKEN_TYPE.TokenPrimary,
@@ -120,7 +121,7 @@ namespace Tokenvator.AccessTokens
             Winnt._SID_AND_ATTRIBUTES sidAndAttributes = new Winnt._SID_AND_ATTRIBUTES
             {
                 Sid = pSID,
-                Attributes = Constants.SE_GROUP_INTEGRITY_32
+                Attributes = (uint)Winnt.SE_GROUP_INTEGRITY_32
             };
             try
             {
@@ -164,7 +165,7 @@ namespace Tokenvator.AccessTokens
             Winbase._SECURITY_ATTRIBUTES securityAttributes = new Winbase._SECURITY_ATTRIBUTES();
             if (!advapi32.DuplicateTokenEx(
                         luaToken,
-                        Constants.TOKEN_IMPERSONATE | Constants.TOKEN_QUERY,
+                        Winnt.TOKEN_IMPERSONATE | Winnt.TOKEN_QUERY,
                         ref securityAttributes,
                         Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,
                         Winnt._TOKEN_TYPE.TokenImpersonation,
