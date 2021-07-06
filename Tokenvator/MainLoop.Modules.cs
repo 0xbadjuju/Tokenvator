@@ -17,6 +17,7 @@ using Tokenvator.Plugins.NamedPipes;
 
 using MonkeyWorks.Unmanaged.Headers;
 using MonkeyWorks.Unmanaged.Libraries;
+using System.IO;
 
 namespace Tokenvator
 {
@@ -60,7 +61,7 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         private static void _AlterPrivilege(bool remote, int processID, string command, IntPtr hToken, Winnt.TokenPrivileges privilege)
         {
-            using (Tokens t = new Tokens(hToken))
+            using (TokenManipulation t = new TokenManipulation(hToken))
             {
                 if (remote && t.OpenProcessToken(processID))
                     t.SetWorkingTokenToRemote();
@@ -127,7 +128,7 @@ namespace Tokenvator
                 if (!remote)
                     Console.WriteLine("[-] Unable to parse {0}", command);
 
-            using (Tokens t = new Tokens(hToken))
+            using (TokenManipulation t = new TokenManipulation(hToken))
             {
                 if (!t.OpenProcessToken(processID))
                     return;
@@ -147,10 +148,31 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         // https://github.com/numbnet/Win32-OpenSSH/blob/8dd7423e13ac0b88b3084ec95bc93ea09dec1fef/contrib/win32/win32compat/win32auth.c
         // https://github.com/bb107/WinSudo/blob/b2cb7700bd2f7ee59e2ef7f9ca20c2a671ce72a8/PrivilegeHelps/Security.cpp
+        // https://www.exploit-db.com/papers/42556
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _CreateToken()
+        private static void _CreateToken(string input, IntPtr hToken)
         {
-
+            string item = Misc.NextItem(ref input);
+            try
+            {
+                using (CreateTokens t = new CreateTokens(hToken))
+                {
+                    if ("create_token" == item)
+                    {
+                        t.SetWorkingTokenToSelf();
+                        t.CreateToken();
+                    }
+                    else
+                    {
+                        t.SetWorkingTokenToSelf();
+                        t.CreateToken(item);
+                    }
+                }
+            }
+            catch (System.AccessViolationException ex)
+            {
+                Console.WriteLine(ex);
+            }
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -229,12 +251,12 @@ namespace Tokenvator
         private static void _GetSystem(string input, IntPtr hToken)
         {
             bool exists, enabled;
-            Privileges.CheckTokenPrivilege(hToken, "SeDebugPrivilege", out exists, out enabled);
+            TokenInformation.CheckTokenPrivilege(hToken, "SeDebugPrivilege", out exists, out enabled);
             string item = Misc.NextItem(ref input);
 
             if (exists)
             {
-                using (Tokens t = new Tokens(hToken))
+                using (TokenManipulation t = new TokenManipulation(hToken))
                 {
                     t.SetWorkingTokenToSelf();
 
@@ -262,12 +284,12 @@ namespace Tokenvator
         private static void _GetTrustedInstaller(string input, IntPtr hToken)
         {
             bool exists, enabled;
-            Privileges.CheckTokenPrivilege(hToken, "SeDebugPrivilege", out exists, out enabled);
+            TokenInformation.CheckTokenPrivilege(hToken, "SeDebugPrivilege", out exists, out enabled);
             string item = Misc.NextItem(ref input);
 
             if (exists)
             {
-                using (Tokens t = new Tokens(hToken))
+                using (TokenManipulation t = new TokenManipulation(hToken))
                 {
                     t.SetWorkingTokenToSelf();
 
@@ -303,25 +325,26 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         private static void _Info(bool remote, int processID, IntPtr hToken, string input)
         {
-            using (Tokens t = new Tokens(hToken))
+            using (TokenInformation t = new TokenInformation(hToken))
             {
                 if (remote)
                 {
-                    if (t.OpenProcessToken(processID))
-                    {
-                        t.SetWorkingTokenToRemote();
-                        hToken = t.GetWorkingToken();
-                    }
-                    else
+                    if (!t.OpenProcessToken(processID))
                     {
                         return;
                     }
+                    t.SetWorkingTokenToRemote();
+                }
+                else
+                {
+                    t.SetWorkingTokenToSelf();
                 }
 
+                hToken = t.GetWorkingToken();
+
                 Console.WriteLine("[*] Primary Token");
-                Privileges.GetTokenUser(hToken);
-                Console.WriteLine();          
-                Privileges.GetTokenOwner(hToken);
+                t.GetTokenUser();
+                
                 Console.WriteLine();
 
                 Console.WriteLine("[*] Impersonation Tokens");
@@ -333,37 +356,93 @@ namespace Tokenvator
                 }
 
                 Console.WriteLine("[*] Primary Token Groups");
-                Privileges.GetTokenGroups(hToken);
+                t.GetTokenGroups();
                 Console.WriteLine();
 
                 if ("all" == Misc.NextItem(ref input))
                 {
+                    t.GetTokenSource();
+                    Console.WriteLine();
+                    
+                    t.GetTokenPrivileges();
+                    Console.WriteLine();
+                    
+                    t.GetTokenOwner();
+                    Console.WriteLine();
+                    
+                    t.GetTokenPrimaryGroup();
+                    Console.WriteLine();
+                    
+                    t.GetTokenDefaultDacl();
+                    Console.WriteLine();
+
                     Winnt._TOKEN_TYPE tokenType;
-                    Privileges.GetElevationType(hToken, out tokenType);
-                    Privileges.PrintElevation(hToken);
+                    TokenInformation.GetElevationType(hToken, out tokenType);
+                    TokenInformation.PrintElevation(hToken);
                 }
             }
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        //
+        // sc create TokenDriver binPath="C:\Windows\System32\kerneltokens.sys" type=kernel
         ////////////////////////////////////////////////////////////////////////////////
         private static void _InstallDriver(string command)
         {
-            
-            //string name = command.Replace(".sys", "");
-            string name = Misc.NextItem(ref command);
-            Console.WriteLine(name);
-            Console.WriteLine(command);
+            string servicename = Misc.NextItem(ref command);
+            string path = Misc.NextItem(ref command);
+            string force = Misc.NextItem(ref command);
 
-            PSExec p = new PSExec(name);
+            if (servicename.Equals(path))
+            {
+                Console.WriteLine("[-] No driver name specified.");
+                Console.WriteLine("install_driver <driver_name> <driver_file>");
+                Console.WriteLine("install_driver <driver_name> <driver_file> force");
+                return;
+            }
+
+            bool overwrite = false;
+            if ("force".Equals(force))
+            {
+                overwrite = true;
+            }
+
+            Console.WriteLine("[*] Service Name: " + servicename);
+            Console.WriteLine("[*] Service Path: " + path);
+
+            PSExec p = new PSExec(servicename);
 
             if (!p.Connect("."))
+            {
+                Console.WriteLine("[-] Unable to connect to service controller");
                 return;
+            }
+
+            string filename;
+            try
+            {
+                filename = Path.GetFullPath(path);
+            }
+            catch (Exception ex)
+            {
+                filename = CreateProcess.FindFilePath(path);
+                if (string.IsNullOrEmpty(filename))
+                {
+                    Console.WriteLine("[-] Unable to locate service binary");
+                    return;
+                }
+            }
+
+            Console.WriteLine("[*] Full Path: " + filename);
+
+            if (!File.Exists(filename))
+            {
+                Console.WriteLine("[-] Unable to find service binary: {0}");
+                return;
+            }
 
             if (!p.Open())
             {
-                if (!p.CreateDriver(command))
+                if (!p.CreateDriver(filename, overwrite))
                 {
                     return;
                 }
@@ -374,7 +453,9 @@ namespace Tokenvator
             }
 
             if (!p.Start())
+            {
                 return;
+            }
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -433,7 +514,7 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         private static void _ListPrivileges(bool remote, int processID, IntPtr hToken)
         {
-            using (Tokens t = new Tokens(hToken))
+            using (TokenInformation t = new TokenInformation(hToken))
             {
                 if (remote && t.OpenProcessToken(processID))
                     t.SetWorkingTokenToRemote();
@@ -441,8 +522,7 @@ namespace Tokenvator
                     t.SetWorkingTokenToSelf();
                 else
                     return;
-
-                t.EnumerateTokenPrivileges();
+                t.GetTokenPrivileges();
             }
         }
 
@@ -490,7 +570,7 @@ namespace Tokenvator
                 domain = "NT AUTHORITY";
             }
 
-            using (Tokens t = new Tokens(hToken))
+            using (TokenManipulation t = new TokenManipulation(hToken))
             {
                 t.LogonUser(domain, username, password, logonType, input, start);
             }
@@ -501,7 +581,7 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         private static void _NukePrivileges(bool remote, int processID, IntPtr hToken)
         {
-            using (Tokens t = new Tokens(hToken))
+            using (TokenManipulation t = new TokenManipulation(hToken))
             {
                 if (remote && !t.OpenProcessToken(processID))
                     return;
@@ -587,7 +667,7 @@ namespace Tokenvator
                 return false;
             }
 
-            using (Tokens t = new Tokens(hToken))
+            using (TokenManipulation t = new TokenManipulation(hToken))
             {
                 if (string.IsNullOrEmpty(command))
                 {
@@ -951,7 +1031,7 @@ namespace Tokenvator
         {
             if ("privileges" == input.ToLower())
             {
-                foreach (string item in Tokens.validPrivileges)
+                foreach (string item in TokenManipulation.validPrivileges)
                 {
                     Console.WriteLine(item);
                 }

@@ -1,17 +1,54 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
-
 using System.Security.Principal;
+using System.Text;
 
 using Tokenvator.Resources;
 
 using MonkeyWorks.Unmanaged.Headers;
 using MonkeyWorks.Unmanaged.Libraries;
 
-namespace Tokenvator.Plugins.Enumeration
+namespace Tokenvator.Plugins.AccessTokens
 {
-    class Privileges
-    {            
+    class TokenInformation : AccessTokens
+    {
+        IntPtr hToken;
+        public Winnt._TOKEN_SOURCE tokenSource;
+        public IntPtr hTokenSource;
+        public Ntifs._TOKEN_USER tokenUser;
+        public IntPtr hTokenUser;
+        public Ntifs._TOKEN_GROUPS tokenGroups;
+        public IntPtr hTokenGroups;
+        public Winnt._TOKEN_PRIVILEGES_ARRAY tokenPrivileges;
+        public IntPtr hTokenPrivileges;
+        public Ntifs._TOKEN_OWNER tokenOwner;
+        public IntPtr hTokenOwner;
+        public Winnt._TOKEN_PRIMARY_GROUP tokenPrimaryGroup;
+        public IntPtr hTokenPrimaryGroup;
+        public Winnt._TOKEN_DEFAULT_DACL tokenDefaultDacl;
+        public IntPtr hTokenDefaultDacl;
+        public Winnt._TOKEN_DEFAULT_DACL_ACL tokenDefaultDaclAcl;
+
+        List<uint> threads = new List<uint>();
+
+        public TokenInformation(IntPtr hToken) : base(hToken)
+        {
+            this.hToken = hToken;
+        }
+
+        ~TokenInformation()
+        {
+            Marshal.FreeHGlobal(hTokenSource);
+            Marshal.FreeHGlobal(hTokenUser);
+            Marshal.FreeHGlobal(hTokenGroups);
+            Marshal.FreeHGlobal(hTokenPrivileges);
+            Marshal.FreeHGlobal(hTokenOwner);
+            Marshal.FreeHGlobal(hTokenPrimaryGroup);
+            Marshal.FreeHGlobal(hTokenDefaultDacl);
+        }
+
         ////////////////////////////////////////////////////////////////////////////////
         //https://blogs.msdn.microsoft.com/cjacks/2006/10/08/how-to-determine-if-a-user-is-a-member-of-the-administrators-group-with-uac-enabled-on-windows-vista/
         ////////////////////////////////////////////////////////////////////////////////
@@ -126,74 +163,142 @@ namespace Tokenvator.Plugins.Enumeration
         }
 
         ////////////////////////////////////////////////////////////////////////////////
+        // List all process threads
+        ////////////////////////////////////////////////////////////////////////////////
+        public bool ListThreads(int processId)
+        {
+            if (0 == processId)
+            {
+                processId = Process.GetCurrentProcess().Id;
+            }
+
+            IntPtr hSnapshot = kernel32.CreateToolhelp32Snapshot(TiHelp32.TH32CS_SNAPTHREAD, 0);
+
+            if (IntPtr.Zero == hSnapshot)
+            {
+                Misc.GetWin32Error("CreateToolhelp32Snapshot");
+                return false;
+            }
+
+            TiHelp32.tagTHREADENTRY32 threadyEntry32 = new TiHelp32.tagTHREADENTRY32()
+            {
+                dwSize = (uint)Marshal.SizeOf(typeof(TiHelp32.tagTHREADENTRY32))
+            };
+
+            if (!kernel32.Thread32First(hSnapshot, ref threadyEntry32))
+            {
+                Misc.GetWin32Error("Thread32First");
+                return false;
+            }
+
+            if (threadyEntry32.th32OwnerProcessID == processId)
+                threads.Add(threadyEntry32.th32ThreadID);
+
+            while (kernel32.Thread32Next(hSnapshot, ref threadyEntry32))
+            {
+                if (threadyEntry32.th32OwnerProcessID == processId)
+                    threads.Add(threadyEntry32.th32ThreadID);
+            }
+
+            return true;
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        // Lists the users for threads
+        ////////////////////////////////////////////////////////////////////////////////
+        public void GetThreadUsers()
+        {
+            foreach (uint t in threads)
+            {
+                Console.WriteLine("[*] Thread ID: " + t);
+                if (_OpenThreadToken(t))
+                {
+                    TokenInformation ti = new TokenInformation(hWorkingThreadToken);
+                    ti.GetTokenUser();
+                }
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        // Opens a thread token
+        ////////////////////////////////////////////////////////////////////////////////
+        private bool _OpenThreadToken(uint threadId)
+        {
+            IntPtr hToken = new IntPtr();
+            IntPtr hThread = kernel32.OpenThread(ProcessThreadsApi.ThreadSecurityRights.THREAD_QUERY_INFORMATION, false, threadId);
+
+            if (IntPtr.Zero == hThread)
+            {
+                Misc.GetWin32Error("OpenThread");
+                return false;
+            }
+
+            bool retVal = kernel32.OpenThreadToken(hThread, Winnt.TOKEN_QUERY, false, ref hWorkingThreadToken);
+
+            if (!retVal || IntPtr.Zero == hWorkingThreadToken)
+            {
+                return false;
+            }
+            return true;
+        }
+
+
+        #region GetTokenInformation
+        ////////////////////////////////////////////////////////////////////////////////
         // Displays the users associated with a token
         ////////////////////////////////////////////////////////////////////////////////
-        public static void GetTokenOwner(IntPtr hToken)
+        public void GetTokenSource()
         {
             uint returnLength = 0;
-            advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenOwner, IntPtr.Zero, 0, out returnLength);
-            IntPtr lpTokenInformation = Marshal.AllocHGlobal((int)returnLength);
-            Ntifs._TOKEN_OWNER tokenOwner;
+            advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenSource, IntPtr.Zero, 0, out returnLength);
+            hTokenSource = Marshal.AllocHGlobal((int)returnLength);
             try
             {
-                if (!advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenOwner, lpTokenInformation, returnLength, out returnLength))
+                if (!advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenSource, hTokenSource, returnLength, out returnLength))
                 {
-                    Misc.GetWin32Error("GetTokenInformation - Pass 2");
+                    Misc.GetWin32Error("GetTokenInformation (TokenSource) - Pass 2");
                     return;
                 }
-                tokenOwner = (Ntifs._TOKEN_OWNER)Marshal.PtrToStructure(lpTokenInformation, typeof(Ntifs._TOKEN_OWNER));
-                if (IntPtr.Zero == tokenOwner.Owner)
+                tokenSource = (Winnt._TOKEN_SOURCE)Marshal.PtrToStructure(hTokenSource, typeof(Winnt._TOKEN_SOURCE));
+                if (0 == tokenSource.SourceName.Length)
                 {
                     Misc.GetWin32Error("PtrToStructure");
                 }
             }
             catch (Exception ex)
             {
-                Misc.GetWin32Error("GetTokenInformation - Pass 2");
+                Misc.GetWin32Error("GetTokenInformation (TokenSource) - Pass 2");
                 Console.WriteLine(ex.Message);
                 return;
             }
-            finally
-            {
-                Marshal.FreeHGlobal(lpTokenInformation);
-            }
 
-            Console.WriteLine("[+] Owner: ");
-            string sid, account;
-            sid = account = string.Empty;
-            _ReadSidAndName(tokenOwner.Owner, out sid, out account);
-            Console.WriteLine("{0,-50} {1}", sid, account);
+            Console.WriteLine("[+] Source: " + new string(tokenSource.SourceName));
             return;
         }
-
+        
         ////////////////////////////////////////////////////////////////////////////////
         // Displays the users associated with a token
         ////////////////////////////////////////////////////////////////////////////////
-        public static void GetTokenUser(IntPtr hToken)
+        public void GetTokenUser()
         {
             uint returnLength = 0;
             advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenUser, IntPtr.Zero, 0, out returnLength);
-            IntPtr lpTokenInformation = Marshal.AllocHGlobal((int)returnLength);
-
-            Ntifs._TOKEN_USER tokenUser;
+            hTokenUser = Marshal.AllocHGlobal((int)returnLength);
+            
             try
             {
-                if (!advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenUser, lpTokenInformation, returnLength, out returnLength))
+                if (!advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenUser, hTokenUser, returnLength, out returnLength))
                 {
                     Misc.GetWin32Error("GetTokenInformation - Pass 2");
                     return;
                 }
-                tokenUser = (Ntifs._TOKEN_USER)Marshal.PtrToStructure(lpTokenInformation, typeof(Ntifs._TOKEN_USER));
+                tokenUser = (Ntifs._TOKEN_USER)Marshal.PtrToStructure(hTokenUser, typeof(Ntifs._TOKEN_USER));
             }
             catch (Exception ex)
             {
                 Misc.GetWin32Error("GetTokenInformation - Pass 2");
                 Console.WriteLine(ex.Message);
                 return;
-            }
-            finally
-            {
-                Marshal.FreeHGlobal(lpTokenInformation);
             }
             
             Console.WriteLine("[+] User: ");
@@ -207,20 +312,18 @@ namespace Tokenvator.Plugins.Enumeration
         ////////////////////////////////////////////////////////////////////////////////
         // Lists the groups associated with a token
         ////////////////////////////////////////////////////////////////////////////////
-        public static bool GetTokenGroups(IntPtr hToken)
+        public bool GetTokenGroups()
         {
-            uint returnLength = 0;
-            advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenGroups, IntPtr.Zero, 0, out returnLength);
-            IntPtr lpTokenInformation = Marshal.AllocHGlobal((int)returnLength);
-            Ntifs._TOKEN_GROUPS tokenGroups;
+            advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenGroups, IntPtr.Zero, 0, out uint returnLength);
+            hTokenGroups = Marshal.AllocHGlobal((int)returnLength);
             try
             {
-                if (!advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenGroups, lpTokenInformation, returnLength, out returnLength))
+                if (!advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenGroups, hTokenGroups, returnLength, out returnLength))
                 {
                     Misc.GetWin32Error("GetTokenInformation - Pass 2");
                     return false;
                 }
-                tokenGroups = (Ntifs._TOKEN_GROUPS)Marshal.PtrToStructure(lpTokenInformation, typeof(Ntifs._TOKEN_GROUPS));
+                tokenGroups = (Ntifs._TOKEN_GROUPS)Marshal.PtrToStructure(hTokenGroups, typeof(Ntifs._TOKEN_GROUPS));
 
                 Console.WriteLine("[+] Enumerated {0} Groups: ", tokenGroups.GroupCount);
                 for (int i = 0; i < tokenGroups.GroupCount; i++)
@@ -239,16 +342,191 @@ namespace Tokenvator.Plugins.Enumeration
                 Console.WriteLine(ex.Message);
                 return false;
             }
-            finally
-            {
-                Marshal.FreeHGlobal(lpTokenInformation);
-            }
         }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        // Prints the tokens privileges
+        ////////////////////////////////////////////////////////////////////////////////
+        public void GetTokenPrivileges()
+        {
+            ////////////////////////////////////////////////////////////////////////////////
+            Console.WriteLine("[*] Enumerating Token Privileges");
+            uint TokenInfLength;
+            advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrivileges, IntPtr.Zero, 0, out TokenInfLength);
+
+            if (TokenInfLength < 0 || TokenInfLength > int.MaxValue)
+            {
+                Misc.GetWin32Error("GetTokenInformation - 1 " + TokenInfLength);
+                return;
+            }
+            Console.WriteLine("[*] GetTokenInformation - Pass 1");
+            hTokenPrivileges = Marshal.AllocHGlobal((int)TokenInfLength);
+
+            ////////////////////////////////////////////////////////////////////////////////
+            if (!advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrivileges, hTokenPrivileges, TokenInfLength, out TokenInfLength))
+            {
+                Misc.GetWin32Error("GetTokenInformation - 2 " + TokenInfLength);
+                return;
+            }
+            Console.WriteLine("[*] GetTokenInformation - Pass 2");
+            tokenPrivileges = (Winnt._TOKEN_PRIVILEGES_ARRAY)Marshal.PtrToStructure(hTokenPrivileges, typeof(Winnt._TOKEN_PRIVILEGES_ARRAY));
+            Console.WriteLine("[+] Enumerated {0} Privileges", tokenPrivileges.PrivilegeCount);
+            Console.WriteLine();
+            Console.WriteLine("{0,-45}{1,-30}", "Privilege Name", "Enabled");
+            Console.WriteLine("{0,-45}{1,-30}", "--------------", "-------");
+            ////////////////////////////////////////////////////////////////////////////////
+            for (int i = 0; i < tokenPrivileges.PrivilegeCount; i++)
+            {
+                StringBuilder lpName = new StringBuilder();
+                int cchName = 0;
+                IntPtr lpLuid = Marshal.AllocHGlobal(Marshal.SizeOf(tokenPrivileges.Privileges[i]));
+                Marshal.StructureToPtr(tokenPrivileges.Privileges[i].Luid, lpLuid, true);
+
+                advapi32.LookupPrivilegeName(null, lpLuid, null, ref cchName);
+                if (cchName <= 0 || cchName > int.MaxValue)
+                {
+                    Misc.GetWin32Error("LookupPrivilegeName Pass 1");
+                    Marshal.FreeHGlobal(lpLuid);
+                    continue;
+                }
+
+                lpName.EnsureCapacity(cchName + 1);
+                if (!advapi32.LookupPrivilegeName(null, lpLuid, lpName, ref cchName))
+                {
+                    Misc.GetWin32Error("LookupPrivilegeName Pass 2");
+                    Marshal.FreeHGlobal(lpLuid);
+                    continue;
+                }
+
+                Winnt._PRIVILEGE_SET privilegeSet = new Winnt._PRIVILEGE_SET
+                {
+                    PrivilegeCount = 1,
+                    Control = Winnt.PRIVILEGE_SET_ALL_NECESSARY,
+                    Privilege = new Winnt._LUID_AND_ATTRIBUTES[] { tokenPrivileges.Privileges[i] }
+                };
+
+                int pfResult = 0;
+                if (!advapi32.PrivilegeCheck(hToken, ref privilegeSet, out pfResult))
+                {
+                    Misc.GetWin32Error("PrivilegeCheck");
+                    Marshal.FreeHGlobal(lpLuid);
+                    continue;
+                }
+                Console.WriteLine("{0,-45}{1,-30}", lpName.ToString(), Convert.ToBoolean(pfResult));
+                Marshal.FreeHGlobal(lpLuid);
+            }
+            Console.WriteLine();
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        // Displays the users associated with a token
+        ////////////////////////////////////////////////////////////////////////////////
+        public void GetTokenOwner()
+        {
+            uint returnLength = 0;
+            advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenOwner, IntPtr.Zero, 0, out returnLength);
+            hTokenOwner = Marshal.AllocHGlobal((int)returnLength);
+            try
+            {
+                if (!advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenOwner, hTokenOwner, returnLength, out returnLength))
+                {
+                    Misc.GetWin32Error("GetTokenInformation - Pass 2");
+                    return;
+                }
+                tokenOwner = (Ntifs._TOKEN_OWNER)Marshal.PtrToStructure(hTokenOwner, typeof(Ntifs._TOKEN_OWNER));
+                if (IntPtr.Zero == tokenOwner.Owner)
+                {
+                    Misc.GetWin32Error("PtrToStructure");
+                }
+            }
+            catch (Exception ex)
+            {
+                Misc.GetWin32Error("GetTokenInformation - Pass 2");
+                Console.WriteLine(ex.Message);
+                return;
+            }
+
+            Console.WriteLine("[+] Owner: ");
+            string sid, account;
+            sid = account = string.Empty;
+            _ReadSidAndName(tokenOwner.Owner, out sid, out account);
+            Console.WriteLine("{0,-50} {1}", sid, account);
+            return;
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        // Displays the users associated with a token
+        ////////////////////////////////////////////////////////////////////////////////
+        public void GetTokenPrimaryGroup()
+        {
+            uint returnLength = 0;
+            advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrimaryGroup, IntPtr.Zero, 0, out returnLength);
+            hTokenPrimaryGroup = Marshal.AllocHGlobal((int)returnLength);
+            try
+            {
+                if (!advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrimaryGroup, hTokenPrimaryGroup, returnLength, out returnLength))
+                {
+                    Misc.GetWin32Error("GetTokenInformation - Pass 2");
+                    return;
+                }
+                tokenPrimaryGroup = (Winnt._TOKEN_PRIMARY_GROUP)Marshal.PtrToStructure(hTokenPrimaryGroup, typeof(Winnt._TOKEN_PRIMARY_GROUP));
+                if (IntPtr.Zero == tokenPrimaryGroup.PrimaryGroup)
+                {
+                    Misc.GetWin32Error("PtrToStructure");
+                }
+            }
+            catch (Exception ex)
+            {
+                Misc.GetWin32Error("GetTokenInformation - Pass 2");
+                Console.WriteLine(ex.Message);
+                return;
+            }
+
+            _ReadSidAndName(tokenPrimaryGroup.PrimaryGroup, out string primaryGroupSid, out string primaryGroupName);
+            Console.WriteLine("[+] Primary Group: ");
+            Console.WriteLine("{0,-50} {1}", primaryGroupSid, primaryGroupName);
+            return;
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        // Displays the users associated with a token
+        ////////////////////////////////////////////////////////////////////////////////
+        public void GetTokenDefaultDacl()
+        {
+            uint returnLength = 0;
+            advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenDefaultDacl, IntPtr.Zero, 0, out returnLength);
+            hTokenDefaultDacl = Marshal.AllocHGlobal((int)returnLength);
+            try
+            {
+                if (!advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenDefaultDacl, hTokenDefaultDacl, returnLength, out returnLength))
+                {
+                    Misc.GetWin32Error("GetTokenInformation - Pass 2");
+                    return;
+                }
+                tokenDefaultDacl = (Winnt._TOKEN_DEFAULT_DACL)Marshal.PtrToStructure(hTokenDefaultDacl, typeof(Winnt._TOKEN_DEFAULT_DACL));
+                if (IntPtr.Zero == tokenDefaultDacl.DefaultDacl)
+                {
+                    Misc.GetWin32Error("PtrToStructure");
+                }
+                tokenDefaultDaclAcl = (Winnt._TOKEN_DEFAULT_DACL_ACL)Marshal.PtrToStructure(hTokenDefaultDacl, typeof(Winnt._TOKEN_DEFAULT_DACL_ACL));
+            }
+            catch (Exception ex)
+            {
+                Misc.GetWin32Error("GetTokenInformation - Pass 2");
+                Console.WriteLine(ex.Message);
+                return;
+            }
+
+            string primaryGroup = Marshal.PtrToStringUni(tokenPrimaryGroup.PrimaryGroup);
+            Console.WriteLine("[+] ACL Count: {0}", tokenDefaultDaclAcl.DefaultDacl.AceCount);
+            return;
+        }
+        #endregion
 
         ////////////////////////////////////////////////////////////////////////////////
         //
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _ReadSidAndName(IntPtr pointer, out string sid, out string account)
+        public static void _ReadSidAndName(IntPtr pointer, out string sid, out string account)
         {
             sid = string.Empty;
             account = string.Empty;

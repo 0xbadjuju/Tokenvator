@@ -15,41 +15,29 @@ using MonkeyWorks.Unmanaged.Libraries;
 
 namespace Tokenvator.Plugins.AccessTokens
 {
-    partial class Tokens : IDisposable
+    partial class TokenManipulation : AccessTokens
     {
-        protected IntPtr phNewToken;
-        protected IntPtr hExistingToken;
-        private readonly IntPtr currentProcessToken;
         private Dictionary<uint, string> processes;
-
-        internal delegate bool Create(IntPtr phNewToken, string newProcess, string arguments); 
-
-        public static List<string> validPrivileges = new List<string> { "SeAssignPrimaryTokenPrivilege", 
-            "SeAuditPrivilege", "SeBackupPrivilege", "SeChangeNotifyPrivilege", "SeCreateGlobalPrivilege", 
-            "SeCreatePagefilePrivilege", "SeCreatePermanentPrivilege", "SeCreateSymbolicLinkPrivilege", 
-            "SeCreateTokenPrivilege", "SeDebugPrivilege", "SeEnableDelegationPrivilege", 
-            "SeImpersonatePrivilege", "SeIncreaseBasePriorityPrivilege", "SeIncreaseQuotaPrivilege", 
-            "SeIncreaseWorkingSetPrivilege", "SeLoadDriverPrivilege", "SeLockMemoryPrivilege", 
-            "SeMachineAccountPrivilege", "SeManageVolumePrivilege", "SeProfileSingleProcessPrivilege", 
-            "SeRelabelPrivilege", "SeRemoteShutdownPrivilege", "SeRestorePrivilege", "SeSecurityPrivilege", 
-            "SeShutdownPrivilege", "SeSyncAgentPrivilege", "SeSystemEnvironmentPrivilege", 
-            "SeSystemProfilePrivilege", "SeSystemtimePrivilege", "SeTakeOwnershipPrivilege", 
-            "SeTcbPrivilege", "SeTimeZonePrivilege", "SeTrustedCredManAccessPrivilege", 
+        
+        public static List<string> validPrivileges = new List<string> { "SeAssignPrimaryTokenPrivilege",
+            "SeAuditPrivilege", "SeBackupPrivilege", "SeChangeNotifyPrivilege", "SeCreateGlobalPrivilege",
+            "SeCreatePagefilePrivilege", "SeCreatePermanentPrivilege", "SeCreateSymbolicLinkPrivilege",
+            "SeCreateTokenPrivilege", "SeDebugPrivilege", "SeEnableDelegationPrivilege",
+            "SeImpersonatePrivilege", "SeIncreaseBasePriorityPrivilege", "SeIncreaseQuotaPrivilege",
+            "SeIncreaseWorkingSetPrivilege", "SeLoadDriverPrivilege", "SeLockMemoryPrivilege",
+            "SeMachineAccountPrivilege", "SeManageVolumePrivilege", "SeProfileSingleProcessPrivilege",
+            "SeRelabelPrivilege", "SeRemoteShutdownPrivilege", "SeRestorePrivilege", "SeSecurityPrivilege",
+            "SeShutdownPrivilege", "SeSyncAgentPrivilege", "SeSystemEnvironmentPrivilege",
+            "SeSystemProfilePrivilege", "SeSystemtimePrivilege", "SeTakeOwnershipPrivilege",
+            "SeTcbPrivilege", "SeTimeZonePrivilege", "SeTrustedCredManAccessPrivilege",
             "SeUndockPrivilege", "SeUnsolicitedInputPrivilege" };
-
-        List<uint> threads = new List<uint>();
 
         ////////////////////////////////////////////////////////////////////////////////
         // Default Constructor
         ////////////////////////////////////////////////////////////////////////////////
-        internal Tokens(IntPtr currentProcessToken)
-        {
-            hWorkingToken = new IntPtr();
-            phNewToken = new IntPtr();
-            hExistingToken = new IntPtr();
+        internal TokenManipulation(IntPtr currentProcessToken) : base(currentProcessToken)
+        {         
             processes = new Dictionary<uint, string>();
-
-            this.currentProcessToken = currentProcessToken;
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -57,18 +45,12 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         public void Dispose()
         {
-            if (IntPtr.Zero != phNewToken)  
-                kernel32.CloseHandle(phNewToken);
-            if (IntPtr.Zero != hExistingToken)
-                kernel32.CloseHandle(hExistingToken);
-            if (IntPtr.Zero != hWorkingToken)
-                kernel32.CloseHandle(hWorkingToken);
         }
 
         ////////////////////////////////////////////////////////////////////////////////
         // Default Destructor
         ////////////////////////////////////////////////////////////////////////////////
-        ~Tokens()
+        ~TokenManipulation()
         {
             Dispose();
         }
@@ -97,7 +79,8 @@ namespace Tokenvator.Plugins.AccessTokens
             SetWorkingTokenToNewToken();
             SetTokenPrivilege(privilege, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED_BY_DEFAULT | Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED);
 
-            EnumerateTokenPrivileges();
+            TokenInformation ti = new TokenInformation(hWorkingToken);
+            ti.GetTokenPrivileges();
 
             return true;
         }
@@ -115,8 +98,8 @@ namespace Tokenvator.Plugins.AccessTokens
 
             uint status = ntdll.NtSetInformationProcess(
                 kernel32.GetCurrentProcess(),
-                ntdll._PROCESS_INFORMATION_CLASS.ProcessAccessToken, 
-                ref processAccessToken, 
+                ntdll._PROCESS_INFORMATION_CLASS.ProcessAccessToken,
+                ref processAccessToken,
                 (uint)Marshal.SizeOf(typeof(ntdll._PROCESS_ACCESS_TOKEN))
             );
 
@@ -236,6 +219,7 @@ namespace Tokenvator.Plugins.AccessTokens
             return true;
         }
 
+        #region Privilege Escalations
         ////////////////////////////////////////////////////////////////////////////////
         // Creates a new process as SYSTEM
         ////////////////////////////////////////////////////////////////////////////////
@@ -344,36 +328,7 @@ namespace Tokenvator.Plugins.AccessTokens
 
             return false;
         }
-
-        ////////////////////////////////////////////////////////////////////////////////
-        // Impersonates the token from a specified processId
-        ////////////////////////////////////////////////////////////////////////////////
-        public virtual bool ImpersonateUser()
-        {
-            Winbase._SECURITY_ATTRIBUTES securityAttributes = new Winbase._SECURITY_ATTRIBUTES();
-            if (!advapi32.DuplicateTokenEx(
-                        hExistingToken,
-                        (uint)Winnt.ACCESS_MASK.MAXIMUM_ALLOWED,
-                        ref securityAttributes,
-                        Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,
-                        Winnt._TOKEN_TYPE.TokenPrimary,
-                        out phNewToken
-            ))
-            {
-                Misc.GetWin32Error("DuplicateTokenEx: ");
-                return false;
-            }
-            Console.WriteLine(" [+] Duplicate Token Handle: 0x{0}", phNewToken.ToString("X4"));
-
-            if (!advapi32.ImpersonateLoggedOnUser(phNewToken))
-            {
-                Misc.GetWin32Error("ImpersonateLoggedOnUser: ");
-                return false;
-            }
-
-            Console.WriteLine("[+] Operating as {0}", WindowsIdentity.GetCurrent().Name);
-            return true;
-        }
+        #endregion
 
         ////////////////////////////////////////////////////////////////////////////////
         //
@@ -416,138 +371,102 @@ namespace Tokenvator.Plugins.AccessTokens
                 createProcess(hExistingToken, next, arguments);
             }
         }
-
+        
         ////////////////////////////////////////////////////////////////////////////////
-        // Sets hToken to a processes primary token
+        // Sets a Token to have a specified privilege
+        // http://www.leeholmes.com/blog/2010/09/24/adjusting-token-privileges-in-powershell/
+        // https://support.microsoft.com/en-us/help/131065/how-to-obtain-a-handle-to-any-process-with-sedebugprivilege
         ////////////////////////////////////////////////////////////////////////////////
-        public virtual bool OpenProcessToken(int processId)
+        public bool SetTokenPrivilege(string privilege, Winnt.TokenPrivileges attribute)
         {
-            WindowsPrincipal windowsPrincipal = new WindowsPrincipal(WindowsIdentity.GetCurrent());
-            if (!windowsPrincipal.IsInRole(WindowsBuiltInRole.Administrator)
-                && !windowsPrincipal.IsInRole(WindowsBuiltInRole.SystemOperator))
+            if (!validPrivileges.Contains(privilege))
             {
-                Console.WriteLine("[-] Administrator privileges required");
+                Console.WriteLine("[-] Invalid Privilege Specified");
                 return false;
             }
 
-            IntPtr hProcess = kernel32.OpenProcess(Winnt.PROCESS_QUERY_INFORMATION, false, (uint)processId);
-            if (IntPtr.Zero == hProcess)
+            Console.WriteLine("[*] Adjusting Token Privilege");
+            ////////////////////////////////////////////////////////////////////////////////
+            Winnt._LUID luid = new Winnt._LUID();
+            if (!advapi32.LookupPrivilegeValue(null, privilege, ref luid))
             {
-                Misc.GetWin32Error("OpenProcess");
+                Misc.GetWin32Error("LookupPrivilegeValue");
                 return false;
             }
-            Console.WriteLine("[*] Recieved Process Handle 0x{0}", hProcess.ToString("X4"));
+            Console.WriteLine(" [+] Recieved luid");
 
-            if (!kernel32.OpenProcessToken(hProcess, Winnt.TOKEN_ALL_ACCESS, out hExistingToken))
+            ////////////////////////////////////////////////////////////////////////////////
+            Winnt._LUID_AND_ATTRIBUTES luidAndAttributes = new Winnt._LUID_AND_ATTRIBUTES
             {
-                if (!kernel32.OpenProcessToken(hProcess, (uint)Winnt.ACCESS_MASK.MAXIMUM_ALLOWED, out hExistingToken))
+                Luid = luid,
+                Attributes = (uint)attribute
+            };
+            Winnt._TOKEN_PRIVILEGES newState = new Winnt._TOKEN_PRIVILEGES
+            {
+                PrivilegeCount = 1,
+                Privileges = luidAndAttributes
+            };
+            Winnt._TOKEN_PRIVILEGES previousState = new Winnt._TOKEN_PRIVILEGES();
+            Console.WriteLine(" [*] AdjustTokenPrivilege");
+            uint returnLength;
+            if (!advapi32.AdjustTokenPrivileges(hWorkingToken, false, ref newState, (uint)Marshal.SizeOf(newState), ref previousState, out returnLength))
+            {
+                Misc.GetWin32Error("AdjustTokenPrivileges");
+                return false;
+            }
+
+            Console.WriteLine(" [+] Adjusted Privilege: {0}", privilege);
+            Console.WriteLine(" [+] Privilege State: {0}", attribute);
+            return false;
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        // Updates the token session ID to the specified session
+        ////////////////////////////////////////////////////////////////////////////////
+        public bool SetTokenSessionId(int sessionId)
+        {
+            bool exists, enabled;
+            SetWorkingTokenToSelf();
+            TokenInformation.CheckTokenPrivilege(hWorkingToken, Winnt.SE_TCB_NAME, out exists, out enabled);
+
+            if (!exists)
+            {
+                Console.WriteLine("[-] SeTcbPrivilege Does Not Exist On Token");
+                return false;
+            }
+
+            SetWorkingTokenToRemote();
+            if (!enabled && !SetTokenPrivilege(Winnt.SE_TCB_NAME, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED))
+            {
+                Console.WriteLine("[-] Enable SeTcbPrivilege Failed ");
+                return false;
+            }
+
+            Console.WriteLine("[*] Updating Token Session ID to {0}", sessionId);
+
+            GCHandle handle = new GCHandle();
+            try
+            {
+                handle = GCHandle.Alloc(sessionId, GCHandleType.Pinned);
+                if (!advapi32.SetTokenInformation(
+                    hWorkingToken,
+                    Winnt._TOKEN_INFORMATION_CLASS.TokenSessionId,
+                    handle.AddrOfPinnedObject(),
+                    sizeof(uint))
+                )
                 {
-                    Console.WriteLine(" [-] Unable to Open Process Token");
-                    Misc.GetWin32Error("OpenProcessToken");
-                    kernel32.CloseHandle(hProcess);
+                    Misc.GetWin32Error("SetTokenInformation");
                     return false;
                 }
             }
-            Console.WriteLine("[*] Recieved Token Handle 0x{0}", hExistingToken.ToString("X4"));
-            kernel32.CloseHandle(hProcess);
-            return true;
-        } 
-
-        ////////////////////////////////////////////////////////////////////////////////
-        // List all process threads
-        ////////////////////////////////////////////////////////////////////////////////
-        public bool ListThreads(int processId)
-        {
-            if (0 == processId)
+            catch (Exception ex)
             {
-                processId = Process.GetCurrentProcess().Id;
+                Console.WriteLine(ex.Message);
             }
-
-            IntPtr hSnapshot = kernel32.CreateToolhelp32Snapshot(TiHelp32.TH32CS_SNAPTHREAD, 0);
-
-            if (IntPtr.Zero == hSnapshot)
+            finally
             {
-                Misc.GetWin32Error("CreateToolhelp32Snapshot");
-                return false;
-            }
-
-            TiHelp32.tagTHREADENTRY32 threadyEntry32 = new TiHelp32.tagTHREADENTRY32()
-            {
-                dwSize = (uint)Marshal.SizeOf(typeof(TiHelp32.tagTHREADENTRY32))
-            };
-
-            if (!kernel32.Thread32First(hSnapshot, ref threadyEntry32))
-            {
-                Misc.GetWin32Error("Thread32First");
-                return false;
-            }           
-
-            if(threadyEntry32.th32OwnerProcessID == processId)
-                threads.Add(threadyEntry32.th32ThreadID);
-
-            while(kernel32.Thread32Next(hSnapshot, ref threadyEntry32))
-            {
-                if (threadyEntry32.th32OwnerProcessID == processId)
-                    threads.Add(threadyEntry32.th32ThreadID);
-            }
-
-            return true;
-        }
-
-        ////////////////////////////////////////////////////////////////////////////////
-        // Lists the users for threads
-        ////////////////////////////////////////////////////////////////////////////////
-        public void GetThreadUsers()
-        {
-            foreach(uint t in threads)
-            {
-                Console.WriteLine("[*] Thread ID: " + t);
-                if (_OpenThreadToken(t))
-                {
-                    Privileges.GetTokenUser(hWorkingThreadToken);
-                }
-            }
-        }
-
-        ////////////////////////////////////////////////////////////////////////////////
-        // Opens a thread token
-        ////////////////////////////////////////////////////////////////////////////////
-        private bool _OpenThreadToken(uint threadId)
-        {
-            IntPtr hToken = new IntPtr();
-            IntPtr hThread = kernel32.OpenThread(ProcessThreadsApi.ThreadSecurityRights.THREAD_QUERY_INFORMATION, false, threadId);
-
-            if(IntPtr.Zero == hThread)
-            {
-                Misc.GetWin32Error("OpenThread");
-                return false;
-            }
-
-            bool retVal = kernel32.OpenThreadToken(hThread, Winnt.TOKEN_QUERY, false, ref hWorkingThreadToken);
-
-            if (!retVal || IntPtr.Zero == hWorkingThreadToken)
-            {
-                return false;
-            }
-            return true;
-        }
-
-        ////////////////////////////////////////////////////////////////////////////////
-        // Creates a new process with the duplicated token
-        ////////////////////////////////////////////////////////////////////////////////
-        public bool StartProcessAsUser(string newProcess)
-        {
-            Create createProcess;
-            if (0 == Process.GetCurrentProcess().SessionId)
-                createProcess = CreateProcess.CreateProcessWithLogonW;
-            else
-                createProcess = CreateProcess.CreateProcessWithTokenW;
-            string arguments = string.Empty;
-            Misc.FindExe(ref newProcess, out arguments);
-
-            if (!createProcess(phNewToken, newProcess, arguments))
-            {
-                return false;
+                if (null != handle && handle.IsAllocated)
+                    handle.Free();
             }
             return true;
         }

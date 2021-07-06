@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 
 using Tokenvator.Resources;
+using Tokenvator.Plugins.AccessTokens;
 
 using MonkeyWorks.Unmanaged.Headers;
 using MonkeyWorks.Unmanaged.Libraries;
@@ -253,7 +254,7 @@ namespace Tokenvator.Plugins.Enumeration
                 kernel32.CloseHandle(hProcess);
                 if (findElevation)
                 {
-                    if (!Privileges.CheckElevation(hToken))
+                    if (!TokenInformation.CheckElevation(hToken))
                     {
                         continue;
                     }
@@ -350,7 +351,7 @@ namespace Tokenvator.Plugins.Enumeration
                 }
                 kernel32.CloseHandle(hProcess);
 
-                if (findElevation && !Privileges.CheckElevation(hToken))
+                if (findElevation && !TokenInformation.CheckElevation(hToken))
                 {
                     continue;
                 }

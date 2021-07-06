@@ -23,11 +23,20 @@ namespace Tokenvator.Resources
 
         ////////////////////////////////////////////////////////////////////////////////
         ////////////////////////////////////////////////////////////////////////////////
+        public static void GetLsaNtError(string location, uint ntError)
+        {
+            uint win32Error = advapi32.LsaNtStatusToWinError(ntError);
+            Console.WriteLine(" [-] Function {0} failed: ", location);
+            Console.WriteLine(" [-] {0}", new System.ComponentModel.Win32Exception((int)win32Error).Message);
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        ////////////////////////////////////////////////////////////////////////////////
         public static void GetNtError(string location, uint ntError)
         {
             uint win32Error = ntdll.RtlNtStatusToDosError(ntError);
             Console.WriteLine(" [-] Function {0} failed: ", location);
-            Console.WriteLine(" [-] {0}", new System.ComponentModel.Win32Exception((int)win32Error).Message);
+            Console.WriteLine(" [-] {0} (0x{1})", new System.ComponentModel.Win32Exception((int)win32Error).Message, ntError.ToString("X4"));
         }
 
         ////////////////////////////////////////////////////////////////////////////////

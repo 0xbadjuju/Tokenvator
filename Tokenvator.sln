@@ -14,25 +14,43 @@ EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
+		Debug|x64 = Debug|x64
 		Debug-Net35|Any CPU = Debug-Net35|Any CPU
+		Debug-Net35|x64 = Debug-Net35|x64
 		Debug-Net45|Any CPU = Debug-Net45|Any CPU
+		Debug-Net45|x64 = Debug-Net45|x64
 		Release|Any CPU = Release|Any CPU
+		Release|x64 = Release|x64
 		Release-Net35|Any CPU = Release-Net35|Any CPU
+		Release-Net35|x64 = Release-Net35|x64
 		Release-Net45|Any CPU = Release-Net45|Any CPU
+		Release-Net45|x64 = Release-Net45|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{0A1ADFEC-C824-4B97-9241-41C00CC2B982}.Debug|Any CPU.ActiveCfg = Release|Any CPU
 		{0A1ADFEC-C824-4B97-9241-41C00CC2B982}.Debug|Any CPU.Build.0 = Release|Any CPU
+		{0A1ADFEC-C824-4B97-9241-41C00CC2B982}.Debug|x64.ActiveCfg = Debug|x64
+		{0A1ADFEC-C824-4B97-9241-41C00CC2B982}.Debug|x64.Build.0 = Debug|x64
 		{0A1ADFEC-C824-4B97-9241-41C00CC2B982}.Debug-Net35|Any CPU.ActiveCfg = Debug-Net35|Any CPU
 		{0A1ADFEC-C824-4B97-9241-41C00CC2B982}.Debug-Net35|Any CPU.Build.0 = Debug-Net35|Any CPU
+		{0A1ADFEC-C824-4B97-9241-41C00CC2B982}.Debug-Net35|x64.ActiveCfg = Debug-Net35|x64
+		{0A1ADFEC-C824-4B97-9241-41C00CC2B982}.Debug-Net35|x64.Build.0 = Debug-Net35|x64
 		{0A1ADFEC-C824-4B97-9241-41C00CC2B982}.Debug-Net45|Any CPU.ActiveCfg = Debug-Net45|Any CPU
 		{0A1ADFEC-C824-4B97-9241-41C00CC2B982}.Debug-Net45|Any CPU.Build.0 = Debug-Net45|Any CPU
+		{0A1ADFEC-C824-4B97-9241-41C00CC2B982}.Debug-Net45|x64.ActiveCfg = Debug-Net45|x64
+		{0A1ADFEC-C824-4B97-9241-41C00CC2B982}.Debug-Net45|x64.Build.0 = Debug-Net45|x64
 		{0A1ADFEC-C824-4B97-9241-41C00CC2B982}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0A1ADFEC-C824-4B97-9241-41C00CC2B982}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0A1ADFEC-C824-4B97-9241-41C00CC2B982}.Release|x64.ActiveCfg = Release|x64
+		{0A1ADFEC-C824-4B97-9241-41C00CC2B982}.Release|x64.Build.0 = Release|x64
 		{0A1ADFEC-C824-4B97-9241-41C00CC2B982}.Release-Net35|Any CPU.ActiveCfg = Release-Net35|Any CPU
 		{0A1ADFEC-C824-4B97-9241-41C00CC2B982}.Release-Net35|Any CPU.Build.0 = Release-Net35|Any CPU
+		{0A1ADFEC-C824-4B97-9241-41C00CC2B982}.Release-Net35|x64.ActiveCfg = Release-Net35|x64
+		{0A1ADFEC-C824-4B97-9241-41C00CC2B982}.Release-Net35|x64.Build.0 = Release-Net35|x64
 		{0A1ADFEC-C824-4B97-9241-41C00CC2B982}.Release-Net45|Any CPU.ActiveCfg = Release-Net45|Any CPU
 		{0A1ADFEC-C824-4B97-9241-41C00CC2B982}.Release-Net45|Any CPU.Build.0 = Release-Net45|Any CPU
+		{0A1ADFEC-C824-4B97-9241-41C00CC2B982}.Release-Net45|x64.ActiveCfg = Release-Net45|x64
+		{0A1ADFEC-C824-4B97-9241-41C00CC2B982}.Release-Net45|x64.Build.0 = Release-Net45|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

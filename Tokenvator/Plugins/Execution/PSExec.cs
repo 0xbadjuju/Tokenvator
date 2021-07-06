@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 
@@ -123,9 +124,20 @@ namespace Tokenvator.Plugins.Execution
         ////////////////////////////////////////////////////////////////////////////////
         // Creates a service
         ////////////////////////////////////////////////////////////////////////////////
-        internal bool CreateDriver(string lpBinaryPathName)
+        internal bool CreateDriver(string source, bool overwrite)
         {
             Console.WriteLine("[*] Creating service {0}", serviceName);
+
+            string destination = $@"{Environment.GetEnvironmentVariable("SystemRoot")}\System32\drivers\";
+
+            string filename = Path.GetFileName(source);
+
+            destination = $@"{destination}{filename}";
+
+            Console.WriteLine("[*] Copying file from {0} to {1}", source, destination);
+
+            File.Copy(source, destination, overwrite);
+
             IntPtr hSCObject = advapi32.CreateService(
                 hServiceManager,
                 serviceName, serviceName,
@@ -133,14 +145,14 @@ namespace Tokenvator.Plugins.Execution
                 Winsvc.dwServiceType.SERVICE_KERNEL_DRIVER,
                 Winsvc.dwStartType.SERVICE_DEMAND_START,
                 Winsvc.dwErrorControl.SERVICE_ERROR_NORMAL,
-                lpBinaryPathName,
+                destination,
                 string.Empty, null, string.Empty, null, null
             );
 
             if (IntPtr.Zero == hSCObject)
             {
                 Console.WriteLine("[-] Failed to create service");
-                Misc.GetWin32Error("CreateDriver");
+                Misc.GetWin32Error("CreateService");
                 disposed = true;
                 return false;
             }

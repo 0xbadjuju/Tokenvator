@@ -10,7 +10,7 @@ using MonkeyWorks.Unmanaged.Libraries;
 
 namespace Tokenvator.Plugins.AccessTokens
 {
-    class RestrictedToken : Tokens
+    class RestrictedToken : AccessTokens
     {
         IntPtr luaToken;
 

@@ -1,14 +1,18 @@
 ﻿using System;
 using System.Runtime.InteropServices;
+using System.Diagnostics;
 
-using Tokenvator.Resources;
-
+using MonkeyWorks.Unmanaged.Headers;
 using MonkeyWorks.Unmanaged.Libraries;
+
+using Tokenvator.Plugins.AccessTokens;
+using Tokenvator.Resources;
 
 namespace Tokenvator.Plugins.Enumeration
 {
     class DesktopACL : IDisposable
     {
+        #region P/Invokes
         [Flags]
         public enum WindowStationSecurity
         {
@@ -335,12 +339,15 @@ namespace Tokenvator.Plugins.Enumeration
         private IntPtr ptrWinSta0 = IntPtr.Zero;
         private IntPtr pSid = IntPtr.Zero;
         private IntPtr ppSecurityDescriptor = IntPtr.Zero;
+        #endregion
 
         internal DesktopACL()
         {
+            Console.WriteLine("[*] Updating Desktop DACL");
             ptrWinSta0 = Marshal.StringToHGlobalUni("WinSta0");
         }
 
+        //SeSecurityPrivilege
         internal void OpenWindow()
         {
             IntPtr hWinStation = OpenWindowStationW(
@@ -463,6 +470,94 @@ namespace Tokenvator.Plugins.Enumeration
                 return;
             }
             Console.WriteLine(" [+] Applied DACL to Object");
+        }
+
+        internal void UpdateSecurityDacl(IntPtr hToken)
+        {
+            TokenInformation tokenInformation = new TokenInformation(hToken);
+            tokenInformation.GetTokenUser();
+
+            #region Windows Station
+            IntPtr hWindowStation = user32.GetProcessWindowStation();
+            if (IntPtr.Zero == hWindowStation)
+            {
+                Misc.GetWin32Error("GetProcessWindowStation");
+                return;
+            }
+
+            Winnt.SECURITY_INFORMATION pSIRequested = Winnt.SECURITY_INFORMATION.DACL_SECURITY_INFORMATION;
+            //Winnt._SECURITY_DESCRIPTOR pSID = new Winnt._SECURITY_DESCRIPTOR();
+            uint nLength = 0;
+
+            user32.GetUserObjectSecurity(hWindowStation, ref pSIRequested, IntPtr.Zero, nLength, ref nLength);
+            IntPtr pSID = Marshal.AllocHGlobal((int)nLength);
+            if (!user32.GetUserObjectSecurity(hWindowStation, ref pSIRequested, pSID, nLength, ref nLength))
+            {
+                Misc.GetWin32Error("GetUserObjectSecurity");
+                return;
+            }
+
+            bool bDaclPresent = false;
+            Winnt._ACL oldACL = new Winnt._ACL();
+            bool bDaclDefaulted = false;
+            if (!advapi32.GetSecurityDescriptorDacl(pSID, ref bDaclPresent, ref oldACL, ref bDaclDefaulted))
+            {
+                Misc.GetWin32Error("GetSecurityDescriptorDacl");
+                return;
+            }
+
+            if (!bDaclPresent)
+            {
+                Console.WriteLine("[-] DACL not present, attempt a different method");
+                return;
+            }
+
+            Accctrl.TRUSTEE_W trustee = new Accctrl.TRUSTEE_W()
+            {
+                pMultipleTrustee = IntPtr.Zero,
+                MultipleTrusteeOperation = Accctrl.MULTIPLE_TRUSTEE_OPERATION.NO_MULTIPLE_TRUSTEE,
+                TrusteeForm = Accctrl.TRUSTEE_FORM.TRUSTEE_IS_SID,
+                TrusteeType = Accctrl.TRUSTEE_TYPE.TRUSTEE_IS_USER,
+                ptstrName = tokenInformation.tokenUser.User.Sid
+            };
+
+            Accctrl._EXPLICIT_ACCESS_W explicitAccess = new Accctrl._EXPLICIT_ACCESS_W()
+            {
+                grfAccessMode = Accctrl._ACCESS_MODE.SET_ACCESS,
+                grfAccessPermissions = Winuser.WindowStationSecurity.WINSTA_ALL_ACCESS | Winuser.WindowStationSecurity.READ_CONTROL,
+                grfInheritance = Accctrl.Inheritance.NO_INHERITANCE,
+                Trustee = trustee
+            };
+
+            Winnt._ACL newACL = new Winnt._ACL();
+            uint retVal = advapi32.SetEntriesInAclW(1, ref explicitAccess, oldACL, ref newACL);
+            if (0 != retVal)
+            {
+                Misc.GetWin32Error("SetEntriesInAclW");
+                return;
+            }
+
+            Winnt._SECURITY_DESCRIPTOR securityDescriptor = new Winnt._SECURITY_DESCRIPTOR();
+            if (!advapi32.InitializeSecurityDescriptor(securityDescriptor, 1))
+            {
+                Misc.GetWin32Error("InitializeSecurityDescriptor");
+                return;
+            }
+
+            if (!advapi32.SetSecurityDescriptorDacl(ref securityDescriptor, true, ref newACL, false))
+            {
+                Misc.GetWin32Error("SetSecurityDescriptorDacl");
+                return;
+            }
+
+            if (!user32.SetUserObjectSecurity(hWindowStation, pSIRequested, securityDescriptor))
+            {
+                Misc.GetWin32Error("SetUserObjectSecurity");
+                return;
+            }
+            #endregion
+
+
         }
 
         public void Dispose()

@@ -135,6 +135,9 @@ namespace Tokenvator
                     case "clone_token":
                         _CloneToken(remote, processID, command, hToken);
                         break;
+                    case "create_token":
+                        _CreateToken(input, hToken);
+                        break;
                     case "detach_filter":
                         Filters.FilterDetach(input);
                         break;
