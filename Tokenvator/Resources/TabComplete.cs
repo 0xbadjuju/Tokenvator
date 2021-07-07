@@ -34,6 +34,18 @@ namespace Tokenvator
             }
         }
 
+        public void GetHistory()
+        {
+            for (int i = 0; i < scrollbackPosition; i++)
+            {
+                try
+                {
+                    Console.WriteLine("{0} - {1}", i, scrollback[i]);
+                }
+                catch { continue; }
+            }
+        }
+
         ////////////////////////////////////////////////////////////////////////////////
         // Get console input
         ////////////////////////////////////////////////////////////////////////////////
@@ -49,7 +61,8 @@ namespace Tokenvator
                     case ConsoleKey.Enter:
                         Console.WriteLine();
                         scrollback.Add(stringBuilder.ToString());
-                        scrollbackPosition++;
+                        //scrollbackPosition++;
+                        scrollbackPosition = scrollback.Count;
                         return stringBuilder.ToString();
                     case ConsoleKey.Tab:
                         if (hold == input.Key)
