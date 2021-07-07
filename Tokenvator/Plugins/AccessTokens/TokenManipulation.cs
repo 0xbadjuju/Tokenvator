@@ -18,7 +18,7 @@ namespace Tokenvator.Plugins.AccessTokens
     partial class TokenManipulation : AccessTokens
     {
         private Dictionary<uint, string> processes;
-        
+
         public static List<string> validPrivileges = new List<string> { "SeAssignPrimaryTokenPrivilege",
             "SeAuditPrivilege", "SeBackupPrivilege", "SeChangeNotifyPrivilege", "SeCreateGlobalPrivilege",
             "SeCreatePagefilePrivilege", "SeCreatePermanentPrivilege", "SeCreateSymbolicLinkPrivilege",
@@ -36,7 +36,7 @@ namespace Tokenvator.Plugins.AccessTokens
         // Default Constructor
         ////////////////////////////////////////////////////////////////////////////////
         internal TokenManipulation(IntPtr currentProcessToken) : base(currentProcessToken)
-        {         
+        {
             processes = new Dictionary<uint, string>();
         }
 
@@ -54,7 +54,7 @@ namespace Tokenvator.Plugins.AccessTokens
         {
             Dispose();
         }
-
+        /*
         ////////////////////////////////////////////////////////////////////////////////
         // Assigns a token to a process
         ////////////////////////////////////////////////////////////////////////////////
@@ -84,6 +84,7 @@ namespace Tokenvator.Plugins.AccessTokens
 
             return true;
         }
+        */
 
         ////////////////////////////////////////////////////////////////////////////////
         // Assigns a token to a process
@@ -371,7 +372,76 @@ namespace Tokenvator.Plugins.AccessTokens
                 createProcess(hExistingToken, next, arguments);
             }
         }
-        
+
+        ////////////////////////////////////////////////////////////////////////////////
+        // Can be use to remove groups, adding groups would require a new token
+        //https://docs.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-adjusttokengroups
+        ////////////////////////////////////////////////////////////////////////////////
+        public void SetTokenGroup(string group, bool isSID)
+        {
+            var tokenGroups = new Ntifs._TOKEN_GROUPS();
+            tokenGroups.Initialize();
+
+            hExistingToken = hWorkingToken;
+
+            if (!DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation))
+            {
+                return;
+            }
+            SetWorkingTokenToNewToken();
+
+            TokenInformation ti = new TokenInformation(hWorkingToken);
+            ti.GetTokenGroups();
+            for (int i = 0; i < ti.tokenGroups.GroupCount; i++)
+            {
+                tokenGroups.Groups[i].Sid = ti.tokenGroups.Groups[i].Sid;
+                tokenGroups.Groups[i].Attributes = ti.tokenGroups.Groups[i].Attributes;
+                Console.WriteLine(tokenGroups.Groups[i].Sid);
+            }
+            tokenGroups.GroupCount = ti.tokenGroups.GroupCount;
+
+            if (!isSID)
+            {
+                Console.WriteLine("Group:     {0}", group);
+                string domain = Environment.MachineName;
+                if (group.Contains(@"\"))
+                {
+                    string[] split = group.Split('\\');
+                    domain = split[0];
+                    group = split[1];
+                }
+                group = new NTAccount(domain, group).Translate(typeof(SecurityIdentifier)).Value;
+            }
+            Console.WriteLine("Group SID: {0}", group);
+            ++tokenGroups.GroupCount;
+
+            if (!CreateTokens.InitializeSid("S-1-5-21-258464558-1780981397-2849438727-1010", ref tokenGroups.Groups[tokenGroups.GroupCount].Sid))
+            {
+                return;
+            }
+            tokenGroups.Groups[tokenGroups.GroupCount].Attributes = (uint)Winnt.SE_GROUP_ENABLED;
+            CreateTokens ct = new CreateTokens(hWorkingToken);
+
+            string userName = WindowsIdentity.GetCurrent().Name;
+            userName = userName.Split('\\')[1];
+
+            //ct.CreateTokenGroups(userName, out Ntifs._TOKEN_GROUPS tg, out Winnt._TOKEN_PRIMARY_GROUP tpg);
+
+            tokenGroups = ti.tokenGroups;
+
+            if (!advapi32.AdjustTokenGroups(hWorkingToken, false, ref tokenGroups, (uint)Marshal.SizeOf(tokenGroups), ref ti.tokenGroups, out uint returnLength))
+            {
+                Misc.GetWin32Error("AdjustTokenGroups");
+                return;
+            }
+
+            ti.GetTokenGroups();
+
+            Console.WriteLine(returnLength);
+
+
+        }
+
         ////////////////////////////////////////////////////////////////////////////////
         // Sets a Token to have a specified privilege
         // http://www.leeholmes.com/blog/2010/09/24/adjusting-token-privileges-in-powershell/
@@ -417,7 +487,7 @@ namespace Tokenvator.Plugins.AccessTokens
 
             Console.WriteLine(" [+] Adjusted Privilege: {0}", privilege);
             Console.WriteLine(" [+] Privilege State: {0}", attribute);
-            return false;
+            return true;
         }
 
         ////////////////////////////////////////////////////////////////////////////////

