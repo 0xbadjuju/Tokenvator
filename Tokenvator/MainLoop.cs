@@ -16,40 +16,59 @@ namespace Tokenvator
     {
         private static string context = "(Tokens) > ";
         public static string[,] options = new string[,] {
-            {"Info", "-", "-", "-"},
+            {"Info", "all", "-", "Info all"},
             {"Help", "Command", "-", "Help List_Filter_Instances"},
-
+            {"History", "-", "-", "History"},
+            {"", "", "", ""},
+            {"Add_Privilege", "ProcessID", "Privilege", "Add_Privileges SeCreateTokenPrivilege"},
             {"List_Privileges", "ProcessID", "-", "List_Privileges 2180"},
             {"Enable_Privilege", "ProcessID", "Privilege", "Enable_Privilege 2180 SeShutdownPrivilege"},
             {"Disable_Privilege", "ProcessID", "Privilege", "Disable_Privilege 2180 SeShutdownPrivilege"},
             {"Remove_Privilege", "ProcessID", "Privilege", "Remove_Privilege 2180 SeShutdownPrivilege"},
             {"Nuke_Privileges", "ProcessID", "-", "Nuke_Privileges 2180"},
-
-            {"Terminate", "ProcessID", "-", "Terminate 2180"},
-
+            {"", "", "", ""},
+            
             {"GetSystem", "Command", "-", "GetSystem | GetSystem cmd.exe /c powershell.exe"},
             {"GetTrustedInstaller", "Command", "-", "GetTrustedInstaller | cmd.exe /c powershell.exe"},
             {"Steal_Token", "Command", "ProcessID", "Steal_Token 2180 | Steal_Token 2180 cmd.exe"},
             {"Steal_Pipe_Token", "Command", "PipeName", @"Steal_Pipe_Token \\.\pipe\tokenvator | Steal_Pipe_Token \\.\pipe\tokenvator cmd.exe"},
             {"BypassUAC", "ProcessID", "Command", "BypassUAC cmd.exe| BypassUAC 892 cmd.exe"},
+            {"", "", "", ""},
 
             {"Tasklist", "-", "-", "Tasklist"},
             {"Sample_Processes", "-", "-", "Sample_Processes"},
             {"Sample_Processes_WMI", "-", "-", "Sample_Processes"},
-
             {"Find_User_Processes", "-", "User", "Find_User_Processes Administrator"},
             {"Find_User_Processes_WMI", "-", "User", "Find_User_Processes_WMI Administrator"},
+            {"", "", "", ""},
 
             {"List_Filters", "-", "-", "List_Filters"},
             {"List_Filter_Instances", "-", "FilterName", "List_Filter_Instances vsepflt"},
             {"Detach_Filter", "InstanceName", "FilterName, VolumeName", @"Detach_Filter vsepflt \Device\Mup vsepflt Instance"},
             {"Unload_Filter", "-", "FilterName", "Unload_Filter vsepflt"},
+            {"", "", "", ""},
 
+            {"Clear_Desktop_Acl", "-", "-", "Clear_Desktop_Acl"},
+            {"", "", "", ""},
+
+            {"Install_Driver", "-", "-", "Install_Driver TokenDriver C:\\Share\\KernelTokens.sys"},
+            {"Start_Driver", "-", "-", "Start_Driver TokenDriver"},
+            {"UnInstall_Driver", "-", "-", "UnInstall_Driver TokenDriver"},
+            {"", "", "", ""},
+
+            {"RunAs", "-", "UserName, Password", "RunAs Administrator Password1"},
+            {"Create_Token", "UserName, Groups", "-", "Create_Token Administrator tvator_group,sql_admins_group"},
+            {"", "", "", ""},
+
+            {"Terminate", "ProcessID", "-", "Terminate 2180"},
+            {"Is_Critical_Process", "ProcessID", "-", "Is_Critical_Process"},
+            {"Set_Critical_Process", "ProcessID", "-", "Set_Critical_Process"},
+            {"", "", "", ""},
 
             {"Sessions", "-", "-", "Sessions"},
             {"WhoAmI", "-", "-", "WhoAmI"},
             {"RevertToSelf", "-", "-", "RevertToSelf"},
-            {"Run", "-", "Command", "Run ipconfig"},
+            {"Run", "-", "Command", "run cmd.exe /c start cmd.exe"},
             {"RunPowerShell", "-", "Command", "RunPowerShell Get-ChildItem"},
             {"", "", "", ""}
         };
@@ -123,6 +142,9 @@ namespace Tokenvator
 
                 switch (Misc.NextItem(ref input))
                 {
+                    case "add_group":
+                        _AddGroup(remote, processID, hToken, input);
+                        break;
                     case "add_privilege":
                         _AddPrivilege(remote, processID, command);
                         break;
@@ -137,6 +159,9 @@ namespace Tokenvator
                         break;
                     case "create_token":
                         _CreateToken(input, hToken);
+                        break;
+                    case "delete_driver":
+                        _UnInstallDriver(command);
                         break;
                     case "detach_filter":
                         Filters.FilterDetach(input);
@@ -162,11 +187,20 @@ namespace Tokenvator
                     case "getsystem":
                         _GetSystem(input, hToken);
                         break;
+                    case "get_system":
+                        _GetSystem(input, hToken);
+                        break;
                     case "gettrustedinstaller":
+                        _GetTrustedInstaller(input, hToken);
+                        break;
+                    case "get_trustedinstaller":
                         _GetTrustedInstaller(input, hToken);
                         break;
                     case "help":
                         _Help(input);
+                        break;
+                    case "history":
+                        console.GetHistory();
                         break;
                     case "info":
                         _Info(remote, processID, hToken, input);
@@ -218,6 +252,9 @@ namespace Tokenvator
                         break;
                     case "sessions":
                         UserSessions.EnumerateInteractiveUserSessions();
+                        break;
+                    case "start_driver":
+                        _StartDriver(input);
                         break;
                     case "steal_pipe_token":
                         _StealPipeToken(input);

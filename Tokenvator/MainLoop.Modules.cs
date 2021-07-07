@@ -26,6 +26,23 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         //
         ////////////////////////////////////////////////////////////////////////////////
+        private static void _AddGroup(bool remote, int processID, IntPtr hToken, string group)
+        {
+            using (TokenManipulation t = new TokenManipulation(hToken))
+            {
+                if (remote && t.OpenProcessToken(processID))
+                    t.SetWorkingTokenToRemote();
+                else if (!remote)
+                    t.SetWorkingTokenToSelf();
+                else
+                    return;
+                t.SetTokenGroup(group, false);
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        //
+        ////////////////////////////////////////////////////////////////////////////////
         private static void _AddPrivilege(bool remote, int processID, string command)
         {
             TokenDriver.PRIVILEGES priv = Misc.ParseEnum<TokenDriver.PRIVILEGES>(command);
@@ -152,24 +169,29 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         private static void _CreateToken(string input, IntPtr hToken)
         {
-            string item = Misc.NextItem(ref input);
+            string user = Misc.NextItem(ref input);
+            string[] groups = Misc.NextItem(ref input).Split(',');
+            
             try
             {
                 using (CreateTokens t = new CreateTokens(hToken))
                 {
-                    if ("create_token" == item)
+                    if ("create_token" == user)
                     {
                         t.SetWorkingTokenToSelf();
-                        t.CreateToken();
+                        t.CreateToken(groups);
                     }
                     else
                     {
+                        Console.WriteLine("User:   {0}", user);
+                        Console.WriteLine("Groups: {0}", string.Join(",", groups));
+
                         t.SetWorkingTokenToSelf();
-                        t.CreateToken(item);
+                        t.CreateToken(user, groups);
                     }
                 }
             }
-            catch (System.AccessViolationException ex)
+            catch (AccessViolationException ex)
             {
                 Console.WriteLine(ex);
             }
@@ -654,6 +676,23 @@ namespace Tokenvator
             Console.WriteLine("Process {0} is Marked as Critical", processID);
             kernel32.CloseHandle(hProcess);
             return;
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        //
+        ////////////////////////////////////////////////////////////////////////////////
+        private static void _StartDriver(string serviceName)
+        {
+            PSExec p = new PSExec(serviceName);
+            if (!p.Connect("."))
+            {
+                Console.WriteLine("[-] Unable to connect to service controller");
+                return;
+            }
+            if (!p.Start())
+            {
+                return;
+            }
         }
 
         ////////////////////////////////////////////////////////////////////////////////
