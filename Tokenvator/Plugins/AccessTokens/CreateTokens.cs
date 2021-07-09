@@ -30,15 +30,13 @@ namespace Tokenvator.Plugins.AccessTokens
             SetWorkingTokenToSelf();
         }
 
-        public void CreateToken(string[] groups)
+        //SeCreateTokenPrivilege
+        public void CreateToken(string[] groups, string command)
         {
             if (!_CheckPrivileges())
             {
                 return;
             }
-
-            IntPtr hToken = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(IntPtr)));
-            Console.WriteLine("Token Handle: 0x{0}", hToken.ToString("X4"));
 
             uint LG_INCLUDE_INDIRECT = 0x0001;
             uint MAX_PREFERRED_LENGTH = 0xFFFFFFFF;
@@ -68,6 +66,8 @@ namespace Tokenvator.Plugins.AccessTokens
             };
 
             TokenInformation ti = new TokenInformation(hWorkingToken);
+            ti.SetWorkingTokenToSelf();
+
             ti.GetTokenSource();
             ti.GetTokenUser();
             ti.GetTokenGroups();
@@ -78,6 +78,8 @@ namespace Tokenvator.Plugins.AccessTokens
 
             Winnt._LUID systemLuid = Winnt.SYSTEM_LUID;
             long expirationTime = long.MaxValue / 2;
+
+            IntPtr hToken = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(IntPtr)));
 
             //out/ref hToken - required
             //Ref Expirationtime - required
@@ -103,11 +105,17 @@ namespace Tokenvator.Plugins.AccessTokens
                 new TokenInformation(hToken).GetTokenUser();
             }
             phNewToken = hToken;
-            StartProcessAsUser("cmd.exe");
+
+            if (string.IsNullOrEmpty(command))
+            {
+                command = "cmd.exe";
+            }
+
+            StartProcessAsUser(command);
         }
 
         //SeCreateTokenPrivilege
-        public void CreateToken(string userName, string[] groups)
+        public void CreateToken(string userName, string[] groups, string command)
         {
             Console.WriteLine("[*] Creating Token for {0}", userName);
 
@@ -144,7 +152,7 @@ namespace Tokenvator.Plugins.AccessTokens
             };
             #endregion
 
-            string domain = Environment.MachineName;
+            string domain = string.Empty;
             if (userName.Contains(@"\"))
             {
                 string[] split = userName.Split('\\');
@@ -198,7 +206,11 @@ namespace Tokenvator.Plugins.AccessTokens
 
             Console.WriteLine();
 
-            StartProcessAsUser("cmd.exe");         
+            if (string.IsNullOrEmpty(command))
+            {
+                command = "cmd.exe";
+            }
+            StartProcessAsUser(command);         
         }
 
         private bool _CheckPrivileges()
@@ -401,7 +413,9 @@ namespace Tokenvator.Plugins.AccessTokens
             //High Integrity Token
             InitializeSid("S-1-16-12288", ref tokenGroups.Groups[extraGroups].Sid);
             tokenGroups.Groups[extraGroups++].Attributes = groupsAttributes;
+            #endregion
 
+            #region Custom Groups
             //Custom groups
             foreach (string group in groups)
             {
@@ -417,7 +431,7 @@ namespace Tokenvator.Plugins.AccessTokens
                 InitializeSid(sid, ref tokenGroups.Groups[extraGroups].Sid);
                 tokenGroups.Groups[extraGroups++].Attributes = groupsAttributes;
             }
-            #endregion 
+            #endregion
 
             #region Local & Global Entries
             for (int i = 0; i < localEntriesRead; i++)
@@ -450,15 +464,13 @@ namespace Tokenvator.Plugins.AccessTokens
 
             tokenGroups.GroupCount = (int)(localEntriesRead + globalEntriesRead + extraGroups);
 
-            Console.WriteLine("[*] Adding Groups");//new string('*', 80));
+            Console.WriteLine("[*] Adding Groups");
 
             for (int i = 0; i < tokenGroups.GroupCount; i++)
             {
                 TokenInformation._ReadSidAndName(tokenGroups.Groups[i].Sid, out string sid, out string account);
                 Console.WriteLine(" ({0}) {1,-50} {2}", i, sid, account);
             }
-
-            //Console.WriteLine(new string('*', 80));
 
             return true;
         }
@@ -773,7 +785,7 @@ namespace Tokenvator.Plugins.AccessTokens
                 Console.WriteLine(ex.Message);
             }
 
-            //Console.WriteLine(" [+] {0} {1}", sddl, accountName);
+            Console.WriteLine(" [+] {0} {1}", sddl, accountName);
             return true;
         }
     }

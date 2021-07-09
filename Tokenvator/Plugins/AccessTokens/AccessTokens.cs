@@ -44,7 +44,7 @@ namespace Tokenvator.Plugins.AccessTokens
         public void SetWorkingTokenToSelf()
         {
             hWorkingToken = currentProcessToken;
-            //Console.WriteLine("[*] Setting Working Token to Self: 0x{0}", hWorkingToken.ToString("X4"));
+            Console.WriteLine("[*] Setting Working Token to Self: 0x{0}", hWorkingToken.ToString("X4"));
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -53,7 +53,7 @@ namespace Tokenvator.Plugins.AccessTokens
         public void SetWorkingTokenToRemote()
         {
             hWorkingToken = hExistingToken;
-            //Console.WriteLine("[*] Setting Working Token to Remote: 0x{0}", hWorkingToken.ToString("X4"));
+            Console.WriteLine("[*] Setting Working Token to Remote: 0x{0}", hWorkingToken.ToString("X4"));
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -62,6 +62,8 @@ namespace Tokenvator.Plugins.AccessTokens
         public void SetWorkingTokenToNewToken()
         {
             hWorkingToken = phNewToken;
+            Console.WriteLine("[*] Setting Working Token to New Token: 0x{0}", hWorkingToken.ToString("X4"));
+
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -77,6 +79,7 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         public virtual bool OpenProcessToken(int processId)
         {
+            /*
             WindowsPrincipal windowsPrincipal = new WindowsPrincipal(WindowsIdentity.GetCurrent());
             if (!windowsPrincipal.IsInRole(WindowsBuiltInRole.Administrator)
                 && !windowsPrincipal.IsInRole(WindowsBuiltInRole.SystemOperator))
@@ -84,6 +87,7 @@ namespace Tokenvator.Plugins.AccessTokens
                 Console.WriteLine("[-] Administrator privileges required");
                 return false;
             }
+            */
 
             IntPtr hProcess = kernel32.OpenProcess(Winnt.PROCESS_QUERY_INFORMATION, false, (uint)processId);
             if (IntPtr.Zero == hProcess)

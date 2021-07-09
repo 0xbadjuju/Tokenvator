@@ -332,7 +332,7 @@ namespace Tokenvator.Plugins.Enumeration
         ////////////////////////////////////////////////////////////////////////////////
         // Find processes for a user via Tokens
         ////////////////////////////////////////////////////////////////////////////////
-        public static Dictionary<uint, string> EnumerateUserProcesses(bool findElevation, string userAccount)
+        public static Dictionary<uint, string> EnumerateUserProcesses(bool findElevation, string targetAccount)
         {
             Dictionary<uint, string> users = new Dictionary<uint, string>();
             Process[] pids = Process.GetProcesses();
@@ -378,7 +378,7 @@ namespace Tokenvator.Plugins.Enumeration
                 {
                     continue;
                 }
-                if (userName.ToUpper() == userAccount.ToUpper())
+                if (userName.Contains(targetAccount, StringComparison.OrdinalIgnoreCase))
                 {
                     users.Add((uint)p.Id, p.ProcessName);
                     if (findElevation)
@@ -405,7 +405,7 @@ namespace Tokenvator.Plugins.Enumeration
         {
             Dictionary<uint, string> processes = new Dictionary<uint, string>();
             List<ManagementObject> systemProcesses = new List<ManagementObject>();
-            ManagementScope scope = new ManagementScope("\\\\.\\root\\cimv2");
+            ManagementScope scope = new ManagementScope(@"\\.\root\cimv2");
             scope.Connect();
             if (!scope.IsConnected)
             {
@@ -415,14 +415,14 @@ namespace Tokenvator.Plugins.Enumeration
             ObjectQuery query = new ObjectQuery("SELECT * FROM Win32_Process");
             ManagementObjectSearcher objectSearcher = new ManagementObjectSearcher(scope, query);
             ManagementObjectCollection objectCollection = objectSearcher.Get();
-            Console.WriteLine("[*] Examining " + objectCollection.Count + " processes");
+            Console.WriteLine("[*] Examining {0} processes", objectCollection.Count);
             foreach (ManagementObject managementObject in objectCollection)
             {
                 try
                 {
                     string[] owner = new string[2];
                     managementObject.InvokeMethod("GetOwner", (object[])owner);
-                    if ((owner[1] + "\\" + owner[0]).ToUpper() == userAccount.ToUpper())
+                    if ((owner[1] + "\\" + owner[0]).Contains(userAccount, StringComparison.OrdinalIgnoreCase))
                     {
                         processes.Add((uint)managementObject["ProcessId"], (string)managementObject["Name"]);
                     }
@@ -434,6 +434,17 @@ namespace Tokenvator.Plugins.Enumeration
             }
             Console.WriteLine("[*] Discovered {0} processes", processes.Count);
             return processes;
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // https://stackoverflow.com/questions/444798/case-insensitive-containsstring
+    ////////////////////////////////////////////////////////////////////////////////
+    public static class StringExtensions
+    {
+        public static bool Contains(this string source, string toCheck, StringComparison comp)
+        {
+            return source?.IndexOf(toCheck, comp) >= 0;
         }
     }
 }

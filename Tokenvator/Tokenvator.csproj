@@ -164,6 +164,7 @@
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Microsoft.VisualBasic" />
     <Reference Include="System" />
     <Reference Include="System.Core">
       <RequiredTargetFramework>3.5</RequiredTargetFramework>
@@ -195,6 +196,7 @@
     <Compile Include="Plugins\MiniFilters\Filters.cs" />
     <Compile Include="MainLoop.cs" />
     <Compile Include="MainLoop.Modules.cs" />
+    <Compile Include="Resources\CommandLineParsing.cs" />
     <Compile Include="Resources\Misc.cs" />
     <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\Accctrl.cs" />
     <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\lmaccess.cs" />

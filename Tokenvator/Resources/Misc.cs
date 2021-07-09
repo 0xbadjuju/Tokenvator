@@ -1,7 +1,9 @@
 ﻿using System;
+using System.IO;
 using System.Linq;
 
 using MonkeyWorks.Unmanaged.Libraries;
+using Tokenvator.Plugins.Execution;
 
 namespace Tokenvator.Resources
 {
@@ -18,6 +20,37 @@ namespace Tokenvator.Resources
                 string[] commandAndArguments = command.Split(new string[] { " " }, StringSplitOptions.RemoveEmptyEntries);
                 command = commandAndArguments.First();
                 arguments = string.Join(" ", commandAndArguments.Skip(1).Take(commandAndArguments.Length - 1).ToArray());
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        // Return the full path to binary file
+        ////////////////////////////////////////////////////////////////////////////////
+        public static bool FindFullPath(string input, out string fullpath)
+        {
+            fullpath = string.Empty;
+            try
+            {
+                fullpath = Path.GetFullPath(input);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                if (ex is ArgumentException)
+                {
+                    //I don't like calling CreateProcess here
+                    fullpath = CreateProcess.FindFilePath(input);
+                    if (string.IsNullOrEmpty(fullpath))
+                    {
+                        Console.WriteLine("[-] Unable to locate full binary path");
+                        return false;
+                    }
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
             }
         }
 

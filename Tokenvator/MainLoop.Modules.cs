@@ -43,9 +43,9 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         //
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _AddPrivilege(bool remote, int processID, string command)
+        private static void _AddPrivilege(CommandLineParsing cLP)
         {
-            TokenDriver.PRIVILEGES priv = Misc.ParseEnum<TokenDriver.PRIVILEGES>(command);
+            TokenDriver.PRIVILEGES priv = Misc.ParseEnum<TokenDriver.PRIVILEGES>(cLP.Privilege);
 
             using (TokenDriver td = new TokenDriver())
             {
@@ -56,11 +56,11 @@ namespace Tokenvator
                 }
 
                 Console.WriteLine("[+] Connected to Driver");
-                if (remote)
+                if (cLP.Remote)
                 {
                     TokenDriver.PRIVILEGE_DATA data = new TokenDriver.PRIVILEGE_DATA
                     {
-                        ProcessID = (uint)processID,
+                        ProcessID = (uint)cLP.ProcessID,
                         Privilege = priv,
                     };
                     td.AddTokenPrivilege(data);
@@ -76,17 +76,17 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         //
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _AlterPrivilege(bool remote, int processID, string command, IntPtr hToken, Winnt.TokenPrivileges privilege)
+        private static void _AlterPrivilege(CommandLineParsing cLP, IntPtr hToken, Winnt.TokenPrivileges attribute)
         {
             using (TokenManipulation t = new TokenManipulation(hToken))
             {
-                if (remote && t.OpenProcessToken(processID))
+                if (cLP.Remote && t.OpenProcessToken(cLP.ProcessID))
                     t.SetWorkingTokenToRemote();
-                else if (!remote)
+                else if (!cLP.Remote)
                     t.SetWorkingTokenToSelf();
                 else
                     return;
-                t.SetTokenPrivilege(command, privilege);
+                t.SetTokenPrivilege(cLP.Privilege, attribute);
             }
         }
 
@@ -167,27 +167,27 @@ namespace Tokenvator
         // https://github.com/bb107/WinSudo/blob/b2cb7700bd2f7ee59e2ef7f9ca20c2a671ce72a8/PrivilegeHelps/Security.cpp
         // https://www.exploit-db.com/papers/42556
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _CreateToken(string input, IntPtr hToken)
-        {
-            string user = Misc.NextItem(ref input);
-            string[] groups = Misc.NextItem(ref input).Split(',');
-            
+        private static void _CreateToken(CommandLineParsing cLP, IntPtr hToken)
+        {   
             try
             {
-                using (CreateTokens t = new CreateTokens(hToken))
+                using (CreateTokens ct = new CreateTokens(hToken))
                 {
-                    if ("create_token" == user)
+                    string[] groups = new string[0];
+                    if (cLP.GetData("groups", out object g))
                     {
-                        t.SetWorkingTokenToSelf();
-                        t.CreateToken(groups);
+                        groups = ((string)g).Split(new string[] { "," }, StringSplitOptions.RemoveEmptyEntries);
+                    }
+
+                    if (cLP.GetData("user", out object user))
+                    {
+                        ct.SetWorkingTokenToSelf();
+                        ct.CreateToken((string)user, groups, cLP.Command);
                     }
                     else
                     {
-                        Console.WriteLine("User:   {0}", user);
-                        Console.WriteLine("Groups: {0}", string.Join(",", groups));
-
-                        t.SetWorkingTokenToSelf();
-                        t.CreateToken(user, groups);
+                        ct.SetWorkingTokenToSelf();
+                        ct.CreateToken(groups, cLP.Command);
                     }
                 }
             }
@@ -200,9 +200,14 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         //
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _FindUserProcesses(string input)
+        private static void _FindUserProcesses(CommandLineParsing cLP)
         {
-            Dictionary<uint, string> processes = UserSessions.EnumerateUserProcesses(false, input);
+            if (!cLP.GetData("user", out object username))
+            {
+                Console.WriteLine("[-] Username not specified");
+                return;
+            }
+            Dictionary<uint, string> processes = UserSessions.EnumerateUserProcesses(false, (string)username);
             Console.WriteLine("{0,-30}{1,-30}", "Process ID", "Process Name");
             Console.WriteLine("{0,-30}{1,-30}", "----------", "------------");
             foreach (uint pid in processes.Keys)
@@ -214,9 +219,14 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         //
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _FindUserProcessesWMI(string input)
+        private static void _FindUserProcessesWMI(CommandLineParsing cLP)
         {
-            Dictionary<uint, string> processes = UserSessions.EnumerateUserProcessesWMI(input);
+            if (!cLP.GetData("user", out object username))
+            {
+                Console.WriteLine("[-] Username not specified");
+                return;
+            }
+            Dictionary<uint, string> processes = UserSessions.EnumerateUserProcessesWMI((string)username);
             Console.WriteLine("{0,-30}{1,-30}", "Process ID", "Process Name");
             Console.WriteLine("{0,-30}{1,-30}", "----------", "------------");
             foreach (uint pid in processes.Keys)
@@ -270,11 +280,10 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         //
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _GetSystem(string input, IntPtr hToken)
+        private static void _GetSystem(CommandLineParsing cLP, IntPtr hToken)
         {
             bool exists, enabled;
             TokenInformation.CheckTokenPrivilege(hToken, "SeDebugPrivilege", out exists, out enabled);
-            string item = Misc.NextItem(ref input);
 
             if (exists)
             {
@@ -285,29 +294,29 @@ namespace Tokenvator
                     if (!enabled)
                         t.SetTokenPrivilege(Winnt.SE_DEBUG_NAME, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED);
 
-                    if ("getsystem" == item)
+                    
+                    if (string.IsNullOrEmpty(cLP.Command))
                         t.GetSystem();
                     else
-                        t.GetSystem(item + " " + input);
+                        t.GetSystem(cLP.CommandAndArgs);
                 }
             }
             else
             {
-                if ("getsystem" == item)
+                if (string.IsNullOrEmpty(cLP.Command))
                     NamedPipes.GetSystem();
                 else
-                    NamedPipes.GetSystem(input, item + " " + input);
+                    NamedPipes.GetSystem(cLP.Command, cLP.Arguments);
             }
         }
 
         ////////////////////////////////////////////////////////////////////////////////
         //
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _GetTrustedInstaller(string input, IntPtr hToken)
+        private static void _GetTrustedInstaller(CommandLineParsing cLP, IntPtr hToken)
         {
             bool exists, enabled;
             TokenInformation.CheckTokenPrivilege(hToken, "SeDebugPrivilege", out exists, out enabled);
-            string item = Misc.NextItem(ref input);
 
             if (exists)
             {
@@ -318,10 +327,10 @@ namespace Tokenvator
                     if (!enabled)
                         t.SetTokenPrivilege(Winnt.SE_DEBUG_NAME, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED);
 
-                    if ("gettrustedinstaller" == item)
+                    if (string.IsNullOrEmpty(cLP.Command))
                         t.GetTrustedInstaller();
                     else
-                        t.GetTrustedInstaller(item + " " + input);
+                        t.GetTrustedInstaller(cLP.CommandAndArgs);
                 }
             }
             else
@@ -345,13 +354,13 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         //
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _Info(bool remote, int processID, IntPtr hToken, string input)
+        private static void _Info(CommandLineParsing cLP, IntPtr hToken)
         {
             using (TokenInformation t = new TokenInformation(hToken))
             {
-                if (remote)
+                if (cLP.Remote)
                 {
-                    if (!t.OpenProcessToken(processID))
+                    if (!t.OpenProcessToken(cLP.ProcessID))
                     {
                         return;
                     }
@@ -370,9 +379,11 @@ namespace Tokenvator
                 Console.WriteLine();
 
                 Console.WriteLine("[*] Impersonation Tokens");
-                if ("all" == Misc.NextItem(ref input))
+
+                bool all = cLP.GetData("all", out object obj);
+                if (all)
                 {
-                    t.ListThreads(processID);
+                    t.ListThreads(cLP.ProcessID);
                     t.GetThreadUsers();
                     Console.WriteLine();
                 }
@@ -381,7 +392,7 @@ namespace Tokenvator
                 t.GetTokenGroups();
                 Console.WriteLine();
 
-                if ("all" == Misc.NextItem(ref input))
+                if (all)
                 {
                     t.GetTokenSource();
                     Console.WriteLine();
@@ -408,32 +419,36 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         // sc create TokenDriver binPath="C:\Windows\System32\kerneltokens.sys" type=kernel
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _InstallDriver(string command)
+        private static void _InstallDriver(CommandLineParsing cLP)
         {
-            string servicename = Misc.NextItem(ref command);
-            string path = Misc.NextItem(ref command);
-            string force = Misc.NextItem(ref command);
+            //string servicename = Misc.NextItem(ref command);
+            //string path = Misc.NextItem(ref command);
+            //string force = Misc.NextItem(ref command);
 
-            if (servicename.Equals(path))
+            string serviceName = "TokenDriver";
+            if (cLP.GetData("ServiceName", out object sn))
             {
-                Console.WriteLine("[-] No driver name specified.");
-                Console.WriteLine("install_driver <driver_name> <driver_file>");
-                Console.WriteLine("install_driver <driver_name> <driver_file> force");
-                return;
+                serviceName = (string)sn;
+            }
+
+            string path = string.Empty;
+            if (cLP.GetData("Path", out object p))
+            {
+                path = (string)p;
             }
 
             bool overwrite = false;
-            if ("force".Equals(force))
+            if (cLP.GetData("Force", out object f))
             {
                 overwrite = true;
             }
 
-            Console.WriteLine("[*] Service Name: " + servicename);
+            Console.WriteLine("[*] Service Name: " + serviceName);
             Console.WriteLine("[*] Service Path: " + path);
 
-            PSExec p = new PSExec(servicename);
+            PSExec psexec = new PSExec(serviceName);
 
-            if (!p.Connect("."))
+            if (!psexec.Connect("."))
             {
                 Console.WriteLine("[-] Unable to connect to service controller");
                 return;
@@ -446,10 +461,17 @@ namespace Tokenvator
             }
             catch (Exception ex)
             {
-                filename = CreateProcess.FindFilePath(path);
-                if (string.IsNullOrEmpty(filename))
+                if (ex is ArgumentException)
                 {
-                    Console.WriteLine("[-] Unable to locate service binary");
+                    filename = CreateProcess.FindFilePath(path);
+                    if (string.IsNullOrEmpty(filename))
+                    {
+                        Console.WriteLine("[-] Unable to locate service binary");
+                        return;
+                    }
+                }
+                else
+                {
                     return;
                 }
             }
@@ -462,19 +484,19 @@ namespace Tokenvator
                 return;
             }
 
-            if (!p.Open())
+            if (!psexec.Open())
             {
-                if (!p.CreateDriver(filename, overwrite))
+                if (!psexec.CreateDriver(filename, overwrite))
                 {
                     return;
                 }
-                if (!p.Open())
+                if (!psexec.Open())
                 {
                     return;
                 }
             }
 
-            if (!p.Start())
+            if (!psexec.Start())
             {
                 return;
             }
@@ -534,17 +556,17 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         //
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _ListPrivileges(bool remote, int processID, IntPtr hToken)
+        private static void _ListPrivileges(CommandLineParsing cLP, IntPtr hToken)
         {
-            using (TokenInformation t = new TokenInformation(hToken))
+            using (TokenInformation ti = new TokenInformation(hToken))
             {
-                if (remote && t.OpenProcessToken(processID))
-                    t.SetWorkingTokenToRemote();
-                else if (!remote)
-                    t.SetWorkingTokenToSelf();
+                if (cLP.Remote && ti.OpenProcessToken(cLP.ProcessID))
+                    ti.SetWorkingTokenToRemote();
+                else if (!cLP.Remote)
+                    ti.SetWorkingTokenToSelf();
                 else
                     return;
-                t.GetTokenPrivileges();
+                ti.GetTokenPrivileges();
             }
         }
 
@@ -681,9 +703,16 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         //
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _StartDriver(string serviceName)
+        private static void _StartDriver(CommandLineParsing cLP)
         {
-            PSExec p = new PSExec(serviceName);
+            if (!cLP.GetData("ServiceName", out object sn))
+            {
+                Console.WriteLine("[-] ServiceName not set");
+                return;
+            }
+
+
+            PSExec p = new PSExec((string) sn);
             if (!p.Connect("."))
             {
                 Console.WriteLine("[-] Unable to connect to service controller");
@@ -698,9 +727,9 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         //
         ////////////////////////////////////////////////////////////////////////////////
-        private static bool _StealToken(bool remote, int processID, string command, IntPtr hToken)
+        private static bool _StealToken(CommandLineParsing cLP, IntPtr hToken)
         {
-            if (!remote)
+            if (!cLP.Remote)
             {
                 Console.WriteLine("[-] Unable to identify Process ID");
                 return false;
@@ -708,18 +737,29 @@ namespace Tokenvator
 
             using (TokenManipulation t = new TokenManipulation(hToken))
             {
-                if (string.IsNullOrEmpty(command))
+                
+                if (string.IsNullOrWhiteSpace(cLP.Command))
                 {
-                    if (t.OpenProcessToken(processID))
+                    if (t.OpenProcessToken(cLP.ProcessID))
+                    {
                         if (t.ImpersonateUser())
+                        {
                             return true;
+                        }
+                    }
                 }
                 else
                 {
-                    if (t.OpenProcessToken(processID))
+                    if (t.OpenProcessToken(cLP.ProcessID))
+                    {
                         if (t.DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation))
-                            if (t.StartProcessAsUser(command))
+                        {
+                            if (t.StartProcessAsUser(cLP.Command))
+                            {
                                 return true;
+                            }
+                        }
+                    }
                 }
                 return false;
             }
@@ -871,28 +911,17 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         //
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _Run(string input)
+        private static void _Run(CommandLineParsing cLP)
         {
-            string command = Misc.NextItem(ref input);
             process = new Process();
-            process.StartInfo.FileName = command;
-            string args = Misc.NextItem(ref input);
-            if (args == command)
-            {
-                args = string.Empty;
-            }
-            else
-            {
-                args += " " + input;
-            }
-
-            process.StartInfo.Arguments = args;
+            process.StartInfo.FileName = cLP.Command;
+            process.StartInfo.Arguments = cLP.Arguments;
             process.StartInfo.CreateNoWindow = true;
             process.StartInfo.UseShellExecute = false;
             process.StartInfo.RedirectStandardInput = true;
             process.StartInfo.RedirectStandardError = true;
             process.StartInfo.RedirectStandardOutput = true;
-            Console.WriteLine("[+] Starting {0}", command);
+            Console.WriteLine("[+] Starting {0}", cLP.CommandAndArgs);
             Console.WriteLine("[*] Note: The prompt is currently missing for input");
             Console.WriteLine();
             process.Start();
@@ -911,13 +940,18 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         // This is probably going to break on certain consoles - e.g. Hangul || Kanji
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _RunAsNetOnly(string input)
+        private static void _RunAsNetOnly(CommandLineParsing cLP)
         {
             string[] domain_user;
             string domain;
             string username;
 
-            string userInfo = Misc.NextItem(ref input);
+            if (!cLP.GetData("", out object un))
+            {
+                Console.WriteLine("[-] Username not specified");
+            }
+
+            string userInfo = (string)un;
             if (userInfo.Contains("\\"))
             {
                 domain_user = userInfo
@@ -938,15 +972,18 @@ namespace Tokenvator
                 username = userInfo;
             }
 
-            string password = Misc.NextItemPreserveCase(ref input);
+
+            if (!cLP.GetData("", out object pw))
+            {
+                Console.WriteLine("[-] Username not specified");
+            }
+            string password = (string)pw;
 
             Console.WriteLine("[*] Username: {0}", username);
             Console.WriteLine("[*] Domain:   {0}", domain);
             Console.WriteLine("[*] Password: {0}", password);
 
-            string command = Misc.NextItem(ref input);
-
-            if (0 == string.Compare(command, password, true))
+            if (string.IsNullOrEmpty(cLP.Command))
             {
                 bool retVal = advapi32.LogonUser(
                     username, domain, password,
@@ -993,7 +1030,7 @@ namespace Tokenvator
             }
             else
             {
-                Console.WriteLine("[*] Command: {0}", command);
+                Console.WriteLine("[*] Command: {0}", cLP.Command);
 
                 Winbase._STARTUPINFO startupInfo = new Winbase._STARTUPINFO
                 {
@@ -1003,8 +1040,8 @@ namespace Tokenvator
                 bool retVal = advapi32.CreateProcessWithLogonW(
                     username, domain, password,
                     Winbase.LOGON_FLAGS.LOGON_NETCREDENTIALS_ONLY,
-                    command, 
-                    input,
+                    cLP.Command, 
+                    cLP.Arguments,
                     Winbase.CREATION_FLAGS.CREATE_NEW_PROCESS_GROUP,
                     IntPtr.Zero, 
                     Environment.CurrentDirectory,
@@ -1026,13 +1063,13 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         //
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _RunPowerShell(string command)
+        private static void _RunPowerShell(CommandLineParsing cLP)
         {
             Runspace runspace = RunspaceFactory.CreateRunspace();
             runspace.Open();
             RunspaceInvoke scriptInvoker = new RunspaceInvoke(runspace);
             Pipeline pipeline = runspace.CreatePipeline();
-            pipeline.Commands.AddScript(command);
+            pipeline.Commands.AddScript(cLP.Command);
             pipeline.Commands.Add("Out-String");
             Collection<PSObject> results = pipeline.Invoke();
             runspace.Close();

@@ -14,7 +14,6 @@ namespace Tokenvator.Plugins.AccessTokens
 {
     class TokenInformation : AccessTokens
     {
-        IntPtr hToken;
         public Winnt._TOKEN_SOURCE tokenSource;
         public IntPtr hTokenSource;
         public Ntifs._TOKEN_USER tokenUser;
@@ -35,7 +34,6 @@ namespace Tokenvator.Plugins.AccessTokens
 
         public TokenInformation(IntPtr hToken) : base(hToken)
         {
-            this.hToken = hToken;
         }
 
         ~TokenInformation()
@@ -224,7 +222,6 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         private bool _OpenThreadToken(uint threadId)
         {
-            IntPtr hToken = new IntPtr();
             IntPtr hThread = kernel32.OpenThread(ProcessThreadsApi.ThreadSecurityRights.THREAD_QUERY_INFORMATION, false, threadId);
 
             if (IntPtr.Zero == hThread)
@@ -242,18 +239,17 @@ namespace Tokenvator.Plugins.AccessTokens
             return true;
         }
 
-
         #region GetTokenInformation
         ////////////////////////////////////////////////////////////////////////////////
         // Displays the users associated with a token
         ////////////////////////////////////////////////////////////////////////////////
         public void GetTokenSource()
         {
-            advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenSource, IntPtr.Zero, 0, out uint returnLength);
+            advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenSource, IntPtr.Zero, 0, out uint returnLength);
             hTokenSource = Marshal.AllocHGlobal((int)returnLength);
             try
             {
-                if (!advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenSource, hTokenSource, returnLength, out returnLength))
+                if (!advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenSource, hTokenSource, returnLength, out returnLength))
                 {
                     Misc.GetWin32Error("GetTokenInformation (TokenSource) - Pass 2");
                     return;
@@ -280,13 +276,12 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         public void GetTokenUser()
         {
-            uint returnLength = 0;
-            advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenUser, IntPtr.Zero, 0, out returnLength);
+            advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenUser, IntPtr.Zero, 0, out uint returnLength);
             hTokenUser = Marshal.AllocHGlobal((int)returnLength);
             
             try
             {
-                if (!advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenUser, hTokenUser, returnLength, out returnLength))
+                if (!advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenUser, hTokenUser, returnLength, out returnLength))
                 {
                     Misc.GetWin32Error("GetTokenInformation - Pass 2");
                     return;
@@ -313,11 +308,11 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         public bool GetTokenGroups()
         {
-            advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenGroups, IntPtr.Zero, 0, out uint returnLength);
+            advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenGroups, IntPtr.Zero, 0, out uint returnLength);
             hTokenGroups = Marshal.AllocHGlobal((int)returnLength);
             try
             {
-                if (!advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenGroups, hTokenGroups, returnLength, out returnLength))
+                if (!advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenGroups, hTokenGroups, returnLength, out returnLength))
                 {
                     Misc.GetWin32Error("GetTokenInformation (TokenGroups) - Pass 2");
                     return false;
@@ -350,8 +345,7 @@ namespace Tokenvator.Plugins.AccessTokens
         {
             ////////////////////////////////////////////////////////////////////////////////
             Console.WriteLine("[*] Enumerating Token Privileges");
-            uint TokenInfLength;
-            advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrivileges, IntPtr.Zero, 0, out TokenInfLength);
+            advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrivileges, IntPtr.Zero, 0, out uint TokenInfLength);
 
             if (TokenInfLength < 0 || TokenInfLength > int.MaxValue)
             {
@@ -362,7 +356,7 @@ namespace Tokenvator.Plugins.AccessTokens
             hTokenPrivileges = Marshal.AllocHGlobal((int)TokenInfLength);
 
             ////////////////////////////////////////////////////////////////////////////////
-            if (!advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrivileges, hTokenPrivileges, TokenInfLength, out TokenInfLength))
+            if (!advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrivileges, hTokenPrivileges, TokenInfLength, out TokenInfLength))
             {
                 Misc.GetWin32Error("GetTokenInformation - 2 " + TokenInfLength);
                 return;
@@ -405,7 +399,7 @@ namespace Tokenvator.Plugins.AccessTokens
                 };
 
                 int pfResult = 0;
-                if (!advapi32.PrivilegeCheck(hToken, ref privilegeSet, out pfResult))
+                if (!advapi32.PrivilegeCheck(hWorkingToken, ref privilegeSet, out pfResult))
                 {
                     Misc.GetWin32Error("PrivilegeCheck");
                     Marshal.FreeHGlobal(lpLuid);
@@ -422,12 +416,11 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         public void GetTokenOwner()
         {
-            uint returnLength = 0;
-            advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenOwner, IntPtr.Zero, 0, out returnLength);
+            advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenOwner, IntPtr.Zero, 0, out uint returnLength);
             hTokenOwner = Marshal.AllocHGlobal((int)returnLength);
             try
             {
-                if (!advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenOwner, hTokenOwner, returnLength, out returnLength))
+                if (!advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenOwner, hTokenOwner, returnLength, out returnLength))
                 {
                     Misc.GetWin32Error("GetTokenInformation - Pass 2");
                     return;
@@ -458,12 +451,11 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         public void GetTokenPrimaryGroup()
         {
-            uint returnLength = 0;
-            advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrimaryGroup, IntPtr.Zero, 0, out returnLength);
+            advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrimaryGroup, IntPtr.Zero, 0, out uint returnLength);
             hTokenPrimaryGroup = Marshal.AllocHGlobal((int)returnLength);
             try
             {
-                if (!advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrimaryGroup, hTokenPrimaryGroup, returnLength, out returnLength))
+                if (!advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrimaryGroup, hTokenPrimaryGroup, returnLength, out returnLength))
                 {
                     Misc.GetWin32Error("GetTokenInformation - Pass 2");
                     return;
@@ -492,12 +484,11 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         public void GetTokenDefaultDacl()
         {
-            uint returnLength = 0;
-            advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenDefaultDacl, IntPtr.Zero, 0, out returnLength);
+            advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenDefaultDacl, IntPtr.Zero, 0, out uint returnLength);
             hTokenDefaultDacl = Marshal.AllocHGlobal((int)returnLength);
             try
             {
-                if (!advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenDefaultDacl, hTokenDefaultDacl, returnLength, out returnLength))
+                if (!advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenDefaultDacl, hTokenDefaultDacl, returnLength, out returnLength))
                 {
                     Misc.GetWin32Error("GetTokenInformation - Pass 2");
                     return;

@@ -43,8 +43,9 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         // IDisposable
         ////////////////////////////////////////////////////////////////////////////////
-        public void Dispose()
+        public new void Dispose()
         {
+            base.Dispose();
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -449,13 +450,14 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         public bool SetTokenPrivilege(string privilege, Winnt.TokenPrivileges attribute)
         {
+            /*
             if (!validPrivileges.Contains(privilege))
             {
                 Console.WriteLine("[-] Invalid Privilege Specified");
                 return false;
             }
-
-            Console.WriteLine("[*] Adjusting Token Privilege");
+            */
+            Console.WriteLine("[*] Adjusting Token Privilege {0} => {1}", privilege, attribute);
             ////////////////////////////////////////////////////////////////////////////////
             Winnt._LUID luid = new Winnt._LUID();
             if (!advapi32.LookupPrivilegeValue(null, privilege, ref luid))

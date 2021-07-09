@@ -51,9 +51,9 @@ namespace Tokenvator
             {"Clear_Desktop_Acl", "-", "-", "Clear_Desktop_Acl"},
             {"", "", "", ""},
 
-            {"Install_Driver", "-", "-", "Install_Driver TokenDriver C:\\Share\\KernelTokens.sys"},
-            {"Start_Driver", "-", "-", "Start_Driver TokenDriver"},
-            {"UnInstall_Driver", "-", "-", "UnInstall_Driver TokenDriver"},
+            {"Install_Driver", "-", "DriverName, DriverFilePath", "Install_Driver TokenDriver C:\\Share\\KernelTokens.sys"},
+            {"Start_Driver", "-", "DriverName", "Start_Driver TokenDriver"},
+            {"UnInstall_Driver", "-", "DriverName", "UnInstall_Driver TokenDriver"},
             {"", "", "", ""},
 
             {"RunAs", "-", "UserName, Password", "RunAs Administrator Password1"},
@@ -139,14 +139,20 @@ namespace Tokenvator
                         }
                     }
                 }
+                string action = Misc.NextItem(ref input);
+                CommandLineParsing cLP = new CommandLineParsing();
+                if (!string.Equals(action, input, StringComparison.OrdinalIgnoreCase))
+                {
+                    cLP.Parse(input);
+                }
 
-                switch (Misc.NextItem(ref input))
+                switch (action)
                 {
                     case "add_group":
                         _AddGroup(remote, processID, hToken, input);
                         break;
                     case "add_privilege":
-                        _AddPrivilege(remote, processID, command);
+                        _AddPrivilege(cLP);
                         break;
                     case "bypassuac":
                         _BypassUAC(remote, processID, command, input, hToken);
@@ -158,7 +164,7 @@ namespace Tokenvator
                         _CloneToken(remote, processID, command, hToken);
                         break;
                     case "create_token":
-                        _CreateToken(input, hToken);
+                        _CreateToken(cLP, hToken);
                         break;
                     case "delete_driver":
                         _UnInstallDriver(command);
@@ -167,34 +173,34 @@ namespace Tokenvator
                         Filters.FilterDetach(input);
                         break;
                     case "disable_privilege":
-                        _AlterPrivilege(remote, processID, command, hToken, Winnt.TokenPrivileges.SE_PRIVILEGE_NONE);
+                        _AlterPrivilege(cLP, hToken, Winnt.TokenPrivileges.SE_PRIVILEGE_NONE);
                         break;
                     case "enable_privilege":
-                        _AlterPrivilege(remote, processID, command, hToken, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED);
+                        _AlterPrivilege(cLP, hToken, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED);
                         break;
                     case "exit":
                         Environment.Exit(0);
                         break;
                     case "find_user_processes":
-                        _FindUserProcesses(input);
+                        _FindUserProcesses(cLP);
                         break;
                     case "find_user_processes_wmi":
-                        _FindUserProcessesWMI(input);
+                        _FindUserProcessesWMI(cLP);
                         break;
                     case "getinfo":
-                        _Info(remote, processID, hToken, input);
+                        _Info(cLP, hToken);
                         break;
                     case "getsystem":
-                        _GetSystem(input, hToken);
+                        _GetSystem(cLP, hToken);
                         break;
                     case "get_system":
-                        _GetSystem(input, hToken);
+                        _GetSystem(cLP, hToken);
                         break;
                     case "gettrustedinstaller":
-                        _GetTrustedInstaller(input, hToken);
+                        _GetTrustedInstaller(cLP, hToken);
                         break;
                     case "get_trustedinstaller":
-                        _GetTrustedInstaller(input, hToken);
+                        _GetTrustedInstaller(cLP, hToken);
                         break;
                     case "help":
                         _Help(input);
@@ -203,10 +209,10 @@ namespace Tokenvator
                         console.GetHistory();
                         break;
                     case "info":
-                        _Info(remote, processID, hToken, input);
+                        _Info(cLP, hToken);
                         break;
                     case "install_driver":
-                        _InstallDriver(input);
+                        _InstallDriver(cLP);
                         break;
                     case "list_filters":
                         _ListFilters();
@@ -215,7 +221,7 @@ namespace Tokenvator
                         _ListFiltersInstances(input);
                         break;
                     case "list_privileges":
-                        _ListPrivileges(remote, processID, hToken);
+                        _ListPrivileges(cLP, hToken);
                         break;
                     case "logon_user":
                         _LogonUser(input, hToken);
@@ -224,7 +230,7 @@ namespace Tokenvator
                         _NukePrivileges(remote, processID, hToken);
                         break;
                     case "remove_privilege":
-                        _AlterPrivilege(remote, processID, command, hToken, Winnt.TokenPrivileges.SE_PRIVILEGE_REMOVED);
+                        _AlterPrivilege(cLP, hToken, Winnt.TokenPrivileges.SE_PRIVILEGE_REMOVED);
                         break;
                     case "is_critical_process":
                         _IsCriticalProcess(remote, processID, hProcess);
@@ -236,13 +242,13 @@ namespace Tokenvator
                         Console.WriteLine(advapi32.RevertToSelf() ? "[*] Reverted token to " + WindowsIdentity.GetCurrent().Name : "[-] RevertToSelf failed");
                         break;
                     case "run":
-                        _Run(input);
+                        _Run(cLP);
                         break;
                     case "runas":
-                        _RunAsNetOnly(input);
+                        _RunAsNetOnly(cLP);
                         break;
                     case "runpowershell":
-                        _RunPowerShell(input);
+                        _RunPowerShell(cLP);
                         break;
                     case "sample_processes":
                         _SampleProcess();
@@ -254,13 +260,13 @@ namespace Tokenvator
                         UserSessions.EnumerateInteractiveUserSessions();
                         break;
                     case "start_driver":
-                        _StartDriver(input);
+                        _StartDriver(cLP);
                         break;
                     case "steal_pipe_token":
                         _StealPipeToken(input);
                         break;
                     case "steal_token":
-                        _StealToken(remote, processID, command, hToken);
+                        _StealToken(cLP, hToken);
                         break;
                     case "tasklist":
                         UserSessions.Tasklist();

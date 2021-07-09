@@ -194,7 +194,7 @@ namespace Tokenvator.Plugins.Execution
                 if (1053 != error)
                 {
                     Console.WriteLine("[-] Failed to start service");
-                    Misc.GetWin32Error("Start");
+                    Misc.GetWin32Error("StartService");
                     return false;
                 }
             }
