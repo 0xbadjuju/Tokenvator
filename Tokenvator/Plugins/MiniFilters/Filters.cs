@@ -103,34 +103,71 @@ namespace Tokenvator.Plugins.MiniFilters
             while (0 != offset);
         }
 
-        internal static void FilterDetach(string input)
+        internal static void FilterDetach(CommandLineParsing cLP)
         {
-            string filterName = Misc.NextItem(ref input);
-            string volumeName = Misc.NextItem(ref input);
-            string instanceName = input;
-            if (volumeName == instanceName)
+            if (!cLP.GetData("filter", out string filter))
             {
-                instanceName = string.Empty;
+                Console.WriteLine("[-] /Filter: Not Specified");
+                return;
             }
 
-            uint result = fltlib.FilterDetach(filterName, volumeName, instanceName);
-            if (0 != result)
+            if (!cLP.GetData("instance", out string instance))
             {
-                Console.WriteLine("FilterDetach Failed: 0x{0}", result.ToString("X4"));
+                Console.WriteLine("[-] /Instance: Not Specified");
+                return;
             }
-        }
 
-        internal static void Unload(string filterName)
-        {
-            uint result = fltlib.FilterUnload(filterName);
+            if (!cLP.GetData("volume", out string volume))
+            {
+                Console.WriteLine("[-] /Volume: Not Specified");
+                return;
+            }
+
+            uint result = fltlib.FilterDetach(filter, volume, instance);
             if (0 != result)
             {
                 if (2147943714 == result)
                 {
-                    Console.WriteLine("Privilege Not Held");
+                    Console.WriteLine("[-] Privilege Not Held (Probably SeLoadDriverPrivilege)");
+                    return;
+                }
+                else if (2149515280 == result)
+                {
+                    Console.WriteLine("[-] Filter does not have a detach routine");
+                    return;
+                }
+                Console.WriteLine("FilterDetach Failed: 0x{0}", result.ToString("X4"));
+                return;
+            }
+
+            Console.WriteLine("[+] Filter Detached");
+        }
+
+        internal static void Unload(CommandLineParsing cLP)
+        {
+            if (!cLP.GetData("filter", out string filter))
+            {
+                Console.WriteLine("[-] Filter Not Specified");
+                return;
+            }
+
+            uint result = fltlib.FilterUnload(filter);
+            if (0 != result)
+            {
+                if (2147943714 == result)
+                {
+                    Console.WriteLine("[-] Privilege Not Held (Probably SeLoadDriverPrivilege)");
+                    return;
+                }
+                else if (2149515280 == result)
+                {
+                    Console.WriteLine("[-] Filter does not have a detach routine");
+                    return;
                 }
                 Console.WriteLine("FilterUnload Failed: 0x{0}", result.ToString("X4"));
+                return;
             }
+            Console.WriteLine("[+] Filter Unloaded");
         }
 
         ~Filters()

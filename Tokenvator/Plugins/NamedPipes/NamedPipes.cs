@@ -122,7 +122,7 @@ namespace Tokenvator.Plugins.NamedPipes
 
         ////////////////////////////////////////////////////////////////////////////////
         ////////////////////////////////////////////////////////////////////////////////
-        public static void GetPipeToken(string pipeName, string command)
+        public static void GetPipeToken(string pipeName, string command, string arguments)
         {
             Console.WriteLine("[*] Creating Listener Thread");
             Thread thread = new Thread(() => _GetPipeToken(pipeName));
@@ -132,9 +132,6 @@ namespace Tokenvator.Plugins.NamedPipes
             Console.WriteLine("[*] Joining Thread");
             thread.Join();
             Console.WriteLine("[*] Joined Thread");
-
-            string arguments = string.Empty;
-            Misc.FindExe(ref command, out arguments);
 
             if (IntPtr.Zero != hToken)
             {

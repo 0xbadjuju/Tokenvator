@@ -335,11 +335,10 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         //
         ////////////////////////////////////////////////////////////////////////////////
-        public void LogonUser(string domain, string username, string password, Winbase.LOGON_TYPE logonType, string input, string start)
+        public void LogonUser(string domain, string username, string password, Winbase.LOGON_TYPE logonType, string command, string arguments)
         {
             if (!advapi32.LogonUser(username, domain, password, logonType, Winbase.LOGON_PROVIDER.LOGON32_PROVIDER_DEFAULT, out hExistingToken))
             {
-                Console.WriteLine(" [-] Logon User");
                 Misc.GetWin32Error("LogonUser");
                 return;
             }
@@ -353,9 +352,8 @@ namespace Tokenvator.Plugins.AccessTokens
                 }
             }
 
-            string next = Misc.NextItem(ref input);
 
-            if (next.ToLower() == start.ToLower())
+            if (string.IsNullOrEmpty(command))
             {
                 ImpersonateUser();
             }
@@ -367,10 +365,7 @@ namespace Tokenvator.Plugins.AccessTokens
                 else
                     createProcess = CreateProcess.CreateProcessWithTokenW;
 
-                string arguments;
-                Misc.FindExe(ref next, out arguments);
-
-                createProcess(hExistingToken, next, arguments);
+                createProcess(hExistingToken, command, arguments);
             }
         }
 

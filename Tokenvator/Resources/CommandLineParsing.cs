@@ -17,6 +17,7 @@ namespace Tokenvator.Resources
         public string Command { get; private set; }
         public string Arguments { get; private set; }
         public bool Remote { get; private set; } = false;
+        public string PipeName { get; private set; }
 
         public static List<string> privileges = new List<string> { "SeAssignPrimaryTokenPrivilege",
             "SeAuditPrivilege", "SeBackupPrivilege", "SeChangeNotifyPrivilege", "SeCreateGlobalPrivilege",
@@ -42,10 +43,14 @@ namespace Tokenvator.Resources
         /// <param name="input"></param>
         public void Parse(string input)
         {
-            input = Regex.Replace(input, "(\".*?)(/)(.*?\")", "$1\0$3");
-            
+            //"(\".*?)(/?)(.*?\")"
+            //Console.WriteLine();
+            //Console.WriteLine(input);
+            input = Regex.Replace(input, "(\"[^\"]*)(\\/)+([^\"]*[^:](?!\\\\)\")", "$1\0$3");
+            //Console.WriteLine(input);
+            //Console.WriteLine();
             //Not working properly needs above regex - not sure why
-            
+
             /*
             var textfieldParser = new TextFieldParser(new System.IO.StringReader(input))
             {
@@ -66,19 +71,30 @@ namespace Tokenvator.Resources
                     continue;
                 }
 
-                string b = a.Replace('\0', '/');
-                b = Regex.Replace(b, "(\".*?)(:)(.*?\")", "$1\0$3").Replace("\"", "");
+                //Console.WriteLine(a);
+                string b = a.Replace('\0', '/').Replace("\"", "");
+                //Console.WriteLine(b);
+
+                //b = Regex.Replace(b, "(\".*?)(:)(.*?\")", "$1\0$3").Replace("\"", "");
                 string[] argData = b.Split(new string[] { ":" }, StringSplitOptions.RemoveEmptyEntries);
                 if (string.IsNullOrWhiteSpace(argData.FirstOrDefault()))
                 {
                     continue;
                 }
 
-                string c = string.Join(" ", argData.Skip(1).Take(argData.Count() - 1).ToArray()).Replace('\0', ':');
-                //Console.WriteLine("[*] a {0}", argData.FirstOrDefault().ToLower());
-                //Console.WriteLine("[*] c {0}", c);
+                string c = string.Join(":", argData.Skip(1).Take(argData.Count() - 1).ToArray());//.Replace('\0', ':');
                 arguments.Add(argData.FirstOrDefault().ToLower(), c.Trim());
+                //Console.WriteLine();
             }
+
+            Console.WriteLine();
+            Console.WriteLine("{0,-10} {1}", "Option", "Value");
+            Console.WriteLine("{0,-10} {1}", "------", "-----");
+            foreach (var key in arguments.Keys)
+            {
+                Console.WriteLine("{0,-10} {1}", key, arguments[key]);
+            }
+            Console.WriteLine();
 
             if (arguments.ContainsKey("process"))
             {
@@ -88,6 +104,10 @@ namespace Tokenvator.Resources
                     {
                         ProcessID = pid;
                         Remote = true;
+                    }
+                    else
+                    {
+                        return;
                     }
                 }
             }
@@ -105,7 +125,6 @@ namespace Tokenvator.Resources
 
             if (arguments.ContainsKey("command"))
             {
-                Console.WriteLine("Parsing Command");
                 if (arguments.TryGetValue("command", out object command))
                 {
                     _ParseCommand((string)command, out string c, out string a);
@@ -113,6 +132,15 @@ namespace Tokenvator.Resources
                     Console.WriteLine("[*] Command: " + c);
                     Console.WriteLine("[*] Arguments: " + a);
                     Console.WriteLine("[*] If the above doesn't look correct you may need quotes");
+                }
+            }
+
+            if (arguments.ContainsKey("pipename"))
+            {
+                if (arguments.TryGetValue("pipename", out object pn))
+                {
+                    string name = (string)pn;
+                    PipeName = name.Contains(@"\\.\pipe") ? name.Replace(@"\\.\pipe", "") : name;
                 }
             }
         }
@@ -123,9 +151,11 @@ namespace Tokenvator.Resources
         /// <param name="input"></param>
         /// <param name="output"></param>
         /// <returns></returns>
-        public bool GetData(string input, out object output)
+        public bool GetData<T>(string input, out T output)
         {
-            return arguments.TryGetValue(input.ToLower(), out output);
+            bool retVal = arguments.TryGetValue(input.ToLower(), out object obj);
+            output = (T)obj;
+            return retVal;
         }
 
         /// <summary>

@@ -149,13 +149,13 @@ namespace Tokenvator
                 switch (action)
                 {
                     case "add_group":
-                        _AddGroup(remote, processID, hToken, input);
+                        _AddGroup(cLP, hToken);
                         break;
                     case "add_privilege":
                         _AddPrivilege(cLP);
                         break;
                     case "bypassuac":
-                        _BypassUAC(remote, processID, command, input, hToken);
+                        _BypassUAC(cLP, hToken);
                         break;
                     case "clear_desktop_acl":
                         _ClearDesktopACL();
@@ -167,10 +167,10 @@ namespace Tokenvator
                         _CreateToken(cLP, hToken);
                         break;
                     case "delete_driver":
-                        _UnInstallDriver(command);
+                        _UnInstallDriver(cLP);
                         break;
                     case "detach_filter":
-                        Filters.FilterDetach(input);
+                        Filters.FilterDetach(cLP);
                         break;
                     case "disable_privilege":
                         _AlterPrivilege(cLP, hToken, Winnt.TokenPrivileges.SE_PRIVILEGE_NONE);
@@ -218,25 +218,29 @@ namespace Tokenvator
                         _ListFilters();
                         break;
                     case "list_filter_instances":
-                        _ListFiltersInstances(input);
+                        _ListFiltersInstances(cLP);
                         break;
                     case "list_privileges":
                         _ListPrivileges(cLP, hToken);
                         break;
                     case "logon_user":
-                        _LogonUser(input, hToken);
+                        _LogonUser(cLP, hToken);
                         break;
                     case "nuke_privileges":
-                        _NukePrivileges(remote, processID, hToken);
+                        _NukePrivileges(cLP, hToken);
+                        break;
+                    case "pid":
+                        Console.WriteLine("[+] Process ID: {0}", Process.GetCurrentProcess().Id);
+                        Console.WriteLine("[+] Parent ID:  {0}", Process.GetCurrentProcess().Parent().Id);
                         break;
                     case "remove_privilege":
                         _AlterPrivilege(cLP, hToken, Winnt.TokenPrivileges.SE_PRIVILEGE_REMOVED);
                         break;
                     case "is_critical_process":
-                        _IsCriticalProcess(remote, processID, hProcess);
+                        _IsCriticalProcess(cLP, hProcess);
                         break;
                     case "set_critical_process":
-                        _SetCriticalProcess(remote, processID, command, hProcess);
+                        _SetCriticalProcess(cLP, hProcess);
                         break;
                     case "reverttoself":
                         Console.WriteLine(advapi32.RevertToSelf() ? "[*] Reverted token to " + WindowsIdentity.GetCurrent().Name : "[-] RevertToSelf failed");
@@ -263,7 +267,7 @@ namespace Tokenvator
                         _StartDriver(cLP);
                         break;
                     case "steal_pipe_token":
-                        _StealPipeToken(input);
+                        _StealPipeToken(cLP);
                         break;
                     case "steal_token":
                         _StealToken(cLP, hToken);
@@ -272,16 +276,16 @@ namespace Tokenvator
                         UserSessions.Tasklist();
                         break;
                     case "terminate":
-                        _Terminate(remote, processID, hProcess);
+                        _Terminate(cLP);
                         break;
                     case "unfreeze_token":
-                        _UnfreezeToken(remote, processID);
+                        _UnfreezeToken(cLP);
                         break;
                     case "uninstall_driver":
-                        _UnInstallDriver(command);
+                        _UnInstallDriver(cLP);
                         break;
                     case "unload_filter":
-                        Filters.Unload(Misc.NextItem(ref input));
+                        Filters.Unload(cLP);
                         break;
                     case "whoami":
                         Console.WriteLine("[*] Operating as {0}", WindowsIdentity.GetCurrent().Name);

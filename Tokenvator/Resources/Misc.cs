@@ -141,5 +141,18 @@ namespace Tokenvator.Resources
             }
             Console.WriteLine("==========");
         }
+
+        //https://stackoverflow.com/questions/1343704/casting-c-sharp-out-parameters
+        static bool TryGetTypedValue<TKey, TValue, TActual>(this System.Collections.Generic.IDictionary<TKey, TValue> data, TKey key, out TActual value) where TActual : TValue
+        {
+            TValue tmp;
+            if (data.TryGetValue(key, out tmp))
+            {
+                value = (TActual)tmp;
+                return true;
+            }
+            value = default(TActual);
+            return false;
+        }
     }
 }
