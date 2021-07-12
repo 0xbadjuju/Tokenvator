@@ -4,6 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Reflection;
 
+using Tokenvator.Resources;
+
 namespace Tokenvator
 {
 
@@ -21,6 +23,12 @@ namespace Tokenvator
 
         private string context;
 
+        private readonly List<string> flags = new List<string>()
+        { 
+            "All", "Command", "Filter", "Force", "Groups", "Password", "Path", "Privilege", "Process", "ServiceName", "State", "Username"        
+        };
+
+
         ////////////////////////////////////////////////////////////////////////////////
         // Default constructor
         ////////////////////////////////////////////////////////////////////////////////
@@ -30,10 +38,13 @@ namespace Tokenvator
 
             for (int i = 0; i < menu.GetLength(0); i++)
             {
-                options.Add((string)menu[i,0]);
+                options.Add(menu[i,0]);
             }
         }
 
+        ////////////////////////////////////////////////////////////////////////////////
+        // Get input history
+        ////////////////////////////////////////////////////////////////////////////////
         public void GetHistory()
         {
             for (int i = 0; i < scrollbackPosition; i++)
@@ -146,15 +157,49 @@ namespace Tokenvator
 
             string candidate = options.FirstOrDefault(i => i != input && i.StartsWith(input, true, System.Globalization.CultureInfo.InvariantCulture));
 
-            if (string.IsNullOrEmpty(candidate))
+            if (!string.IsNullOrEmpty(candidate))
             {
+                tempBuilder.Append(candidate);
+                ResetLine();
+                stringBuilder.Remove(0, stringBuilder.Length);
+                stringBuilder.Append(tempBuilder.ToString());
+            }
+
+            //Autocomplete Flags
+            string[] split = input.Split(new string[] { "/"}, StringSplitOptions.None);
+            string last = split.Last();
+            if (1 < split.Length && !last.Contains(":"))
+            {
+                candidate = flags.FirstOrDefault(i => i != last && i.StartsWith(last, true, System.Globalization.CultureInfo.InvariantCulture));
+                string j = string.Join("/", split.Take(split.Length - 1));
+                ResetLine();
+                stringBuilder.Clear();
+                stringBuilder.Append($"{j}/{candidate}");
                 return;
             }
-            tempBuilder.Append(candidate);
 
-            ResetLine();
-            stringBuilder.Remove(0, stringBuilder.Length);
-            stringBuilder.Append(tempBuilder.ToString());
+            //Autocomplete Data
+            last = input.Split(new string[] { " " }, StringSplitOptions.RemoveEmptyEntries).Last();
+            split = input.Split(new string[] { "/", ":" }, StringSplitOptions.None);
+            if (1 < split.Length)
+            {
+                string flag = split[split.Length - 2].ToLower();
+                string item = split.Last();
+
+                switch (flag)
+                {
+                    case "privilege":
+                        candidate = CommandLineParsing.privileges.FirstOrDefault(i => i != item && i.StartsWith(item, true, System.Globalization.CultureInfo.InvariantCulture));
+                        string[] j = input.Split(new string[] { ":" }, StringSplitOptions.None);
+                        string k = string.Join(":", j.Take(j.Length - 1));
+                        ResetLine();
+                        stringBuilder.Clear();
+                        stringBuilder.Append($"{k}:{candidate}");
+                        return;
+                    default:
+                        break;
+                }
+            }
         }
 
         ////////////////////////////////////////////////////////////////////////////////

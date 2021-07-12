@@ -178,15 +178,15 @@ namespace Tokenvator
                 using (CreateTokens ct = new CreateTokens(hToken))
                 {
                     string[] groups = new string[0];
-                    if (cLP.GetData("groups", out object g))
+                    if (cLP.GetData("groups", out string g))
                     {
-                        groups = ((string)g).Split(new string[] { "," }, StringSplitOptions.RemoveEmptyEntries);
+                        groups = (g).Split(new string[] { "," }, StringSplitOptions.RemoveEmptyEntries);
                     }
 
-                    if (cLP.GetData("user", out object user))
+                    if (cLP.GetData("username", out string user))
                     {
                         ct.SetWorkingTokenToSelf();
-                        ct.CreateToken((string)user, groups, cLP.Command);
+                        ct.CreateToken(user, groups, cLP.Command);
                     }
                     else
                     {
@@ -206,12 +206,12 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         private static void _FindUserProcesses(CommandLineParsing cLP)
         {
-            if (!cLP.GetData("user", out object username))
+            if (!cLP.GetData("username", out string user))
             {
                 Console.WriteLine("[-] Username not specified");
                 return;
             }
-            Dictionary<uint, string> processes = UserSessions.EnumerateUserProcesses(false, (string)username);
+            Dictionary<uint, string> processes = UserSessions.EnumerateUserProcesses(false, user);
             Console.WriteLine("{0,-30}{1,-30}", "Process ID", "Process Name");
             Console.WriteLine("{0,-30}{1,-30}", "----------", "------------");
             foreach (uint pid in processes.Keys)
@@ -225,12 +225,12 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         private static void _FindUserProcessesWMI(CommandLineParsing cLP)
         {
-            if (!cLP.GetData("user", out object username))
+            if (!cLP.GetData("username", out string user))
             {
                 Console.WriteLine("[-] Username not specified");
                 return;
             }
-            Dictionary<uint, string> processes = UserSessions.EnumerateUserProcessesWMI((string)username);
+            Dictionary<uint, string> processes = UserSessions.EnumerateUserProcessesWMI(user);
             Console.WriteLine("{0,-30}{1,-30}", "Process ID", "Process Name");
             Console.WriteLine("{0,-30}{1,-30}", "----------", "------------");
             foreach (uint pid in processes.Keys)
@@ -430,13 +430,13 @@ namespace Tokenvator
             //string force = Misc.NextItem(ref command);
 
             string serviceName = "TokenDriver";
-            if (cLP.GetData("ServiceName", out object sn))
+            if (cLP.GetData("ServiceName", out string sn))
             {
                 serviceName = (string)sn;
             }
 
             string path = string.Empty;
-            if (cLP.GetData("Path", out object p))
+            if (cLP.GetData("Path", out string p))
             {
                 path = (string)p;
             }
@@ -905,7 +905,7 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         private static void _UnInstallDriver(CommandLineParsing cLP)
         {
-            if (cLP.GetData("service", out string service))
+            if (cLP.GetData("servicename", out string service))
             {
                 using (PSExec p = new PSExec(service))
                 {
@@ -974,12 +974,13 @@ namespace Tokenvator
             string domain;
             string username;
 
-            if (!cLP.GetData("", out object un))
+            if (!cLP.GetData("username", out string un))
             {
                 Console.WriteLine("[-] Username not specified");
+                return;
             }
 
-            string userInfo = (string)un;
+            string userInfo = un;
             if (userInfo.Contains("\\"))
             {
                 domain_user = userInfo
@@ -1001,11 +1002,11 @@ namespace Tokenvator
             }
 
 
-            if (!cLP.GetData("", out object pw))
+            if (!cLP.GetData("password", out string password))
             {
-                Console.WriteLine("[-] Username not specified");
+                Console.WriteLine("[-] Password not specified");
+                return;
             }
-            string password = (string)pw;
 
             Console.WriteLine("[*] Username: {0}", username);
             Console.WriteLine("[*] Domain:   {0}", domain);
