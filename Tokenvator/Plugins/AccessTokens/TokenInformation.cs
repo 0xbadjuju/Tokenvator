@@ -211,8 +211,11 @@ namespace Tokenvator.Plugins.AccessTokens
                 Console.WriteLine("[*] Thread ID: " + t);
                 if (_OpenThreadToken(t))
                 {
-                    TokenInformation ti = new TokenInformation(hWorkingThreadToken);
-                    ti.GetTokenUser();
+                    using (TokenInformation ti = new TokenInformation(hWorkingThreadToken))
+                    {
+                        ti.SetWorkingTokenToSelf();
+                        ti.GetTokenUser();
+                    }
                 }
             }
         }

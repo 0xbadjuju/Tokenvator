@@ -41,7 +41,7 @@ namespace Tokenvator.Resources
         /// 
         /// </summary>
         /// <param name="input"></param>
-        public void Parse(string input)
+        public bool Parse(string input)
         {
             //"(\".*?)(/?)(.*?\")"
             //Console.WriteLine();
@@ -107,7 +107,7 @@ namespace Tokenvator.Resources
                     }
                     else
                     {
-                        return;
+                        return false;
                     }
                 }
             }
@@ -119,6 +119,10 @@ namespace Tokenvator.Resources
                     if (_ParsePrivileges((string)privilege, out string priv))
                     {
                         Privilege = priv;
+                    }
+                    else
+                    {
+                        return false;
                     }
                 }
             }
@@ -133,6 +137,10 @@ namespace Tokenvator.Resources
                     Console.WriteLine("[*] Arguments: " + a);
                     Console.WriteLine("[*] If the above doesn't look correct you may need quotes");
                 }
+                else
+                {
+                    return false;
+                }
             }
 
             if (arguments.ContainsKey("pipename"))
@@ -142,7 +150,13 @@ namespace Tokenvator.Resources
                     string name = (string)pn;
                     PipeName = name.Contains(@"\\.\pipe") ? name.Replace(@"\\.\pipe", "") : name;
                 }
+                else
+                {
+                    return false;
+                }
             }
+
+            return true;
         }
 
         /// <summary>

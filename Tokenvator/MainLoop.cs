@@ -29,8 +29,8 @@ namespace Tokenvator
             {"Nuke_Privileges", "Process", "-", "Nuke_Privileges /Process:2180 \nNuke_Privileges /Process:powershell.exe"},
             {"", "", "", ""},
             
-            {"GetSystem", "Command", "-", "GetSystem || Get_System \nGetSystem /command:cmd.exe /c start powershell.exe"},
-            {"GetTrustedInstaller", "Command", "-", "GetTrustedInstaller || Get_TrustedInstaller \nGetTrustedInstaller /command:\"cmd.exe /c powershell.exe\""},
+            {"GetSystem", "Command", "-", "GetSystem \nGet_System \nGetSystem /command:cmd.exe /c start powershell.exe"},
+            {"GetTrustedInstaller", "Command", "-", "GetTrustedInstaller \nGet_TrustedInstaller \nGetTrustedInstaller /command:\"cmd.exe /c powershell.exe\""},
             {"Steal_Token", "Command", "Process", "Steal_Token /Process:2180 | Steal_Token /Process:2180 /Command:cmd.exe"},
             {"Steal_Pipe_Token", "Command", "PipeName", @"Steal_Pipe_Token /PipeName:\\.\pipe\tokenvator \nSteal_Pipe_Token /PipeName:tokenvator /command:cmd.exe"},
             {"BypassUAC", "ProcessID", "Command", "BypassUAC /Command:cmd.exe \nBypassUAC /Process:892 /Command:cmd.exe"},
@@ -58,12 +58,13 @@ namespace Tokenvator
             {"", "", "", ""},
 
             {"RunAs", "Command", "UserName, Password", "RunAs /Username:Administrator /Password:Password1 /Command:cmd.exe"},
+            {"Logon_User", "Command, Password, Groups", "UserName", "logon_user /Username:networkservice /Command:cmd.exe"},
             {"Create_Token", "UserName, Groups", "Command", "Create_Token /User:Administrator /Groups:tvator_group,sql_admins_group /Command"},
             {"", "", "", ""},
 
             {"Terminate", "Process", "-", "Terminate /Process:2180"},
             {"Is_Critical_Process", "Process", "-", "Is_Critical_Process /Process:word.exe"},
-            {"Set_Critical_Process", "Process", "-", "Set_Critical_Process /Prodess:excel.exe /true \nSet_Critical_Process /Process:excel.exe"},
+            {"Set_Critical_Process", "Process", "-", "Set_Critical_Process /Process:excel.exe /true \nSet_Critical_Process /Process:excel.exe"},
             {"", "", "", ""},
 
             {"Sessions", "-", "-", "Sessions"},
@@ -98,7 +99,7 @@ namespace Tokenvator
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        //
+        // Mainloop
         ////////////////////////////////////////////////////////////////////////////////
         internal void Run()
         {
@@ -145,7 +146,10 @@ namespace Tokenvator
                 CommandLineParsing cLP = new CommandLineParsing();
                 if (!string.Equals(action, input, StringComparison.OrdinalIgnoreCase))
                 {
-                    cLP.Parse(input);
+                    if (!cLP.Parse(input))
+                    {
+                        return;
+                    }    
                 }
 
                 switch (action)

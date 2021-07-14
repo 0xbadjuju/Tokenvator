@@ -1,14 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Security.Principal;
-using System.Text;
-using System.Threading.Tasks;
 
 using Tokenvator.Resources;
-using Tokenvator.Plugins.Enumeration;
 using Tokenvator.Plugins.Execution;
-
 
 using MonkeyWorks.Unmanaged.Headers;
 using MonkeyWorks.Unmanaged.Libraries;
@@ -44,7 +38,7 @@ namespace Tokenvator.Plugins.AccessTokens
         public void SetWorkingTokenToSelf()
         {
             hWorkingToken = currentProcessToken;
-            Console.WriteLine("[*] Setting Working Token to Self: 0x{0}", hWorkingToken.ToString("X4"));
+            //Console.WriteLine("[*] Setting Working Token to Self: 0x{0}", hWorkingToken.ToString("X4"));
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -53,7 +47,7 @@ namespace Tokenvator.Plugins.AccessTokens
         public void SetWorkingTokenToRemote()
         {
             hWorkingToken = hExistingToken;
-            Console.WriteLine("[*] Setting Working Token to Remote: 0x{0}", hWorkingToken.ToString("X4"));
+            //Console.WriteLine("[*] Setting Working Token to Remote: 0x{0}", hWorkingToken.ToString("X4"));
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -62,7 +56,17 @@ namespace Tokenvator.Plugins.AccessTokens
         public void SetWorkingTokenToNewToken()
         {
             hWorkingToken = phNewToken;
-            Console.WriteLine("[*] Setting Working Token to New Token: 0x{0}", hWorkingToken.ToString("X4"));
+            //Console.WriteLine("[*] Setting Working Token to New Token: 0x{0}", hWorkingToken.ToString("X4"));
+
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        // Sets hWorkingToken to hWorkingThreadToken
+        ////////////////////////////////////////////////////////////////////////////////
+        public void SetWorkingTokenToThreadToken()
+        {
+            hWorkingToken = hWorkingThreadToken;
+            //Console.WriteLine("[*] Setting Working Token to New Token: 0x{0}", hWorkingToken.ToString("X4"));
 
         }
 

@@ -250,7 +250,6 @@ namespace Tokenvator
             if (name == input)
             {
                 Console.WriteLine("[-] Pipename is missing");
-                Console.WriteLine("[*] steal_pipe_token $PIPE_NAME $OPTIONAL_COMMAND");
                 pipeName = string.Empty;
                 return false;
             }
@@ -585,23 +584,23 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         private static void _LogonUser(CommandLineParsing cLP, IntPtr hToken)
         {
-            if (cLP.GetData("username", out string username))
+            if (!cLP.GetData("username", out string username))
             {
                 return;
             }
 
-            if (cLP.GetData("password", out string password))
-            {
-                return;
-            }
-
-            string domain = string.Empty;
+            string domain = ".";
+            string password = string.Empty;
             Winbase.LOGON_TYPE logonType = Winbase.LOGON_TYPE.LOGON32_LOGON_INTERACTIVE;
             if (username.Contains('\\'))
             {
                 string[] split = username.Split('\\').ToArray();
                 domain = split.FirstOrDefault();
                 username = split.LastOrDefault();
+                if (!cLP.GetData("password", out password))
+                {
+                    return;
+                }
             }
             else
             {
@@ -610,24 +609,34 @@ namespace Tokenvator
                     case "localservice":
                         username = "LocalService";
                         logonType = Winbase.LOGON_TYPE.LOGON32_LOGON_SERVICE;
+                        domain = "NT AUTHORITY";
                         break;
                     case "localsystem":
                         username = "LocalSystem";
                         logonType = Winbase.LOGON_TYPE.LOGON32_LOGON_SERVICE;
+                        domain = "NT AUTHORITY";
                         break;
                     case "networkservice":
                         username = "Network Service";
                         logonType = Winbase.LOGON_TYPE.LOGON32_LOGON_SERVICE;
+                        domain = "NT AUTHORITY";
                         break;
                     default:
+                        cLP.GetData("password", out password);
                         break;
                 }
-                domain = "NT AUTHORITY";
             }
 
             using (TokenManipulation t = new TokenManipulation(hToken))
             {
-                t.LogonUser(domain, username, password, logonType, cLP.Command, cLP.Arguments);
+                if (cLP.GetData("groups", out string groups))
+                {
+                    t.LogonUser(domain, username, password, groups, logonType, cLP.Command, cLP.Arguments);
+                }
+                else
+                {
+                    t.LogonUser(domain, username, password, logonType, cLP.Command, cLP.Arguments);
+                }
             }
         }
 
@@ -1047,7 +1056,7 @@ namespace Tokenvator
 
                 WindowsIdentity newId = new WindowsIdentity(phNewToken);
                 WindowsImpersonationContext impersonatedUser = newId.Impersonate();
-                Console.WriteLine("[*] If you run \"info all\", you should now see a thread token in the primary thread.");
+                Console.WriteLine("[*] If you run \"info /all\", you should now see a thread token in the primary thread.");
 
                 if (!retVal)
                 {

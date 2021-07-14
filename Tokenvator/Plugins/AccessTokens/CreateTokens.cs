@@ -287,7 +287,7 @@ namespace Tokenvator.Plugins.AccessTokens
             return true;
         }
 
-        private bool CreateTokenGroups(string domain, string userName, out Ntifs._TOKEN_GROUPS tokenGroups, out Winnt._TOKEN_PRIMARY_GROUP tokenPrimaryGroup, string[] groups)
+        internal bool CreateTokenGroups(string domain, string userName, out Ntifs._TOKEN_GROUPS tokenGroups, out Winnt._TOKEN_PRIMARY_GROUP tokenPrimaryGroup, string[] groups)
         {
             uint LG_INCLUDE_INDIRECT = 0x0001;
 
@@ -314,9 +314,9 @@ namespace Tokenvator.Plugins.AccessTokens
 
             if (0 != ntRetVal)
             {
-                Console.WriteLine(ntRetVal);
                 Misc.GetNtError("NetUserGetLocalGroups", ntRetVal);
-                return false;
+                Misc.GetNtError("[-] {0}", ntRetVal);
+                //return false;
             }
 
             localgroupUserInfo = new lmaccess._LOCALGROUP_USERS_INFO_0[localEntriesRead];
@@ -347,7 +347,8 @@ namespace Tokenvator.Plugins.AccessTokens
             if (0 != ntRetVal)
             {
                 Misc.GetNtError("NetUserGetGroups", ntRetVal);
-                return false;
+                Misc.GetNtError("[-] {0}", ntRetVal);
+                //return false;
             }
 
             globalGroupUserInfo = new lmaccess._GROUP_USERS_INFO_0[globalEntriesRead];

@@ -352,6 +352,88 @@ namespace Tokenvator.Plugins.AccessTokens
                 }
             }
 
+            if (string.IsNullOrEmpty(command))
+            {
+                ImpersonateUser();
+            }
+            else
+            {
+                Create createProcess;
+                if (0 == Process.GetCurrentProcess().SessionId)
+                    createProcess = CreateProcess.CreateProcessWithLogonW;
+                else
+                    createProcess = CreateProcess.CreateProcessWithTokenW;
+
+                createProcess(hExistingToken, command, arguments);
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        //
+        ////////////////////////////////////////////////////////////////////////////////
+        public void LogonUser(string domain, string username, string password, string groups, Winbase.LOGON_TYPE logonType, string command, string arguments)
+        {
+            SetWorkingTokenToSelf();
+            CreateTokens ct = new CreateTokens(hWorkingToken);
+            ct.CreateTokenGroups(domain, username, out Ntifs._TOKEN_GROUPS tokenGroups, out Winnt._TOKEN_PRIMARY_GROUP tokenPrimaryGroup, groups.Split(','));
+            /*
+            TokenInformation ti = new TokenInformation(hWorkingToken);
+            ti.GetTokenGroups();
+            Ntifs._TOKEN_GROUPS tokenGroups = ti.tokenGroups;
+            
+            int extraGroups = tokenGroups.GroupCount;
+
+            uint groupsAttributes = (uint)(Winnt.SE_GROUP_ENABLED | Winnt.SE_GROUP_ENABLED_BY_DEFAULT | Winnt.SE_GROUP_MANDATORY);
+
+            Ntifs._TOKEN_GROUPS tokenGroupsCopy = new Ntifs._TOKEN_GROUPS();
+            tokenGroupsCopy.Initialize();
+
+            for (int i = 0; i < tokenGroups.GroupCount; i++)
+            {
+                tokenGroupsCopy.Groups[i] = tokenGroups.Groups[i];
+            }
+
+            foreach (string group in groups.Split(new string[] { "," }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                Console.WriteLine(group);
+                string d = Environment.MachineName;
+                string groupname = group;
+                if (group.Contains(@"\"))
+                {
+                    string[] split = group.Split('\\');
+                    d = split[0];
+                    groupname = split[1];
+                }
+                Console.WriteLine(groupname);
+                string sid = new NTAccount(d, groupname).Translate(typeof(SecurityIdentifier)).Value;
+                Console.WriteLine(sid);
+                tokenGroupsCopy.Groups[++extraGroups].Sid = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(IntPtr)));
+                Console.WriteLine(extraGroups);
+                CreateTokens.InitializeSid(sid, ref tokenGroupsCopy.Groups[extraGroups].Sid);
+                tokenGroupsCopy.Groups[extraGroups].Attributes = groupsAttributes;
+            }
+            tokenGroupsCopy.GroupCount = extraGroups;
+            */
+
+            if (!advapi32.LogonUserExExW(
+                username, domain, password, 
+                logonType, Winbase.LOGON_PROVIDER.LOGON32_PROVIDER_DEFAULT, 
+                ref tokenGroups, out hExistingToken, 
+                IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero))
+            {
+                Misc.GetWin32Error("LogonUserExExW");
+                return;
+            }
+            Console.WriteLine("[+] Logged On {0}", username.TrimEnd());
+
+            if (Winbase.LOGON_TYPE.LOGON32_LOGON_SERVICE == logonType)
+            {
+                SetWorkingTokenToRemote();
+                if (!SetTokenSessionId(Process.GetCurrentProcess().SessionId))
+                {
+                    Console.WriteLine(" [-] Unable to Update Token Session ID, this is likely to cause problems with this token");
+                }
+            }
 
             if (string.IsNullOrEmpty(command))
             {
