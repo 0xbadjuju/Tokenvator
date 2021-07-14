@@ -55,37 +55,6 @@ namespace Tokenvator.Plugins.AccessTokens
         {
             Dispose();
         }
-        /*
-        ////////////////////////////////////////////////////////////////////////////////
-        // Assigns a token to a process
-        ////////////////////////////////////////////////////////////////////////////////
-        public bool AddTokenPrivilege(string privilege)
-        {
-            Winbase._SECURITY_ATTRIBUTES securityAttributes = new Winbase._SECURITY_ATTRIBUTES();
-            if (!advapi32.DuplicateTokenEx(
-                        hExistingToken,
-                        Winnt.TOKEN_ALL_ACCESS,
-                        ref securityAttributes,
-                        Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityDelegation,
-                        Winnt._TOKEN_TYPE.TokenPrimary,
-                        out phNewToken
-            ))
-            {
-                Misc.GetWin32Error("DuplicateTokenEx: ");
-                return false;
-            }
-            Console.WriteLine(" [+] Duplicate Token Handle: 0x{0}", phNewToken.ToString("X4"));
-            kernel32.CloseHandle(hExistingToken);
-
-            SetWorkingTokenToNewToken();
-            SetTokenPrivilege(privilege, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED_BY_DEFAULT | Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED);
-
-            TokenInformation ti = new TokenInformation(hWorkingToken);
-            ti.GetTokenPrivileges();
-
-            return true;
-        }
-        */
 
         ////////////////////////////////////////////////////////////////////////////////
         // Assigns a token to a process
@@ -205,7 +174,7 @@ namespace Tokenvator.Plugins.AccessTokens
 
             Winbase._SECURITY_ATTRIBUTES securityAttributes = new Winbase._SECURITY_ATTRIBUTES();
             if (!advapi32.DuplicateTokenEx(
-                        hExistingToken,
+                        hWorkingToken,
                         (uint)Winnt.ACCESS_MASK.MAXIMUM_ALLOWED,
                         ref securityAttributes,
                         impersonationLevel,
@@ -238,9 +207,15 @@ namespace Tokenvator.Plugins.AccessTokens
                 if (OpenProcessToken((int)process))
                 {
                     Console.WriteLine(" [+] Opened {0}", process);
+                    SetWorkingTokenToRemote();
                     if (DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation))
+                    {
+                        SetWorkingTokenToNewToken();
                         if (StartProcessAsUser(newProcess))
+                        {
                             return true;
+                        }
+                    }
                 }
             }
 
@@ -264,8 +239,11 @@ namespace Tokenvator.Plugins.AccessTokens
                 if (OpenProcessToken((int)process))
                 {
                     Console.WriteLine(" [+] Opened {0}", process);
+                    SetWorkingTokenToRemote();
                     if (ImpersonateUser())
+                    {
                         return true;
+                    }
                 }
             }
             return false;
@@ -293,12 +271,14 @@ namespace Tokenvator.Plugins.AccessTokens
                 return false;
             }
 
+            SetWorkingTokenToRemote();
             if (!DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation))
             {
                 Misc.GetWin32Error("DuplicateToken");
                 return false;
             }
 
+            SetWorkingTokenToNewToken();
             if (!StartProcessAsUser(newProcess))
             {
                 Misc.GetWin32Error("DuplicateToken");
@@ -325,15 +305,20 @@ namespace Tokenvator.Plugins.AccessTokens
             }
 
             if (OpenProcessToken((int)services.GetServiceProcessId()))
+            {
+                SetWorkingTokenToRemote();
                 if (ImpersonateUser())
+                {
                     return true;
+                }
+            }
 
             return false;
         }
         #endregion
 
         ////////////////////////////////////////////////////////////////////////////////
-        //
+        // 
         ////////////////////////////////////////////////////////////////////////////////
         public void LogonUser(string domain, string username, string password, Winbase.LOGON_TYPE logonType, string command, string arguments)
         {
@@ -354,6 +339,7 @@ namespace Tokenvator.Plugins.AccessTokens
 
             if (string.IsNullOrEmpty(command))
             {
+                SetWorkingTokenToRemote();
                 ImpersonateUser();
             }
             else
@@ -369,7 +355,7 @@ namespace Tokenvator.Plugins.AccessTokens
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        //
+        // 
         ////////////////////////////////////////////////////////////////////////////////
         public void LogonUser(string domain, string username, string password, string groups, Winbase.LOGON_TYPE logonType, string command, string arguments)
         {
@@ -439,6 +425,7 @@ namespace Tokenvator.Plugins.AccessTokens
 
             if (string.IsNullOrEmpty(command))
             {
+                SetWorkingTokenToRemote();
                 ImpersonateUser();
             }
             else
@@ -454,15 +441,14 @@ namespace Tokenvator.Plugins.AccessTokens
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Can be use to remove groups, adding groups would require a new token
+        // Can be use to remove groups, adding groups would require a new token 
+        // Next Release
         //https://docs.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-adjusttokengroups
         ////////////////////////////////////////////////////////////////////////////////
         public void SetTokenGroup(string group, bool isSID)
         {
             var tokenGroups = new Ntifs._TOKEN_GROUPS();
             tokenGroups.Initialize();
-
-            hExistingToken = hWorkingToken;
 
             if (!DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation))
             {
@@ -524,19 +510,28 @@ namespace Tokenvator.Plugins.AccessTokens
         }
 
         ////////////////////////////////////////////////////////////////////////////////
+        // 
+        ////////////////////////////////////////////////////////////////////////////////
+        public void SetThreadTokenPrivilege(string privilege, Winnt.TokenPrivileges attribute)
+        {
+            foreach (uint t in threads)
+            {
+                Console.WriteLine("[*] Thread ID: " + t);
+                if (OpenThreadToken(t, Winnt.TOKEN_ALL_ACCESS))
+                {
+                    SetWorkingTokenToThreadToken();
+                    SetTokenPrivilege(privilege, attribute);
+                }
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
         // Sets a Token to have a specified privilege
         // http://www.leeholmes.com/blog/2010/09/24/adjusting-token-privileges-in-powershell/
         // https://support.microsoft.com/en-us/help/131065/how-to-obtain-a-handle-to-any-process-with-sedebugprivilege
         ////////////////////////////////////////////////////////////////////////////////
         public bool SetTokenPrivilege(string privilege, Winnt.TokenPrivileges attribute)
         {
-            /*
-            if (!validPrivileges.Contains(privilege))
-            {
-                Console.WriteLine("[-] Invalid Privilege Specified");
-                return false;
-            }
-            */
             Console.WriteLine("[*] Adjusting Token Privilege {0} => {1}", privilege, attribute);
             ////////////////////////////////////////////////////////////////////////////////
             Winnt._LUID luid = new Winnt._LUID();

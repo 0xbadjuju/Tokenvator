@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Security.Principal;
 
 using Tokenvator.Resources;
@@ -19,6 +20,8 @@ namespace Tokenvator.Plugins.AccessTokens
 
         protected IntPtr hWorkingToken;
         protected IntPtr hWorkingThreadToken;
+
+        protected readonly List<uint> threads = new List<uint>();
 
         internal delegate bool Create(IntPtr phNewToken, string newProcess, string arguments);
 
@@ -117,6 +120,72 @@ namespace Tokenvator.Plugins.AccessTokens
         }
 
         ////////////////////////////////////////////////////////////////////////////////
+        // List all process threads
+        ////////////////////////////////////////////////////////////////////////////////
+        public bool ListThreads(int processId)
+        {
+            if (0 == processId)
+            {
+                processId = Process.GetCurrentProcess().Id;
+            }
+
+            IntPtr hSnapshot = kernel32.CreateToolhelp32Snapshot(TiHelp32.TH32CS_SNAPTHREAD, 0);
+
+            if (IntPtr.Zero == hSnapshot)
+            {
+                Misc.GetWin32Error("CreateToolhelp32Snapshot");
+                return false;
+            }
+
+            TiHelp32.tagTHREADENTRY32 threadyEntry32 = new TiHelp32.tagTHREADENTRY32()
+            {
+                dwSize = (uint)Marshal.SizeOf(typeof(TiHelp32.tagTHREADENTRY32))
+            };
+
+            if (!kernel32.Thread32First(hSnapshot, ref threadyEntry32))
+            {
+                Misc.GetWin32Error("Thread32First");
+                return false;
+            }
+
+            if (threadyEntry32.th32OwnerProcessID == processId)
+                threads.Add(threadyEntry32.th32ThreadID);
+
+            while (kernel32.Thread32Next(hSnapshot, ref threadyEntry32))
+            {
+                if (threadyEntry32.th32OwnerProcessID == processId)
+                    threads.Add(threadyEntry32.th32ThreadID);
+            }
+
+            return true;
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        // Opens a thread token
+        ////////////////////////////////////////////////////////////////////////////////
+        public bool OpenThreadToken(uint threadId, uint permissions)
+        {
+            IntPtr hThread = kernel32.OpenThread(ProcessThreadsApi.ThreadSecurityRights.THREAD_QUERY_INFORMATION, false, threadId);
+
+            if (IntPtr.Zero == hThread)
+            {
+                Misc.GetWin32Error("OpenThread");
+                return false;
+            }
+            Console.WriteLine("[*] Recieved Thread Handle 0x{0}", hThread.ToString("X4"));
+
+            bool retVal = kernel32.OpenThreadToken(hThread, permissions, false, ref hWorkingThreadToken);
+
+            if (!retVal || IntPtr.Zero == hWorkingThreadToken)
+            {
+                return false;
+            }
+            Console.WriteLine("[*] Recieved Token Handle 0x{0}", hExistingToken.ToString("X4"));
+            kernel32.CloseHandle(hThread);
+            return true;
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
         // Creates a new process with the duplicated token
         ////////////////////////////////////////////////////////////////////////////////
         public bool StartProcessAsUser(string newProcess)
@@ -129,7 +198,7 @@ namespace Tokenvator.Plugins.AccessTokens
             string arguments = string.Empty;
             Misc.FindExe(ref newProcess, out arguments);
 
-            if (!createProcess(phNewToken, newProcess, arguments))
+            if (!createProcess(hWorkingToken, newProcess, arguments))
             {
                 return false;
             }
@@ -143,7 +212,7 @@ namespace Tokenvator.Plugins.AccessTokens
         {
             Winbase._SECURITY_ATTRIBUTES securityAttributes = new Winbase._SECURITY_ATTRIBUTES();
             if (!advapi32.DuplicateTokenEx(
-                        hExistingToken,
+                        hWorkingToken,
                         (uint)Winnt.ACCESS_MASK.MAXIMUM_ALLOWED,
                         ref securityAttributes,
                         Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,

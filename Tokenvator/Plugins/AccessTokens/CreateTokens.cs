@@ -79,12 +79,12 @@ namespace Tokenvator.Plugins.AccessTokens
             Winnt._LUID systemLuid = Winnt.SYSTEM_LUID;
             long expirationTime = long.MaxValue / 2;
 
-            IntPtr hToken = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(IntPtr)));
+            phNewToken = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(IntPtr)));
 
             //out/ref hToken - required
             //Ref Expirationtime - required
             uint ntRetVal = ntdll.NtCreateToken(
-                out hToken,
+                out phNewToken,
                 Winnt.TOKEN_ALL_ACCESS,
                 ref objectAttributes,
                 Winnt._TOKEN_TYPE.TokenPrimary,
@@ -102,15 +102,15 @@ namespace Tokenvator.Plugins.AccessTokens
             if (0 != ntRetVal)
             {
                 Misc.GetNtError("NtCreateToken", ntRetVal);
-                new TokenInformation(hToken).GetTokenUser();
+                new TokenInformation(phNewToken).GetTokenUser();
             }
-            phNewToken = hToken;
 
             if (string.IsNullOrEmpty(command))
             {
                 command = "cmd.exe";
             }
 
+            SetWorkingTokenToNewToken();
             StartProcessAsUser(command);
         }
 
@@ -181,12 +181,12 @@ namespace Tokenvator.Plugins.AccessTokens
             Winnt._TOKEN_SOURCE tokenSource;
             CreateTokenSource(out tokenSource);
 
-            IntPtr hToken = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(IntPtr)));
+            phNewToken = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(IntPtr)));
 
             //out/ref hToken - required
             //Ref Expirationtime - required
             uint ntRetVal = ntdll.NtCreateToken(
-                out hToken,
+                out phNewToken,
                 Winnt.TOKEN_ALL_ACCESS,
                 ref objectAttributes,
                 Winnt._TOKEN_TYPE.TokenPrimary,
@@ -207,7 +207,6 @@ namespace Tokenvator.Plugins.AccessTokens
                 return;
             }
 
-            phNewToken = hToken;
 
             Console.WriteLine();
 
@@ -221,6 +220,7 @@ namespace Tokenvator.Plugins.AccessTokens
             {
                 command = "cmd.exe";
             }
+            SetWorkingTokenToNewToken();
             StartProcessAsUser(command);         
         }
 

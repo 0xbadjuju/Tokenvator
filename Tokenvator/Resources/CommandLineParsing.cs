@@ -12,12 +12,14 @@ namespace Tokenvator.Resources
         private readonly Dictionary<string, object> arguments;
 
         public int ProcessID { get; private set; }
+        public int ThreadID { get; private set; }
         public string Privilege { get; private set; }
         public string CommandAndArgs { get; private set; }
         public string Command { get; private set; }
         public string Arguments { get; private set; }
         public bool Remote { get; private set; }
         public string PipeName { get; private set; }
+        public bool Impersonation { get; private set; }
 
         public static List<string> privileges = new List<string> { "SeAssignPrimaryTokenPrivilege",
             "SeAuditPrivilege", "SeBackupPrivilege", "SeChangeNotifyPrivilege", "SeCreateGlobalPrivilege",
@@ -36,6 +38,7 @@ namespace Tokenvator.Resources
         {
             arguments = new Dictionary<string, object>();
             Remote = false;
+            Impersonation = false;
         }
 
         /// <summary>
@@ -44,24 +47,11 @@ namespace Tokenvator.Resources
         /// <param name="input"></param>
         public bool Parse(string input)
         {
-            //"(\".*?)(/?)(.*?\")"
             //Console.WriteLine();
             //Console.WriteLine(input);
             input = Regex.Replace(input, "(\"[^\"]*)(\\/)+([^\"]*[^:](?!\\\\)\")", "$1\0$3");
             //Console.WriteLine(input);
             //Console.WriteLine();
-            //Not working properly needs above regex - not sure why
-
-            /*
-            var textfieldParser = new TextFieldParser(new System.IO.StringReader(input))
-            {
-                TextFieldType = FieldType.Delimited,
-                Delimiters = new string[] { @"/", "-" },
-                HasFieldsEnclosedInQuotes = true,
-                TrimWhiteSpace = true,
-            };
-            string[] argumentAndData = textfieldParser.ReadFields();
-            */
 
             string[] argumentAndData = input.Split(new string[] { "/" }, StringSplitOptions.RemoveEmptyEntries);
 
@@ -89,11 +79,11 @@ namespace Tokenvator.Resources
             }
 
             Console.WriteLine();
-            Console.WriteLine("{0,-10} {1}", "Option", "Value");
-            Console.WriteLine("{0,-10} {1}", "------", "-----");
+            Console.WriteLine("{0,-20} {1}", "Option", "Value");
+            Console.WriteLine("{0,-20} {1}", "------", "-----");
             foreach (var key in arguments.Keys)
             {
-                Console.WriteLine("{0,-10} {1}", key, arguments[key]);
+                Console.WriteLine("{0,-20} {1}", key, arguments[key]);
             }
             Console.WriteLine();
 
@@ -111,6 +101,19 @@ namespace Tokenvator.Resources
                     else
                     {
                         return false;
+                    }
+                }
+            }
+
+            if (arguments.ContainsKey("thread"))
+            {
+                object thread;
+                if (arguments.TryGetValue("thread", out thread))
+                {
+                    int tid;
+                    if (int.TryParse((string)thread, out tid))
+                    {
+                        ThreadID = tid;
                     }
                 }
             }
@@ -161,6 +164,15 @@ namespace Tokenvator.Resources
                 else
                 {
                     return false;
+                }
+            }
+
+            if (arguments.ContainsKey("impersonation"))
+            {
+                object pn;
+                if (arguments.TryGetValue("impersonation", out pn))
+                {
+                    Impersonation = true;
                 }
             }
 

@@ -25,7 +25,7 @@ namespace Tokenvator
 
         private readonly List<string> flags = new List<string>()
         { 
-            "All", "Command", "Filter", "Force", "Groups", "Password", "Path", "Privilege", "Process", "ServiceName", "State", "Username"        
+            "All", "Command", "Filter", "Force", "Groups", "Impersonation", "Password", "Path", "Privilege", "Process", "ServiceName", "State", "Thread", "Username"        
         };
 
 

@@ -30,8 +30,6 @@ namespace Tokenvator.Plugins.AccessTokens
         public IntPtr hTokenDefaultDacl;
         public Winnt._TOKEN_DEFAULT_DACL_ACL tokenDefaultDaclAcl;
 
-        List<uint> threads = new List<uint>();
-
         public TokenInformation(IntPtr hToken) : base(hToken)
         {
         }
@@ -160,47 +158,7 @@ namespace Tokenvator.Plugins.AccessTokens
             }
         }
 
-        ////////////////////////////////////////////////////////////////////////////////
-        // List all process threads
-        ////////////////////////////////////////////////////////////////////////////////
-        public bool ListThreads(int processId)
-        {
-            if (0 == processId)
-            {
-                processId = Process.GetCurrentProcess().Id;
-            }
-
-            IntPtr hSnapshot = kernel32.CreateToolhelp32Snapshot(TiHelp32.TH32CS_SNAPTHREAD, 0);
-
-            if (IntPtr.Zero == hSnapshot)
-            {
-                Misc.GetWin32Error("CreateToolhelp32Snapshot");
-                return false;
-            }
-
-            TiHelp32.tagTHREADENTRY32 threadyEntry32 = new TiHelp32.tagTHREADENTRY32()
-            {
-                dwSize = (uint)Marshal.SizeOf(typeof(TiHelp32.tagTHREADENTRY32))
-            };
-
-            if (!kernel32.Thread32First(hSnapshot, ref threadyEntry32))
-            {
-                Misc.GetWin32Error("Thread32First");
-                return false;
-            }
-
-            if (threadyEntry32.th32OwnerProcessID == processId)
-                threads.Add(threadyEntry32.th32ThreadID);
-
-            while (kernel32.Thread32Next(hSnapshot, ref threadyEntry32))
-            {
-                if (threadyEntry32.th32OwnerProcessID == processId)
-                    threads.Add(threadyEntry32.th32ThreadID);
-            }
-
-            return true;
-        }
-
+        #region ThreadInformation
         ////////////////////////////////////////////////////////////////////////////////
         // Lists the users for threads
         ////////////////////////////////////////////////////////////////////////////////
@@ -209,7 +167,7 @@ namespace Tokenvator.Plugins.AccessTokens
             foreach (uint t in threads)
             {
                 Console.WriteLine("[*] Thread ID: " + t);
-                if (_OpenThreadToken(t))
+                if (OpenThreadToken(t, Winnt.TOKEN_QUERY))
                 {
                     using (TokenInformation ti = new TokenInformation(hWorkingThreadToken))
                     {
@@ -221,26 +179,25 @@ namespace Tokenvator.Plugins.AccessTokens
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Opens a thread token
+        // Lists the users for threads
         ////////////////////////////////////////////////////////////////////////////////
-        private bool _OpenThreadToken(uint threadId)
+        public void GetThreadPrivileges()
         {
-            IntPtr hThread = kernel32.OpenThread(ProcessThreadsApi.ThreadSecurityRights.THREAD_QUERY_INFORMATION, false, threadId);
-
-            if (IntPtr.Zero == hThread)
+            foreach (uint t in threads)
             {
-                Misc.GetWin32Error("OpenThread");
-                return false;
+                Console.WriteLine("[*] Thread ID: " + t);
+                if (OpenThreadToken(t, Winnt.TOKEN_QUERY))
+                {
+                    using (TokenInformation ti = new TokenInformation(hWorkingThreadToken))
+                    {
+                        ti.SetWorkingTokenToSelf();
+                        ti.GetTokenUser();
+                        ti.GetTokenPrivileges();
+                    }
+                }
             }
-
-            bool retVal = kernel32.OpenThreadToken(hThread, Winnt.TOKEN_QUERY, false, ref hWorkingThreadToken);
-
-            if (!retVal || IntPtr.Zero == hWorkingThreadToken)
-            {
-                return false;
-            }
-            return true;
         }
+        #endregion
 
         #region GetTokenInformation
         ////////////////////////////////////////////////////////////////////////////////
