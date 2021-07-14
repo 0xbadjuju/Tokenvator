@@ -248,7 +248,8 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         public void GetTokenSource()
         {
-            advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenSource, IntPtr.Zero, 0, out uint returnLength);
+            uint returnLength;
+            advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenSource, IntPtr.Zero, 0, out returnLength);
             hTokenSource = Marshal.AllocHGlobal((int)returnLength);
             try
             {
@@ -279,21 +280,22 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         public void GetTokenUser()
         {
-            advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenUser, IntPtr.Zero, 0, out uint returnLength);
+            uint returnLength;
+            advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenUser, IntPtr.Zero, 0, out returnLength);
             hTokenUser = Marshal.AllocHGlobal((int)returnLength);
             
             try
             {
                 if (!advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenUser, hTokenUser, returnLength, out returnLength))
                 {
-                    Misc.GetWin32Error("GetTokenInformation - Pass 2");
+                    Misc.GetWin32Error("GetTokenInformation (TokenUser) - Pass 2");
                     return;
                 }
                 tokenUser = (Ntifs._TOKEN_USER)Marshal.PtrToStructure(hTokenUser, typeof(Ntifs._TOKEN_USER));
             }
             catch (Exception ex)
             {
-                Misc.GetWin32Error("GetTokenInformation - Pass 2");
+                Misc.GetWin32Error("GetTokenInformation (TokenUser) - Pass 2");
                 Console.WriteLine(ex.Message);
                 return;
             }
@@ -311,7 +313,8 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         public bool GetTokenGroups()
         {
-            advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenGroups, IntPtr.Zero, 0, out uint returnLength);
+            uint returnLength;
+            advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenGroups, IntPtr.Zero, 0, out returnLength);
             hTokenGroups = Marshal.AllocHGlobal((int)returnLength);
             try
             {
@@ -347,21 +350,22 @@ namespace Tokenvator.Plugins.AccessTokens
         public void GetTokenPrivileges()
         {
             ////////////////////////////////////////////////////////////////////////////////
+            uint TokenInfLength;
             Console.WriteLine("[*] Enumerating Token Privileges");
-            advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrivileges, IntPtr.Zero, 0, out uint TokenInfLength);
+            advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrivileges, IntPtr.Zero, 0, out TokenInfLength);
 
             if (TokenInfLength < 0 || TokenInfLength > int.MaxValue)
             {
                 Misc.GetWin32Error("GetTokenInformation - 1 " + TokenInfLength);
                 return;
             }
-            Console.WriteLine("[*] GetTokenInformation - Pass 1");
+            Console.WriteLine("[*] GetTokenInformation (TokenPrivileges) - Pass 1");
             hTokenPrivileges = Marshal.AllocHGlobal((int)TokenInfLength);
 
             ////////////////////////////////////////////////////////////////////////////////
             if (!advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrivileges, hTokenPrivileges, TokenInfLength, out TokenInfLength))
             {
-                Misc.GetWin32Error("GetTokenInformation - 2 " + TokenInfLength);
+                Misc.GetWin32Error("GetTokenInformation (TokenPrivileges) - 2 " + TokenInfLength);
                 return;
             }
             Console.WriteLine("[*] GetTokenInformation - Pass 2");
@@ -419,13 +423,14 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         public void GetTokenOwner()
         {
-            advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenOwner, IntPtr.Zero, 0, out uint returnLength);
+            uint returnLength;
+            advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenOwner, IntPtr.Zero, 0, out returnLength);
             hTokenOwner = Marshal.AllocHGlobal((int)returnLength);
             try
             {
                 if (!advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenOwner, hTokenOwner, returnLength, out returnLength))
                 {
-                    Misc.GetWin32Error("GetTokenInformation - Pass 2");
+                    Misc.GetWin32Error("GetTokenInformation (TokenOwner) - Pass 2");
                     return;
                 }
                 tokenOwner = (Ntifs._TOKEN_OWNER)Marshal.PtrToStructure(hTokenOwner, typeof(Ntifs._TOKEN_OWNER));
@@ -436,7 +441,7 @@ namespace Tokenvator.Plugins.AccessTokens
             }
             catch (Exception ex)
             {
-                Misc.GetWin32Error("GetTokenInformation - Pass 2");
+                Misc.GetWin32Error("GetTokenInformation (TokenOwner) - Pass 2");
                 Console.WriteLine(ex.Message);
                 return;
             }
@@ -454,13 +459,14 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         public void GetTokenPrimaryGroup()
         {
-            advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrimaryGroup, IntPtr.Zero, 0, out uint returnLength);
+            uint returnLength;
+            advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrimaryGroup, IntPtr.Zero, 0, out returnLength);
             hTokenPrimaryGroup = Marshal.AllocHGlobal((int)returnLength);
             try
             {
                 if (!advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrimaryGroup, hTokenPrimaryGroup, returnLength, out returnLength))
                 {
-                    Misc.GetWin32Error("GetTokenInformation - Pass 2");
+                    Misc.GetWin32Error("GetTokenInformation (TokenPrimaryGroup) - Pass 2");
                     return;
                 }
                 tokenPrimaryGroup = (Winnt._TOKEN_PRIMARY_GROUP)Marshal.PtrToStructure(hTokenPrimaryGroup, typeof(Winnt._TOKEN_PRIMARY_GROUP));
@@ -471,12 +477,13 @@ namespace Tokenvator.Plugins.AccessTokens
             }
             catch (Exception ex)
             {
-                Misc.GetWin32Error("GetTokenInformation - Pass 2");
+                Misc.GetWin32Error("GetTokenInformation (TokenPrimaryGroup) - Pass 2");
                 Console.WriteLine(ex.Message);
                 return;
             }
 
-            _ReadSidAndName(tokenPrimaryGroup.PrimaryGroup, out string primaryGroupSid, out string primaryGroupName);
+            string primaryGroupSid, primaryGroupName;
+            _ReadSidAndName(tokenPrimaryGroup.PrimaryGroup, out primaryGroupSid, out primaryGroupName);
             Console.WriteLine("[+] Primary Group: ");
             Console.WriteLine("{0,-50} {1}", primaryGroupSid, primaryGroupName);
             return;
@@ -487,13 +494,14 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         public void GetTokenDefaultDacl()
         {
-            advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenDefaultDacl, IntPtr.Zero, 0, out uint returnLength);
+            uint returnLength;
+            advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenDefaultDacl, IntPtr.Zero, 0, out returnLength);
             hTokenDefaultDacl = Marshal.AllocHGlobal((int)returnLength);
             try
             {
                 if (!advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenDefaultDacl, hTokenDefaultDacl, returnLength, out returnLength))
                 {
-                    Misc.GetWin32Error("GetTokenInformation - Pass 2");
+                    Misc.GetWin32Error("GetTokenInformation (TokenDefaultDacl) - Pass 2");
                     return;
                 }
                 tokenDefaultDacl = (Winnt._TOKEN_DEFAULT_DACL)Marshal.PtrToStructure(hTokenDefaultDacl, typeof(Winnt._TOKEN_DEFAULT_DACL));
@@ -505,7 +513,7 @@ namespace Tokenvator.Plugins.AccessTokens
             }
             catch (Exception ex)
             {
-                Misc.GetWin32Error("GetTokenInformation - Pass 2");
+                Misc.GetWin32Error("GetTokenInformation (TokenDefaultDacl - Pass 2");
                 Console.WriteLine(ex.Message);
                 return;
             }

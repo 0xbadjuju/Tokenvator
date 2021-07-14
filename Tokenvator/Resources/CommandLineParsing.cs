@@ -16,7 +16,7 @@ namespace Tokenvator.Resources
         public string CommandAndArgs { get; private set; }
         public string Command { get; private set; }
         public string Arguments { get; private set; }
-        public bool Remote { get; private set; } = false;
+        public bool Remote { get; private set; }
         public string PipeName { get; private set; }
 
         public static List<string> privileges = new List<string> { "SeAssignPrimaryTokenPrivilege",
@@ -35,6 +35,7 @@ namespace Tokenvator.Resources
         public CommandLineParsing()
         {
             arguments = new Dictionary<string, object>();
+            Remote = false;
         }
 
         /// <summary>
@@ -98,9 +99,11 @@ namespace Tokenvator.Resources
 
             if (arguments.ContainsKey("process"))
             {
-                if (arguments.TryGetValue("process", out object process))
+                object process;
+                if (arguments.TryGetValue("process", out process))
                 {
-                    if (_ParseProcessID((string)process, out int pid))
+                    int pid;
+                    if (_ParseProcessID((string)process, out pid))
                     {
                         ProcessID = pid;
                         Remote = true;
@@ -114,9 +117,11 @@ namespace Tokenvator.Resources
 
             if (arguments.ContainsKey("privilege"))
             {
-                if (arguments.TryGetValue("privilege", out object privilege))
+                object privilege;
+                if (arguments.TryGetValue("privilege", out privilege))
                 {
-                    if (_ParsePrivileges((string)privilege, out string priv))
+                    string priv;
+                    if (_ParsePrivileges((string)privilege, out priv))
                     {
                         Privilege = priv;
                     }
@@ -129,9 +134,11 @@ namespace Tokenvator.Resources
 
             if (arguments.ContainsKey("command"))
             {
-                if (arguments.TryGetValue("command", out object command))
+                object command;
+                if (arguments.TryGetValue("command", out command))
                 {
-                    _ParseCommand((string)command, out string c, out string a);
+                    string a, c;
+                    _ParseCommand((string)command, out c, out a);
                     Command = c; Arguments = a; CommandAndArgs = (string)command;
                     Console.WriteLine("[*] Command: " + c);
                     Console.WriteLine("[*] Arguments: " + a);
@@ -145,7 +152,8 @@ namespace Tokenvator.Resources
 
             if (arguments.ContainsKey("pipename"))
             {
-                if (arguments.TryGetValue("pipename", out object pn))
+                object pn;
+                if (arguments.TryGetValue("pipename", out pn))
                 {
                     string name = (string)pn;
                     PipeName = name.Contains(@"\\.\pipe") ? name.Replace(@"\\.\pipe", "") : name;
@@ -167,7 +175,8 @@ namespace Tokenvator.Resources
         /// <returns></returns>
         public bool GetData<T>(string input, out T output)
         {
-            bool retVal = arguments.TryGetValue(input.ToLower(), out object obj);
+            object obj;
+            bool retVal = arguments.TryGetValue(input.ToLower(), out obj);
             output = (T)obj;
             return retVal;
         }
@@ -182,7 +191,8 @@ namespace Tokenvator.Resources
         {
             string[] cmdAndArgs = input.Split(new string[] { " " }, StringSplitOptions.RemoveEmptyEntries);
             command = cmdAndArgs.FirstOrDefault();
-            if (!Misc.FindFullPath(command, out string fullpath))
+            string fullpath;
+            if (!Misc.FindFullPath(command, out fullpath))
             {
                 Console.WriteLine("[-] Unable to parse full path");
             }

@@ -444,7 +444,10 @@ namespace Tokenvator.Plugins.Enumeration
     {
         public static bool Contains(this string source, string toCheck, StringComparison comp)
         {
-            return source?.IndexOf(toCheck, comp) >= 0;
+            if (!string.IsNullOrEmpty(source))
+                return source.IndexOf(toCheck, comp) >= 0;
+            else
+                return false;
         }
     }
 }

@@ -28,7 +28,8 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         private static void _AddGroup(CommandLineParsing cLP, IntPtr hToken)
         {
-            if (!cLP.GetData("groups", out string groups))
+            string groups;
+            if (!cLP.GetData("groups", out groups))
             {
                 return;
             }
@@ -178,12 +179,14 @@ namespace Tokenvator
                 using (CreateTokens ct = new CreateTokens(hToken))
                 {
                     string[] groups = new string[0];
-                    if (cLP.GetData("groups", out string g))
+                    string g;
+                    if (cLP.GetData("groups", out g))
                     {
                         groups = (g).Split(new string[] { "," }, StringSplitOptions.RemoveEmptyEntries);
                     }
 
-                    if (cLP.GetData("username", out string user))
+                    string user;
+                    if (cLP.GetData("username", out user))
                     {
                         ct.SetWorkingTokenToSelf();
                         ct.CreateToken(user, groups, cLP.Command);
@@ -206,7 +209,8 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         private static void _FindUserProcesses(CommandLineParsing cLP)
         {
-            if (!cLP.GetData("username", out string user))
+            string user;
+            if (!cLP.GetData("username", out user))
             {
                 Console.WriteLine("[-] Username not specified");
                 return;
@@ -225,7 +229,8 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         private static void _FindUserProcessesWMI(CommandLineParsing cLP)
         {
-            if (!cLP.GetData("username", out string user))
+            string user;
+            if (!cLP.GetData("username", out user))
             {
                 Console.WriteLine("[-] Username not specified");
                 return;
@@ -383,7 +388,8 @@ namespace Tokenvator
 
                 Console.WriteLine("[*] Impersonation Tokens");
 
-                bool all = cLP.GetData("all", out object obj);
+                object obj;
+                bool all = cLP.GetData("all", out obj);
                 if (all)
                 {
                     t.ListThreads(cLP.ProcessID);
@@ -429,19 +435,22 @@ namespace Tokenvator
             //string force = Misc.NextItem(ref command);
 
             string serviceName = "TokenDriver";
-            if (cLP.GetData("ServiceName", out string sn))
+            string sn;
+            if (cLP.GetData("ServiceName", out sn))
             {
-                serviceName = (string)sn;
+                serviceName = sn;
             }
 
             string path = string.Empty;
-            if (cLP.GetData("Path", out string p))
+            string p;
+            if (cLP.GetData("Path", out p))
             {
                 path = (string)p;
             }
 
             bool overwrite = false;
-            if (cLP.GetData("Force", out object f))
+            object f;
+            if (cLP.GetData("Force", out f))
             {
                 overwrite = true;
             }
@@ -549,7 +558,8 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         private static void _ListFiltersInstances(CommandLineParsing cLP)
         {
-            if (!cLP.GetData("filter", out string filter))
+            string filter;
+            if (!cLP.GetData("filter", out filter))
             {
                 Console.WriteLine("[-] Filter Not Specified");
                 return;
@@ -584,7 +594,8 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         private static void _LogonUser(CommandLineParsing cLP, IntPtr hToken)
         {
-            if (!cLP.GetData("username", out string username))
+            string username;
+            if (!cLP.GetData("username", out username))
             {
                 return;
             }
@@ -629,7 +640,8 @@ namespace Tokenvator
 
             using (TokenManipulation t = new TokenManipulation(hToken))
             {
-                if (cLP.GetData("groups", out string groups))
+                string groups;
+                if (cLP.GetData("groups", out groups))
                 {
                     t.LogonUser(domain, username, password, groups, logonType, cLP.Command, cLP.Arguments);
                 }
@@ -697,9 +709,11 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         private static void _SetCriticalProcess(CommandLineParsing cLP, IntPtr hProcess)
         {
-            cLP.GetData("state", out string sSetting);
-            
-            if (!bool.TryParse(sSetting, out bool bSetting))
+            string sSetting;
+            cLP.GetData("state", out sSetting);
+
+            bool bSetting;
+            if (!bool.TryParse(sSetting, out bSetting))
             {
                 Console.WriteLine("[-] Invalid Boolean Specified: {0}", sSetting);
                 return;
@@ -739,14 +753,15 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         private static void _StartDriver(CommandLineParsing cLP)
         {
-            if (!cLP.GetData("ServiceName", out object sn))
+            string sn;
+            if (!cLP.GetData("ServiceName", out sn))
             {
                 Console.WriteLine("[-] ServiceName not set");
                 return;
             }
 
 
-            PSExec p = new PSExec((string) sn);
+            PSExec p = new PSExec(sn);
             if (!p.Connect("."))
             {
                 Console.WriteLine("[-] Unable to connect to service controller");
@@ -914,7 +929,8 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         private static void _UnInstallDriver(CommandLineParsing cLP)
         {
-            if (cLP.GetData("servicename", out string service))
+            string service;
+            if (cLP.GetData("servicename", out service))
             {
                 using (PSExec p = new PSExec(service))
                 {
@@ -983,7 +999,8 @@ namespace Tokenvator
             string domain;
             string username;
 
-            if (!cLP.GetData("username", out string un))
+            string un;
+            if (!cLP.GetData("username", out un))
             {
                 Console.WriteLine("[-] Username not specified");
                 return;
@@ -1010,8 +1027,8 @@ namespace Tokenvator
                 username = userInfo;
             }
 
-
-            if (!cLP.GetData("password", out string password))
+            string password;
+            if (!cLP.GetData("password", out password))
             {
                 Console.WriteLine("[-] Password not specified");
                 return;
@@ -1023,11 +1040,12 @@ namespace Tokenvator
 
             if (string.IsNullOrEmpty(cLP.Command))
             {
+                IntPtr phToken;
                 bool retVal = advapi32.LogonUser(
                     username, domain, password,
                     Winbase.LOGON_TYPE.LOGON32_LOGON_NEW_CREDENTIALS,
                     Winbase.LOGON_PROVIDER.LOGON32_PROVIDER_DEFAULT,
-                    out IntPtr phToken
+                    out phToken
                 );
 
                 if (!retVal || IntPtr.Zero == phToken)
@@ -1037,13 +1055,14 @@ namespace Tokenvator
                 }
 
                 Winbase._SECURITY_ATTRIBUTES securityAttributes = new Winbase._SECURITY_ATTRIBUTES();
+                IntPtr phNewToken;
                 advapi32.DuplicateTokenEx(
                     phToken,
                     (uint)Winnt.ACCESS_MASK.MAXIMUM_ALLOWED, 
                     ref securityAttributes,
                     Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,
                     Winnt._TOKEN_TYPE.TokenImpersonation, 
-                    out IntPtr phNewToken
+                    out phNewToken
                 );
 
                 kernel32.CloseHandle(phToken);
@@ -1075,6 +1094,7 @@ namespace Tokenvator
                     cb = (uint)System.Runtime.InteropServices.Marshal.SizeOf(typeof(Winbase._STARTUPINFO))
                 };
 
+                Winbase._PROCESS_INFORMATION processInformation;
                 bool retVal = advapi32.CreateProcessWithLogonW(
                     username, domain, password,
                     Winbase.LOGON_FLAGS.LOGON_NETCREDENTIALS_ONLY,
@@ -1084,7 +1104,7 @@ namespace Tokenvator
                     IntPtr.Zero, 
                     Environment.CurrentDirectory,
                     ref startupInfo,
-                    out Winbase._PROCESS_INFORMATION processInformation
+                    out processInformation
                 );              
 
                 if (!retVal)

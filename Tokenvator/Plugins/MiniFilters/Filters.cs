@@ -105,19 +105,22 @@ namespace Tokenvator.Plugins.MiniFilters
 
         internal static void FilterDetach(CommandLineParsing cLP)
         {
-            if (!cLP.GetData("filter", out string filter))
+            string filter;
+            if (!cLP.GetData("filter", out filter))
             {
                 Console.WriteLine("[-] /Filter: Not Specified");
                 return;
             }
 
-            if (!cLP.GetData("instance", out string instance))
+            string instance;
+            if (!cLP.GetData("instance", out instance))
             {
                 Console.WriteLine("[-] /Instance: Not Specified");
                 return;
             }
 
-            if (!cLP.GetData("volume", out string volume))
+            string volume;
+            if (!cLP.GetData("volume", out volume))
             {
                 Console.WriteLine("[-] /Volume: Not Specified");
                 return;
@@ -145,7 +148,8 @@ namespace Tokenvator.Plugins.MiniFilters
 
         internal static void Unload(CommandLineParsing cLP)
         {
-            if (!cLP.GetData("filter", out string filter))
+            string filter;
+            if (!cLP.GetData("filter", out filter))
             {
                 Console.WriteLine("[-] Filter Not Specified");
                 return;

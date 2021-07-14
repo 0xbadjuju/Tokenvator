@@ -162,13 +162,24 @@ namespace Tokenvator.Plugins.AccessTokens
 
             Winnt._LUID systemLuid = Winnt.SYSTEM_LUID;
             long expirationTime = long.MaxValue / 2;
-            CreateTokenUser(domain, userName, out Ntifs._TOKEN_USER tokenUser);
-            CreateTokenGroups(domain, userName, out Ntifs._TOKEN_GROUPS tokenGroups, out Winnt._TOKEN_PRIMARY_GROUP tokenPrimaryGroup, groups);
-            CreateTokenPrivileges(tokenUser, tokenGroups, out Winnt._TOKEN_PRIVILEGES_ARRAY tokenPrivileges);
-            CreateTokenOwner(domain, userName, out Ntifs._TOKEN_OWNER tokenOwner);
-            //CreateTokenPrimaryGroup(primaryGroup, out Winnt._TOKEN_PRIMARY_GROUP tokenPrimaryGroup);
-            CreateTokenDefaultDACL(out Winnt._TOKEN_DEFAULT_DACL tokenDefaultDacl);
-            CreateTokenSource(out Winnt._TOKEN_SOURCE tokenSource);
+            Ntifs._TOKEN_USER tokenUser;
+            CreateTokenUser(domain, userName, out tokenUser);
+
+            Ntifs._TOKEN_GROUPS tokenGroups;
+            Winnt._TOKEN_PRIMARY_GROUP tokenPrimaryGroup;
+            CreateTokenGroups(domain, userName, out tokenGroups, out tokenPrimaryGroup, groups);
+
+            Winnt._TOKEN_PRIVILEGES_ARRAY tokenPrivileges;
+            CreateTokenPrivileges(tokenUser, tokenGroups, out tokenPrivileges);
+
+            Ntifs._TOKEN_OWNER tokenOwner;
+            CreateTokenOwner(domain, userName, out tokenOwner);
+
+            Winnt._TOKEN_DEFAULT_DACL tokenDefaultDacl;
+            CreateTokenDefaultDACL(out tokenDefaultDacl);
+
+            Winnt._TOKEN_SOURCE tokenSource;
+            CreateTokenSource(out tokenSource);
 
             IntPtr hToken = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(IntPtr)));
 
@@ -215,7 +226,8 @@ namespace Tokenvator.Plugins.AccessTokens
 
         private bool _CheckPrivileges()
         {
-            TokenInformation.CheckTokenPrivilege(hWorkingToken, Winnt.SE_CREATETOKEN_NAME, out bool exists, out bool enabled);
+            bool exists, enabled;
+            TokenInformation.CheckTokenPrivilege(hWorkingToken, Winnt.SE_CREATETOKEN_NAME, out exists, out enabled);
             if (!exists)
             {
                 Console.WriteLine("[-] {0} is not present on the token", Winnt.SE_CREATETOKEN_NAME);
@@ -301,12 +313,13 @@ namespace Tokenvator.Plugins.AccessTokens
             //Console.WriteLine(" - NetUserGetLocalGroups");
 
             lmaccess._LOCALGROUP_USERS_INFO_0[] localgroupUserInfo = new lmaccess._LOCALGROUP_USERS_INFO_0[0];
+            IntPtr bufPtr;
             uint ntRetVal = netapi32.NetUserGetLocalGroups(
                 domain,
                 userName.ToLower(),
                 0,
                 LG_INCLUDE_INDIRECT,
-                out IntPtr bufPtr,
+                out bufPtr,
                 -1,
                 ref localEntriesRead,
                 ref localTotalEntriesRead
@@ -469,7 +482,8 @@ namespace Tokenvator.Plugins.AccessTokens
 
             for (int i = 0; i < tokenGroups.GroupCount; i++)
             {
-                TokenInformation._ReadSidAndName(tokenGroups.Groups[i].Sid, out string sid, out string account);
+                string sid, account;
+                TokenInformation._ReadSidAndName(tokenGroups.Groups[i].Sid, out sid, out account);
                 Console.WriteLine(" ({0}) {1,-50} {2}", i, sid, account);
             }
 
@@ -605,11 +619,13 @@ namespace Tokenvator.Plugins.AccessTokens
         {
 
             //Console.WriteLine(" - LsaEnumerateAccountRights");
+            IntPtr hUserRights;
+            long countOfRights;
             uint ntRetVal = advapi32.LsaEnumerateAccountRights(
                 hPolicyHandle,
                 sid,
-                out IntPtr hUserRights,
-                out long countOfRights
+                out hUserRights,
+                out countOfRights
             );
 
             //Weird Quirk

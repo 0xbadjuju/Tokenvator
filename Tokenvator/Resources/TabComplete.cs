@@ -174,7 +174,7 @@ namespace Tokenvator
                 string j = string.Join("/", split.Take(split.Length - 1));
                 ResetLine();
                 stringBuilder.Clear();
-                stringBuilder.Append($"{j}/{candidate}");
+                stringBuilder.Append(j + "/" + candidate);
                 return;
             }
 
@@ -194,7 +194,7 @@ namespace Tokenvator
                         string k = string.Join(":", j.Take(j.Length - 1));
                         ResetLine();
                         stringBuilder.Clear();
-                        stringBuilder.Append($"{k}:{candidate}");
+                        stringBuilder.Append(string.Format("{0}:{1}", k, candidate));
                         return;
                     default:
                         break;

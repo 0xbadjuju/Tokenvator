@@ -375,7 +375,9 @@ namespace Tokenvator.Plugins.AccessTokens
         {
             SetWorkingTokenToSelf();
             CreateTokens ct = new CreateTokens(hWorkingToken);
-            ct.CreateTokenGroups(domain, username, out Ntifs._TOKEN_GROUPS tokenGroups, out Winnt._TOKEN_PRIMARY_GROUP tokenPrimaryGroup, groups.Split(','));
+            Ntifs._TOKEN_GROUPS tokenGroups;
+            Winnt._TOKEN_PRIMARY_GROUP tokenPrimaryGroup;
+            ct.CreateTokenGroups(domain, username, out tokenGroups, out tokenPrimaryGroup, groups.Split(','));
             /*
             TokenInformation ti = new TokenInformation(hWorkingToken);
             ti.GetTokenGroups();
@@ -507,7 +509,8 @@ namespace Tokenvator.Plugins.AccessTokens
 
             tokenGroups = ti.tokenGroups;
 
-            if (!advapi32.AdjustTokenGroups(hWorkingToken, false, ref tokenGroups, (uint)Marshal.SizeOf(tokenGroups), ref ti.tokenGroups, out uint returnLength))
+            uint returnLength;
+            if (!advapi32.AdjustTokenGroups(hWorkingToken, false, ref tokenGroups, (uint)Marshal.SizeOf(tokenGroups), ref ti.tokenGroups, out returnLength))
             {
                 Misc.GetWin32Error("AdjustTokenGroups");
                 return;

@@ -127,11 +127,11 @@ namespace Tokenvator.Plugins.Execution
         {
             Console.WriteLine("[*] Creating service {0}", serviceName);
 
-            string destination = $@"{Environment.GetEnvironmentVariable("SystemRoot")}\System32\drivers\";
+            string destination = string.Format("{0}\\System32\\drivers\\", Environment.GetEnvironmentVariable("SystemRoot"));
 
             string filename = Path.GetFileName(source);
 
-            destination = $@"{destination}{filename}";
+            destination += filename;
 
             Console.WriteLine("[*] Copying file from {0} to {1}", source, destination);
 
