@@ -191,9 +191,6 @@
     <Compile Include="Plugins\AccessTokens\TokenManipulation.cs" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.PowerShell.5.ReferenceAssemblies" Version="1.1.0" />
-  </ItemGroup>
-  <ItemGroup>
     <Compile Include="Resources\TabComplete.cs" />
   </ItemGroup>
   <ItemGroup>
