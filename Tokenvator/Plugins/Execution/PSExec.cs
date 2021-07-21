@@ -1,26 +1,30 @@
 ﻿using System;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 
 using MonkeyWorks.Unmanaged.Headers;
 using MonkeyWorks.Unmanaged.Libraries;
 
-namespace Tokenvator
+using Tokenvator.Resources;
+
+namespace Tokenvator.Plugins.Execution
 {
     sealed class PSExec : IDisposable
     {
-        String serviceName;
-        IntPtr hServiceManager;
-        IntPtr hSCObject;
+        private readonly string serviceName;
+        private IntPtr hServiceManager;
+        private IntPtr hSCObject;
 
-        Boolean disposed;
+        private bool disposed;
 
         ////////////////////////////////////////////////////////////////////////////////
         //
         ////////////////////////////////////////////////////////////////////////////////
-        public PSExec(String serviceName)
+        public PSExec(string serviceName)
         {
             this.serviceName = serviceName;
+            Console.WriteLine("[*] Using Service Name {0}", serviceName);
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -28,7 +32,8 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         public PSExec()
         {
-            this.serviceName = GenerateUuid(12);
+            serviceName = GenerateUuid(12);
+            Console.WriteLine("[*] Using Service Name {0}", serviceName);
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -36,7 +41,6 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         ~PSExec()
         {
-            Dispose();
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -63,15 +67,21 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         //
         ////////////////////////////////////////////////////////////////////////////////
-        internal Boolean Connect(String machineName)
+        internal bool Connect(string machineName)
         {
+            Console.WriteLine("[*] Connecting to {0}", machineName);
+
             hServiceManager = advapi32.OpenSCManager(
-                machineName, null, Winsvc.dwSCManagerDesiredAccess.SC_MANAGER_CONNECT | Winsvc.dwSCManagerDesiredAccess.SC_MANAGER_CREATE_SERVICE
+                machineName, 
+                null, 
+                Winsvc.dwSCManagerDesiredAccess.SC_MANAGER_CONNECT | Winsvc.dwSCManagerDesiredAccess.SC_MANAGER_CREATE_SERVICE
             );
 
             if (IntPtr.Zero == hServiceManager)
             {
                 Console.WriteLine("[-] Failed to connect service controller {0}", machineName);
+                Misc.GetWin32Error("OpenSCManager");
+                disposed = true;
                 return false;
             }
 
@@ -82,7 +92,7 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         // Creates a service
         ////////////////////////////////////////////////////////////////////////////////
-        internal Boolean Create(String lpBinaryPathName)
+        internal bool Create(string lpBinaryPathName)
         {
             Console.WriteLine("[*] Creating service {0}", serviceName);
             //Console.WriteLine(lpBinaryPathName);
@@ -94,13 +104,55 @@ namespace Tokenvator
                 Winsvc.dwStartType.SERVICE_DEMAND_START,
                 Winsvc.dwErrorControl.SERVICE_ERROR_IGNORE,
                 lpBinaryPathName,
-                String.Empty, null, String.Empty, null, null
+                string.Empty, null, string.Empty, null, null
             );
 
             if (IntPtr.Zero == hSCObject)
             {
                 Console.WriteLine("[-] Failed to create service");
                 Console.WriteLine(Marshal.GetLastWin32Error());
+                disposed = true;
+                return false;
+            }
+
+            advapi32.CloseServiceHandle(hSCObject);
+            Console.WriteLine("[+] Created service {0}", serviceName);
+            return true;
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        // Creates a service
+        ////////////////////////////////////////////////////////////////////////////////
+        internal bool CreateDriver(string source, bool overwrite)
+        {
+            Console.WriteLine("[*] Creating service {0}", serviceName);
+
+            string destination = string.Format("{0}\\System32\\drivers\\", Environment.GetEnvironmentVariable("SystemRoot"));
+
+            string filename = Path.GetFileName(source);
+
+            destination += filename;
+
+            Console.WriteLine("[*] Copying file from {0} to {1}", source, destination);
+
+            File.Copy(source, destination, overwrite);
+
+            IntPtr hSCObject = advapi32.CreateService(
+                hServiceManager,
+                serviceName, serviceName,
+                Winsvc.dwDesiredAccess.SERVICE_ALL_ACCESS,
+                Winsvc.dwServiceType.SERVICE_KERNEL_DRIVER,
+                Winsvc.dwStartType.SERVICE_DEMAND_START,
+                Winsvc.dwErrorControl.SERVICE_ERROR_NORMAL,
+                destination,
+                string.Empty, null, string.Empty, null, null
+            );
+
+            if (IntPtr.Zero == hSCObject)
+            {
+                Console.WriteLine("[-] Failed to create service");
+                Misc.GetWin32Error("CreateService");
+                disposed = true;
                 return false;
             }
 
@@ -112,14 +164,18 @@ namespace Tokenvator
         ///////////////////////////////////////////////////////////////////////////////
         // Opens a handle to a service
         ///////////////////////////////////////////////////////////////////////////////
-        internal Boolean Open()
+        internal bool Open()
         {
-            hSCObject = advapi32.OpenService(hServiceManager, serviceName, Winsvc.dwDesiredAccess.SERVICE_ALL_ACCESS);
+            hSCObject = advapi32.OpenService(
+                hServiceManager, 
+                serviceName, 
+                Winsvc.dwDesiredAccess.SERVICE_ALL_ACCESS
+            );
 
             if (IntPtr.Zero == hSCObject)
             {
                 Console.WriteLine("[-] Failed to open service");
-                Console.WriteLine(Marshal.GetLastWin32Error());
+                Misc.GetWin32Error("Open");
                 return false;
             }
 
@@ -130,15 +186,15 @@ namespace Tokenvator
         ///////////////////////////////////////////////////////////////////////////////
         // Starts the service, if there is a start timeout error, return true
         ///////////////////////////////////////////////////////////////////////////////
-        internal Boolean Start()
+        internal bool Start()
         {
             if (!advapi32.StartService(hSCObject, 0, null))
             {
-                Int32 error = Marshal.GetLastWin32Error();
+                int error = Marshal.GetLastWin32Error();
                 if (1053 != error)
                 {
                     Console.WriteLine("[-] Failed to start service");
-                    Console.WriteLine(new System.ComponentModel.Win32Exception(error).Message);
+                    Misc.GetWin32Error("StartService");
                     return false;
                 }
             }
@@ -149,14 +205,14 @@ namespace Tokenvator
         ///////////////////////////////////////////////////////////////////////////////
         // Stops the service, if service is already stopped returns true
         ///////////////////////////////////////////////////////////////////////////////
-        internal Boolean Stop()
+        internal bool Stop()
         {
             Winsvc._SERVICE_STATUS serviceStatus;
             IntPtr hControlService = advapi32.ControlService(hSCObject, Winsvc.dwControl.SERVICE_CONTROL_STOP, out serviceStatus);
 
             if (IntPtr.Zero == hControlService)
             {
-                Int32 error = Marshal.GetLastWin32Error();
+                int error = Marshal.GetLastWin32Error();
                 if (1062 != error)
                 {
                     Console.WriteLine("[-] Failed to stop service");
@@ -171,7 +227,7 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         // Deletes the service
         ////////////////////////////////////////////////////////////////////////////////
-        internal Boolean Delete()
+        internal bool Delete()
         {
             if (!advapi32.DeleteService(hSCObject))
             {
@@ -186,11 +242,11 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         //
         ////////////////////////////////////////////////////////////////////////////////
-        internal static String GenerateUuid(int length)
+        internal static string GenerateUuid(int length)
         {
             Random random = new Random();
-            const String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-            return new String(Enumerable.Repeat(chars, length).Select(s => s[random.Next(s.Length)]).ToArray());
+            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            return new string(Enumerable.Repeat(chars, length).Select(s => s[random.Next(s.Length)]).ToArray());
         }
     }
 }

@@ -4,16 +4,16 @@ using System.Runtime.InteropServices;
 using MonkeyWorks.Unmanaged.Headers;
 using MonkeyWorks.Unmanaged.Libraries;
 
-namespace Tokenvator
+namespace Tokenvator.Plugins.MiniFilters
 {
     class FilterInstance : Filters
     {
-        private String filterName;
+        private readonly string filterName;
 
         ////////////////////////////////////////////////////////////////////////////////
         //
         ////////////////////////////////////////////////////////////////////////////////
-        internal FilterInstance(String filterName) : base()
+        internal FilterInstance(string filterName) : base()
         {
             this.filterName = filterName;
         }
@@ -26,8 +26,8 @@ namespace Tokenvator
             Console.WriteLine("{0,-20} {1,-11} {2,8} {3,-20}", "Instance Name", "Filter Name", "Altitude", "Volume Name");
             Console.WriteLine("{0,-20} {1,-11} {2,8} {3,-20}", "-------------", "-----------", "--------", "-----------");
 
-            UInt32 dwBytesReturned = 0;
-            UInt32 result = fltlib.FilterInstanceFindFirst(filterName, FltUserStructures._INSTANCE_INFORMATION_CLASS.InstanceFullInformation, IntPtr.Zero, 0, ref dwBytesReturned, ref hFilters);
+            uint dwBytesReturned = 0;
+            uint result = fltlib.FilterInstanceFindFirst(filterName, FltUserStructures._INSTANCE_INFORMATION_CLASS.InstanceFullInformation, IntPtr.Zero, 0, ref dwBytesReturned, ref hFilters);
 
             if (2149515283 == result)
             {
@@ -58,15 +58,15 @@ namespace Tokenvator
                 return;
             }
 
-            UInt32 lpBytesReturned = 0;
-            UInt32 result = 0;
+            uint lpBytesReturned = 0;
+            uint result = 0;
             do
             {
                 if (2147942522 != fltlib.FilterInstanceFindNext(hFilters, FltUserStructures._INSTANCE_INFORMATION_CLASS.InstanceFullInformation, IntPtr.Zero, 0, ref lpBytesReturned))
                 {
                     break;
                 }
-                IntPtr lpBuffer = Marshal.AllocHGlobal((Int32)lpBytesReturned);
+                IntPtr lpBuffer = Marshal.AllocHGlobal((int)lpBytesReturned);
                 result = fltlib.FilterInstanceFindNext(hFilters, FltUserStructures._INSTANCE_INFORMATION_CLASS.InstanceFullInformation, lpBuffer, lpBytesReturned, ref lpBytesReturned);
                 Print(lpBuffer);
                 Marshal.FreeHGlobal(lpBuffer);
@@ -81,20 +81,20 @@ namespace Tokenvator
         {
             var info = (FltUserStructures._INSTANCE_FULL_INFORMATION)Marshal.PtrToStructure(baseAddress, typeof(FltUserStructures._INSTANCE_FULL_INFORMATION));
 
-            Int32 offset = 0;
+            int offset = 0;
             while (true)
             {
                 IntPtr lpName = new IntPtr(baseAddress.ToInt64() + info.InstanceNameBufferOffset);
-                String name = Marshal.PtrToStringUni(lpName, info.InstanceNameLength / 2);
+                string name = Marshal.PtrToStringUni(lpName, info.InstanceNameLength / 2);
                 
                 IntPtr lpFilter = new IntPtr(baseAddress.ToInt64() + info.FilterNameBufferOffset);
-                String filter = Marshal.PtrToStringUni(lpFilter, info.FilterNameLength / 2);
+                string filter = Marshal.PtrToStringUni(lpFilter, info.FilterNameLength / 2);
 
                 IntPtr lpAltitude = new IntPtr(baseAddress.ToInt64() + info.AltitudeBufferOffset);
-                String altitude = Marshal.PtrToStringUni(lpAltitude, info.AltitudeLength / 2);
+                string altitude = Marshal.PtrToStringUni(lpAltitude, info.AltitudeLength / 2);
 
                 IntPtr lpVolume = new IntPtr(baseAddress.ToInt64() + info.VolumeNameBufferOffset);
-                String volume = Marshal.PtrToStringUni(lpVolume, info.VolumeNameLength / 2);
+                string volume = Marshal.PtrToStringUni(lpVolume, info.VolumeNameLength / 2);
                 
                 Console.WriteLine("{0,-20} {1,-11} {2,8} {3,-20}", name, filter, altitude, volume);
                 if (0 == info.NextEntryOffset)

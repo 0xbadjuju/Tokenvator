@@ -3,17 +3,17 @@ using System.Collections.Generic;
 using System.Management;
 using System.ServiceProcess;
 
-namespace Tokenvator
+namespace Tokenvator.Plugins.Execution
 {
     class Services
     {
         private ServiceController service;
-        private String serviceName;
-        private UInt32 ProcessId;
+        private string serviceName;
+        private uint ProcessId;
 
         ////////////////////////////////////////////////////////////////////////////////
         ////////////////////////////////////////////////////////////////////////////////
-        public Services(String serviceName)
+        public Services(string serviceName)
         {
             this.serviceName = serviceName;
             service = new ServiceController(serviceName);
@@ -21,7 +21,7 @@ namespace Tokenvator
 
         ////////////////////////////////////////////////////////////////////////////////
         ////////////////////////////////////////////////////////////////////////////////
-        public Boolean StartService()
+        public bool StartService()
         {
             Console.WriteLine("[*] Starting Service " + serviceName);
             if (service.Status == ServiceControllerStatus.Running)
@@ -50,7 +50,7 @@ namespace Tokenvator
 
         ////////////////////////////////////////////////////////////////////////////////
         ////////////////////////////////////////////////////////////////////////////////
-        public Boolean StopService()
+        public bool StopService()
         {
             Console.WriteLine("[+] Stopping Service {0}", serviceName);
             if (service.CanStop)
@@ -102,7 +102,7 @@ namespace Tokenvator
 
         ////////////////////////////////////////////////////////////////////////////////
         ////////////////////////////////////////////////////////////////////////////////
-        public UInt32 GetServiceProcessId()
+        public uint GetServiceProcessId()
         {
             List<ManagementObject> systemProcesses = new List<ManagementObject>();
             ManagementScope scope = new ManagementScope("\\\\.\\root\\cimv2");
@@ -122,7 +122,7 @@ namespace Tokenvator
             }
             foreach (ManagementObject managementObject in objectCollection)
             {
-                ProcessId = (UInt32)managementObject["ProcessId"];
+                ProcessId = (uint)managementObject["ProcessId"];
             }
             Console.WriteLine(" [+] Returned PID: " + ProcessId);
             return ProcessId;

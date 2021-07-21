@@ -1,0 +1,50 @@
+;
+; KernelTokens.inf
+;
+
+[Version]
+Signature="$WINDOWS NT$"
+Class=System
+ClassGuid={4d36e97d-e325-11ce-bfc1-08002be10318}
+Provider=%ManufacturerName%
+DriverVer=
+CatalogFile=KernelTokens.cat
+PnpLockdown=1
+
+[DestinationDirs]
+DefaultDestDir = 12
+
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+
+
+
+[Standard.NT$ARCH$]
+
+; https://community.osr.com/discussion/291286/wdk10-stampinf-returns-error-1420-defaultinstall-based-inf-cannot-be-processed-as-primitive
+[DefaultInstall.NTAMD64]
+
+[DefaultInstall.NTAMD64.services]
+AddService=%SERVICENAME%,,TokenService
+
+[DefaultUninstall.NTAMD64]
+LegacyUninstall=1
+
+[DefaultUninstall.NTAMD64.services]
+DelService=%SERVICENAME%,0x00000200
+
+[TokenService]
+ServiceType=1   ;Kernel driver
+StartType=3     ;OnDemand start. No reboot required!
+ErrorControl=1  ;Normal
+ServiceBinary=%12%\%DRIVERFILENAME%
+
+[Strings]
+ManufacturerName="NetSPI" ;TODO: Replace with your manufacturer name
+ClassName=""
+DiskName="KernelTokens Source Disk"
+SERVICENAME="krnltknsdrv"
+DRIVERFILENAME="krnltknsdrv.sys"
