@@ -20,9 +20,9 @@ VOID UnFreezeToken(ULONGLONG output[5])
 	KdPrint(("PEPROCESS Base Address  : 0x%llp\r\n", ptrEProcess));
 	output[0] = (uintptr_t)ptrEProcess;
 
-	ULONG Flags2 = *((int*)((char*)ptrEProcess + 0x300));
-	KdPrint(("PEPROCESS Flags2 Offset : 0x%llp\r\n", (char*)ptrEProcess + 0x300));
-	output[1] = (uintptr_t)((char*)ptrEProcess + 0x300);
+	ULONG Flags2 = *((int*)((char*)ptrEProcess + 0x460));
+	KdPrint(("PEPROCESS Flags2 Offset : 0x%llp\r\n", (char*)ptrEProcess + 0x460));
+	output[1] = (uintptr_t)((char*)ptrEProcess + 0x460);
 
 	KdPrint(("Flags2 Original Value   : 0x%x\r\n", Flags2));
 	output[2] = (uintptr_t)Flags2;
@@ -47,9 +47,9 @@ VOID UnFreezeTokenByPid(ULONG ProcessId, ULONGLONG output[5])
 	KdPrint(("PEPROCESS Base Address  : 0x%llp\r\n", ptrEProcess));
 	output[0] = (uintptr_t)ptrEProcess;
 
-	ULONG Flags2 = *((int*)((char*)ptrEProcess + 0x300));
-	KdPrint(("PEPROCESS Flags2 Offset : 0x%llp\r\n", (char*)ptrEProcess + 0x300));
-	output[1] = (uintptr_t)((char*)ptrEProcess + 0x300);
+	ULONG Flags2 = *((int*)((char*)ptrEProcess + 0x460));
+	KdPrint(("PEPROCESS Flags2 Offset : 0x%llp\r\n", (char*)ptrEProcess + 0x460));
+	output[1] = (uintptr_t)((char*)ptrEProcess + 0x460);
 
 	KdPrint(("Flags2 Original Value   : 0x%x\r\n", Flags2));
 	output[2] = (uintptr_t)Flags2;
@@ -67,9 +67,9 @@ VOID _UnfreezeToken(PEPROCESS ptrEProcess, ULONGLONG output[5])
 	KdPrint(("PEPROCESS Base Address  : 0x%llp\r\n", ptrEProcess));
 	output[0] = (uintptr_t)ptrEProcess;
 
-	ULONG Flags2 = *((int*)((char*)ptrEProcess + 0x300));
-	KdPrint(("PEPROCESS Flags2 Offset : 0x%llp\r\n", (char*)ptrEProcess + 0x300));
-	output[1] = (uintptr_t)((char*)ptrEProcess + 0x300);
+	ULONG Flags2 = *((int*)((char*)ptrEProcess + 0x460));
+	KdPrint(("PEPROCESS Flags2 Offset : 0x%llp\r\n", (char*)ptrEProcess + 0x460));
+	output[1] = (uintptr_t)((char*)ptrEProcess + 0x460);
 
 	KdPrint(("Flags2 Original Value   : 0x%x\r\n", Flags2));
 	output[2] = (uintptr_t)Flags2;
@@ -141,7 +141,7 @@ VOID AddTokenPrivilegeByPid(ULONG ProcessId, PRIVILEGES privilege, ULONGLONG out
 	KdPrint(("PEPROCESS Base Address             : 0x%llp\r\n", ptrEProcess));
 	KdPrint(("PEPROCESS Base Address             : 0x%llp\r\n", output[0]));
 
-	PVOID* ptrFastRef = ((char*)ptrEProcess + 0x358);
+	PVOID* ptrFastRef = ((char*)ptrEProcess + 0x4b8);
 	KdPrint(("EX_FAST_REF Base Address           : 0x%llp\r\n", ptrFastRef));
 	output[1] = (uintptr_t)ptrFastRef;
 
@@ -177,7 +177,7 @@ VOID _AddTokenPrivilege(PEPROCESS ptrEProcess, PRIVILEGES privilege, ULONGLONG o
 	KdPrint(("PEPROCESS Base Address             : 0x%llp\r\n", ptrEProcess));
 	KdPrint(("PEPROCESS Base Address             : 0x%llp\r\n", output[0]));
 
-	PVOID* ptrFastRef = ((char*)ptrEProcess + 0x358);
+	PVOID* ptrFastRef = ((char*)ptrEProcess + 0x4b8);
 	KdPrint(("EX_FAST_REF Base Address           : 0x%llp\r\n", ptrFastRef));
 	output[1] = (uintptr_t)ptrFastRef;
 
