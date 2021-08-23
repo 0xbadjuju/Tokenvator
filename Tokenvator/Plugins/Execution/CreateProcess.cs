@@ -4,6 +4,7 @@ using System.Text;
 
 using Tokenvator.Resources;
 
+using DInvoke.DynamicInvoke;
 using MonkeyWorks.Unmanaged.Headers;
 using MonkeyWorks.Unmanaged.Libraries;
 
@@ -16,6 +17,12 @@ namespace Tokenvator.Plugins.Execution
         ////////////////////////////////////////////////////////////////////////////////
         public static bool CreateProcessWithLogonW(IntPtr phNewToken, string name, string arguments)
         {
+            IntPtr padvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
+            IntPtr pImpersonateLoggedOnUser = Generic.GetExportAddress(padvapi32, "ImpersonateLoggedOnUser");
+            object[] paramaters = { phNewToken };
+            bool retVal = (bool)Generic.DynamicFunctionInvoke(pImpersonateLoggedOnUser, typeof(Win32.Delegates.OpenProcess), ref paramaters);
+
+
             if (IntPtr.Zero != phNewToken && !advapi32.ImpersonateLoggedOnUser(phNewToken))
             {
                 Console.WriteLine("[-] Token Impersonation Failed");

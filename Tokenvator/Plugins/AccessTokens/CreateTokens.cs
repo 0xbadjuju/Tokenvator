@@ -9,6 +9,7 @@ using Tokenvator.Plugins.Enumeration;
 
 using MonkeyWorks.Unmanaged.Headers;
 using MonkeyWorks.Unmanaged.Libraries;
+
 using System.Security.Principal;
 
 namespace Tokenvator.Plugins.AccessTokens
@@ -38,8 +39,8 @@ namespace Tokenvator.Plugins.AccessTokens
                 return;
             }
 
-            uint LG_INCLUDE_INDIRECT = 0x0001;
-            uint MAX_PREFERRED_LENGTH = 0xFFFFFFFF;
+            //uint LG_INCLUDE_INDIRECT = 0x0001;
+            //uint MAX_PREFERRED_LENGTH = 0xFFFFFFFF;
 
             Console.WriteLine();
             Console.WriteLine("_SECURITY_QUALITY_OF_SERVICE");
@@ -124,7 +125,7 @@ namespace Tokenvator.Plugins.AccessTokens
                 return;
             }
             
-            uint MAX_PREFERRED_LENGTH = 0xFFFFFFFF;
+            //uint MAX_PREFERRED_LENGTH = 0xFFFFFFFF;
 
             #region _OBJECT_ATTRIBUTES
             Console.WriteLine();

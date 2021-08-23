@@ -142,6 +142,19 @@
     <Compile Include="MainLoop.cs" />
     <Compile Include="MainLoop.Modules.cs" />
     <Compile Include="Resources\CommandLineParsing.cs" />
+    <Compile Include="Resources\DInvoke\DInvoke\DInvoke\DynamicInvoke\Generic.cs" />
+    <Compile Include="Resources\DInvoke\DInvoke\DInvoke\DynamicInvoke\Native.cs" />
+    <Compile Include="Resources\DInvoke\DInvoke\DInvoke\DynamicInvoke\Win32.cs" />
+    <Compile Include="Resources\DInvoke\DInvoke\DInvoke\Injection\Allocation.cs" />
+    <Compile Include="Resources\DInvoke\DInvoke\DInvoke\Injection\Execution.cs" />
+    <Compile Include="Resources\DInvoke\DInvoke\DInvoke\Injection\Injector.cs" />
+    <Compile Include="Resources\DInvoke\DInvoke\DInvoke\Injection\Payload.cs" />
+    <Compile Include="Resources\DInvoke\DInvoke\DInvoke\ManualMap\Map.cs" />
+    <Compile Include="Resources\DInvoke\DInvoke\DInvoke\ManualMap\Overload.cs" />
+    <Compile Include="Resources\DInvoke\DInvoke\DInvoke\SharedData\Native.cs" />
+    <Compile Include="Resources\DInvoke\DInvoke\DInvoke\SharedData\PE.cs" />
+    <Compile Include="Resources\DInvoke\DInvoke\DInvoke\SharedData\Win32.cs" />
+    <Compile Include="Resources\DInvoke\DInvoke\DInvoke\SharedUtilities\Utilities.cs" />
     <Compile Include="Resources\Misc.cs" />
     <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\Accctrl.cs" />
     <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\lmaccess.cs" />
@@ -172,18 +185,6 @@
     <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\Winternl.cs" />
     <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\Winuser.cs" />
     <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\wudfwdm.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\advapi32.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\crypt32.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\dbghelp.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\fltlib.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\kernel32.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\netapi32.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\ntdll.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\secur32.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\user32.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\vaultcli.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\wlanapi.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\wtsapi32.cs" />
     <Compile Include="Plugins\Execution\PSExec.cs" />
     <Compile Include="Plugins\AccessTokens\RestrictedToken.cs" />
     <Compile Include="Plugins\Execution\Services.cs" />
@@ -191,6 +192,30 @@
     <Compile Include="Plugins\AccessTokens\TokenManipulation.cs" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\DInvoke\advapi32.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\DInvoke\crypt32.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\DInvoke\dbghelp.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\DInvoke\fltlib.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\DInvoke\kernel32.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\DInvoke\netapi32.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\DInvoke\ntdll.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\DInvoke\secur32.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\DInvoke\user32.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\DInvoke\vaultcli.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\DInvoke\wlanapi.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\DInvoke\wtsapi32.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\PInvoke\advapi32.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\PInvoke\crypt32.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\PInvoke\dbghelp.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\PInvoke\fltlib.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\PInvoke\kernel32.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\PInvoke\netapi32.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\PInvoke\ntdll.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\PInvoke\secur32.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\PInvoke\user32.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\PInvoke\vaultcli.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\PInvoke\wlanapi.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\PInvoke\wtsapi32.cs" />
     <Compile Include="Resources\TabComplete.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -198,9 +223,17 @@
       <Link>.editorconfig</Link>
     </None>
     <None Include="app.config" />
+    <None Include="Resources\DInvoke\.github\workflows\DInvoke.NetFramework.CI.Package.yml" />
+    <None Include="Resources\DInvoke\.github\workflows\DInvoke.NetFramework.CI.yml" />
+    <None Include="Resources\DInvoke\DInvoke\DInvoke\obj\Debug\DesignTimeResolveAssemblyReferencesInput.cache" />
+    <None Include="Resources\DInvoke\DInvoke\DInvoke\obj\Debug\DInvoke.csprojAssemblyReference.cache" />
+    <None Include="Resources\DInvoke\LICENSE" />
+    <None Include="Resources\DInvoke\README.md" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Plugins\Ownership\" />
+    <Folder Include="Resources\DInvoke\DInvoke\DInvoke\obj\Debug\TempPE\" />
+    <Folder Include="Resources\DInvoke\DInvoke\DInvoke\Properties\" />
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include="Microsoft.Net.Framework.3.5.SP1">
@@ -208,6 +241,9 @@
       <ProductName>.NET Framework 3.5 SP1</ProductName>
       <Install>false</Install>
     </BootstrapperPackage>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Resources\DInvoke\.gitignore" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

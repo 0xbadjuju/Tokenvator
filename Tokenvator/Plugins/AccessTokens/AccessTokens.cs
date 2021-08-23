@@ -7,11 +7,17 @@ using Tokenvator.Plugins.Execution;
 
 using MonkeyWorks.Unmanaged.Headers;
 using MonkeyWorks.Unmanaged.Libraries;
+//using MonkeyWorks.Unmanaged.Libraries.DInvoke;
+
+using DInvoke.DynamicInvoke;
+
 using System.Runtime.InteropServices;
 using System.Diagnostics;
 
 namespace Tokenvator.Plugins.AccessTokens
 {
+    using MonkeyWorks = MonkeyWorks.Unmanaged.Libraries.DInvoke;
+
     class AccessTokens : IDisposable
     {
         protected IntPtr phNewToken;
@@ -97,12 +103,31 @@ namespace Tokenvator.Plugins.AccessTokens
             */
 
             IntPtr hProcess = kernel32.OpenProcess(ProcessThreadsApi.ProcessSecurityRights.PROCESS_QUERY_INFORMATION, false, (uint)processId);
+
+            Console.WriteLine("[D] Calling D/Invoke");
+            
+            IntPtr pkernel32 = Generic.GetPebLdrModuleEntry("kernel32.dll");
+            IntPtr pOpenProcess = Generic.GetExportAddress(pkernel32, "OpenProcess");
+            object[] parameters =
+            {
+                Winnt.PROCESS_QUERY_INFORMATION, false, (uint)processId
+            };
+
+            IntPtr hProcess = (IntPtr)Generic.DynamicFunctionInvoke(pOpenProcess, typeof(MonkeyWorks.kernel32.OpenProcess), ref parameters);
+            //IntPtr hProcess = kernel32.OpenProcess(Winnt.PROCESS_QUERY_INFORMATION, false, (uint)processId);
+
             if (IntPtr.Zero == hProcess)
             {
                 Misc.GetWin32Error("OpenProcess");
                 return false;
             }
             Console.WriteLine("[*] Recieved Process Handle 0x{0}", hProcess.ToString("X4"));
+
+            IntPtr pOpenProcessToken = Generic.GetExportAddress(pkernel32, "OpenProcessToken");
+            parameters = new object[]
+            {
+                hProcess, Winnt.TOKEN_ALL_ACCESS, hExistingToken
+            };
 
             if (!kernel32.OpenProcessToken(hProcess, Winnt.TOKEN_ALL_ACCESS, out hExistingToken))
             {
