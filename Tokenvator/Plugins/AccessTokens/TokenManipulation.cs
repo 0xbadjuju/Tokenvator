@@ -178,7 +178,7 @@ namespace Tokenvator.Plugins.AccessTokens
                         (uint)Winnt.ACCESS_MASK.MAXIMUM_ALLOWED,
                         ref securityAttributes,
                         impersonationLevel,
-                        Winnt._TOKEN_TYPE.TokenPrimary,
+                        Winnt._TOKEN_TYPE.TokenImpersonation,
                         out phNewToken
             ))
             {

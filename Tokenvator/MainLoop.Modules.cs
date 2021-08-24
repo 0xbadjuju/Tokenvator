@@ -180,6 +180,25 @@ namespace Tokenvator
         }
 
         ////////////////////////////////////////////////////////////////////////////////
+        //
+        ////////////////////////////////////////////////////////////////////////////////
+        private static void _CloneToken(CommandLineParsing cLP, IntPtr hToken)
+        {
+            try
+            {
+                using (CreateTokens ct = new CreateTokens(hToken))
+                {
+                    ct.SetWorkingTokenToSelf();
+                    ct.CloneToken(cLP.ProcessID, cLP.Command);
+                }
+            }
+            catch (AccessViolationException ex)
+            {
+                Console.WriteLine(ex);
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
         // https://github.com/numbnet/Win32-OpenSSH/blob/8dd7423e13ac0b88b3084ec95bc93ea09dec1fef/contrib/win32/win32compat/win32auth.c
         // https://github.com/bb107/WinSudo/blob/b2cb7700bd2f7ee59e2ef7f9ca20c2a671ce72a8/PrivilegeHelps/Security.cpp
         // https://www.exploit-db.com/papers/42556
@@ -593,7 +612,7 @@ namespace Tokenvator
             string domain = ".";
             string password = string.Empty;
             Winbase.LOGON_TYPE logonType = Winbase.LOGON_TYPE.LOGON32_LOGON_INTERACTIVE;
-            if (username.Contains('\\'))
+            if (username.Contains('\\') && !username.ToLower().StartsWith("nt service"))
             {
                 string[] split = username.Split('\\').ToArray();
                 domain = split.FirstOrDefault();
@@ -602,6 +621,15 @@ namespace Tokenvator
                 {
                     return;
                 }
+                Console.WriteLine("User Logon");
+            }
+            else if (username.Contains('\\') && username.ToLower().StartsWith("nt service"))
+            {
+                string[] split = username.Split('\\').ToArray();
+                username = split.LastOrDefault();
+                logonType = Winbase.LOGON_TYPE.LOGON32_LOGON_SERVICE;
+                domain = "NT SERVICE";
+                Console.WriteLine("Service Logon");
             }
             else
             {
@@ -799,9 +827,9 @@ namespace Tokenvator
                         t.SetWorkingTokenToRemote();
                         if (!t.DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation))
                         {
-                            t.SetWorkingTokenToNewToken();
                             return false;
                         }
+                        t.SetWorkingTokenToNewToken();
                     }
                     else if (0 != cLP.ThreadID && t.OpenThreadToken((uint)cLP.ThreadID, Winnt.TOKEN_ALL_ACCESS))
                     {
@@ -892,7 +920,7 @@ namespace Tokenvator
         {
             if (cLP.Remote)
             {
-                IntPtr hProcess = kernel32.OpenProcess(Winnt.PROCESS_TERMINATE, false, (uint)cLP.ProcessID);
+                IntPtr hProcess = kernel32.OpenProcess(ProcessThreadsApi.ProcessSecurityRights.PROCESS_TERMINATE, false, (uint)cLP.ProcessID);
                 if (IntPtr.Zero == hProcess)
                 {
                     Misc.GetWin32Error("OpenProcess");

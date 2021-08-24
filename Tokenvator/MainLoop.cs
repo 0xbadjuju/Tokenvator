@@ -59,7 +59,8 @@ namespace Tokenvator
 
             {"RunAs", "Command", "UserName, Password", "RunAs /Username:Administrator /Password:Password1 /Command:cmd.exe"},
             {"Logon_User", "Command, Password, Groups", "UserName", "logon_user /Username:networkservice /Command:cmd.exe"},
-            {"Create_Token", "UserName, Groups", "Command", "Create_Token /User:Administrator /Groups:tvator_group,sql_admins_group /Command"},
+            {"Create_Token", "UserName, Groups", "Command", "Create_Token /User:Administrator /Groups:tvator_group,sql_admins_group /Command:cmd.exe"},
+            {"Clone_Token", "Process", "Command", "Clone_Token /Process:sqlservr /Command:cmd.exe"},
             {"", "", "", ""},
 
             {"Terminate", "Process", "-", "Terminate /Process:2180"},
@@ -167,7 +168,7 @@ namespace Tokenvator
                         _ClearDesktopACL();
                         break;
                     case "clone_token":
-                        _CloneToken(remote, processID, command, hToken);
+                        _CloneToken(cLP, hToken);
                         break;
                     case "create_token":
                         _CreateToken(cLP, hToken);

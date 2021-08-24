@@ -241,7 +241,7 @@ namespace Tokenvator.Plugins.Enumeration
             Dictionary<string, uint> users = new Dictionary<string, uint>();
             foreach (Process p in Process.GetProcesses())
             {
-                IntPtr hProcess = kernel32.OpenProcess(Winnt.PROCESS_QUERY_LIMITED_INFORMATION, true, (uint)p.Id);
+                IntPtr hProcess = kernel32.OpenProcess(ProcessThreadsApi.ProcessSecurityRights.PROCESS_QUERY_LIMITED_INFORMATION, true, (uint)p.Id);
                 if (IntPtr.Zero == hProcess)
                 {
                     continue;
@@ -339,7 +339,7 @@ namespace Tokenvator.Plugins.Enumeration
             Console.WriteLine("[*] Examining {0} processes", pids.Length);
             foreach (Process p in pids)
             {
-                IntPtr hProcess = kernel32.OpenProcess(Winnt.PROCESS_QUERY_LIMITED_INFORMATION, true, (uint)p.Id);
+                IntPtr hProcess = kernel32.OpenProcess(ProcessThreadsApi.ProcessSecurityRights.PROCESS_QUERY_LIMITED_INFORMATION, true, (uint)p.Id);
                 if (IntPtr.Zero == hProcess)
                 {
                     continue;

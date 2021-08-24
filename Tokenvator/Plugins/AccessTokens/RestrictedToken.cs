@@ -52,7 +52,7 @@ namespace Tokenvator.Plugins.AccessTokens
         private bool _GetPrimaryToken(uint processId)
         {
             //Originally Set to true
-            IntPtr hProcess = kernel32.OpenProcess(Winnt.PROCESS_QUERY_LIMITED_INFORMATION, false, processId);
+            IntPtr hProcess = kernel32.OpenProcess(ProcessThreadsApi.ProcessSecurityRights.PROCESS_QUERY_LIMITED_INFORMATION, false, processId);
             if (IntPtr.Zero == hProcess)
             {
                 Console.WriteLine(" [-] Unable to Open Process Token: {0}", processId);

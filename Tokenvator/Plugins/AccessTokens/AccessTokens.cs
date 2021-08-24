@@ -96,7 +96,7 @@ namespace Tokenvator.Plugins.AccessTokens
             }
             */
 
-            IntPtr hProcess = kernel32.OpenProcess(Winnt.PROCESS_QUERY_INFORMATION, false, (uint)processId);
+            IntPtr hProcess = kernel32.OpenProcess(ProcessThreadsApi.ProcessSecurityRights.PROCESS_QUERY_INFORMATION, false, (uint)processId);
             if (IntPtr.Zero == hProcess)
             {
                 Misc.GetWin32Error("OpenProcess");

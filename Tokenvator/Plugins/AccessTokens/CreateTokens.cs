@@ -224,6 +224,95 @@ namespace Tokenvator.Plugins.AccessTokens
             StartProcessAsUser(command);         
         }
 
+        public void CloneToken(int processId, string command)
+        {
+            if (!_CheckPrivileges())
+            {
+                return;
+            }
+
+            uint LG_INCLUDE_INDIRECT = 0x0001;
+            uint MAX_PREFERRED_LENGTH = 0xFFFFFFFF;
+
+            Console.WriteLine();
+            Console.WriteLine("_SECURITY_QUALITY_OF_SERVICE");
+            Winnt._SECURITY_QUALITY_OF_SERVICE securityContextTrackingMode = new Winnt._SECURITY_QUALITY_OF_SERVICE()
+            {
+                Length = (uint)Marshal.SizeOf(typeof(Winnt._SECURITY_QUALITY_OF_SERVICE)),
+                ImpersonationLevel = Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,//SecurityAnonymous
+                ContextTrackingMode = Winnt.SECURITY_CONTEXT_TRACKING_MODE.SECURITY_STATIC_TRACKING,
+                EffectiveOnly = Winnt.EFFECTIVE_ONLY.False
+            };
+
+            IntPtr hSecurityContextTrackingMode = Marshal.AllocHGlobal(Marshal.SizeOf(securityContextTrackingMode));
+            Marshal.StructureToPtr(securityContextTrackingMode, hSecurityContextTrackingMode, false);
+
+            Console.WriteLine("_OBJECT_ATTRIBUTES");
+            wudfwdm._OBJECT_ATTRIBUTES objectAttributes = new wudfwdm._OBJECT_ATTRIBUTES()
+            {
+                Length = (uint)Marshal.SizeOf(typeof(wudfwdm._OBJECT_ATTRIBUTES)),
+                RootDirectory = IntPtr.Zero,
+                Attributes = 0,
+                ObjectName = IntPtr.Zero,
+                SecurityDescriptor = IntPtr.Zero,
+                SecurityQualityOfService = hSecurityContextTrackingMode
+            };
+
+            TokenInformation ti = new TokenInformation(hWorkingToken);
+            //ti.SetWorkingTokenToRemote();
+            ti.OpenProcessToken(processId);
+            ti.SetWorkingTokenToRemote();
+
+            ti.GetTokenSource();
+            ti.GetTokenUser();
+            ti.GetTokenGroups();
+            ti.GetTokenPrivileges();
+            ti.GetTokenOwner();
+            ti.GetTokenPrimaryGroup();
+            ti.GetTokenDefaultDacl();
+
+            Winnt._LUID systemLuid = Winnt.SYSTEM_LUID;
+            long expirationTime = long.MaxValue / 2;
+
+            phNewToken = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(IntPtr)));
+
+            //out/ref hToken - required
+            //Ref Expirationtime - required
+            uint ntRetVal = ntdll.NtCreateToken(
+                out phNewToken,
+                Winnt.TOKEN_ALL_ACCESS,
+                ref objectAttributes,
+                Winnt._TOKEN_TYPE.TokenPrimary,
+                ref systemLuid,
+                ref expirationTime,
+                ref ti.tokenUser,
+                ref ti.tokenGroups,
+                ref ti.tokenPrivileges,
+                ref ti.tokenOwner,
+                ref ti.tokenPrimaryGroup,
+                ref ti.tokenDefaultDacl,
+                ref ti.tokenSource
+            );
+
+            if (0 != ntRetVal)
+            {
+                Misc.GetNtError("NtCreateToken", ntRetVal);
+                new TokenInformation(phNewToken).GetTokenUser();
+            }
+
+            if (string.IsNullOrEmpty(command))
+            {
+                command = "cmd.exe";
+            }
+
+            DesktopACL desktop = new DesktopACL();
+            desktop.OpenDesktop();
+            desktop.OpenWindow();
+
+            SetWorkingTokenToNewToken();
+            StartProcessAsUser(command);           
+        }
+
         private bool _CheckPrivileges()
         {
             bool exists, enabled;
