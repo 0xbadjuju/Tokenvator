@@ -239,6 +239,7 @@ namespace Tokenvator.Plugins.AccessTokens
             {
                 if (OpenProcessToken((int)process))
                 {
+                    SetWorkingTokenToRemote();
                     Console.WriteLine(" [+] Opened {0}", process);
                     SetWorkingTokenToRemote();
                     if (ImpersonateUser())

@@ -22,6 +22,8 @@ namespace Tokenvator.Plugins.AccessTokens
 
     class AccessTokens : IDisposable
     {
+        private bool Disposed = false;
+
         protected IntPtr phNewToken;
         protected IntPtr hExistingToken;
         protected IntPtr currentProcessToken;
@@ -43,6 +45,7 @@ namespace Tokenvator.Plugins.AccessTokens
             hWorkingThreadToken = new IntPtr();
         }
 
+        #region Get/Set
         ////////////////////////////////////////////////////////////////////////////////
         // Sets hWorkingToken to currentProcessToken
         ////////////////////////////////////////////////////////////////////////////////
@@ -88,11 +91,14 @@ namespace Tokenvator.Plugins.AccessTokens
         {
             return hWorkingToken;
         }
+        #endregion
 
-        ////////////////////////////////////////////////////////////////////////////////
-        // Opens a process Token
-        // Converted to Dinvoke Syscalls
-        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Opens a process Token
+        /// Converted to Dinvoke Syscalls 
+        /// </summary>
+        /// <param name="processId"></param>
+        /// <returns></returns>
         [SecurityCritical]
         [HandleProcessCorruptedStateExceptions]
         public virtual bool OpenProcessToken(int processId)
@@ -262,29 +268,102 @@ namespace Tokenvator.Plugins.AccessTokens
             return true;
         }
 
-        ////////////////////////////////////////////////////////////////////////////////
-        // Impersonates the token from a specified processId
-        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Impersonates the token from a specified processId
+        /// Converted to D/Invoke Syscalls - still uses kernel32.GetCurrentThread()
+        /// </summary>
+        /// <returns></returns>
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
         public virtual bool ImpersonateUser()
         {
-            Winbase._SECURITY_ATTRIBUTES securityAttributes = new Winbase._SECURITY_ATTRIBUTES();
-            if (!advapi32.DuplicateTokenEx(
-                        hWorkingToken,
-                        (uint)Winnt.ACCESS_MASK.MAXIMUM_ALLOWED,
-                        ref securityAttributes,
-                        Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,
-                        Winnt._TOKEN_TYPE.TokenPrimary,
-                        out phNewToken
-            ))
+            ////////////////////////////////////////////////////////////////////////////////
+            // Duplicate an existing token
+            // Winbase._SECURITY_ATTRIBUTES securityAttributes = new Winbase._SECURITY_ATTRIBUTES();
+            // advapi32.DuplicateTokenEx(hWorkingToken, (uint)Winnt.ACCESS_MASK.MAXIMUM_ALLOWED, ref securityAttributes, Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation, Winnt._TOKEN_TYPE.TokenPrimary, out phNewToken)
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hNtDuplicateToken = Generic.GetSyscallStub("NtDuplicateToken");
+            MonkeyWorks.ntdll.NtDuplicateToken fSyscallNtDuplicateToken = (MonkeyWorks.ntdll.NtDuplicateToken)Marshal.GetDelegateForFunctionPointer(hNtDuplicateToken, typeof(MonkeyWorks.ntdll.NtDuplicateToken));
+
+            uint ntRetVal = 0;
+
+            Winnt._SECURITY_QUALITY_OF_SERVICE securityContextTrackingMode = new Winnt._SECURITY_QUALITY_OF_SERVICE()
             {
-                Misc.GetWin32Error("DuplicateTokenEx: ");
+                Length = (uint)Marshal.SizeOf(typeof(Winnt._SECURITY_QUALITY_OF_SERVICE)),
+                ImpersonationLevel = Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,//SecurityAnonymous
+                ContextTrackingMode = Winnt.SECURITY_CONTEXT_TRACKING_MODE.SECURITY_STATIC_TRACKING,
+                EffectiveOnly = Winnt.EFFECTIVE_ONLY.False
+            };
+
+            IntPtr hSecurityContextTrackingMode = Marshal.AllocHGlobal(Marshal.SizeOf(securityContextTrackingMode));
+            Marshal.StructureToPtr(securityContextTrackingMode, hSecurityContextTrackingMode, false);
+
+            Console.WriteLine("_OBJECT_ATTRIBUTES");
+            wudfwdm._OBJECT_ATTRIBUTES objectAttributes = new wudfwdm._OBJECT_ATTRIBUTES()
+            {
+                Length = (uint)Marshal.SizeOf(typeof(wudfwdm._OBJECT_ATTRIBUTES)),
+                RootDirectory = IntPtr.Zero,
+                Attributes = 0,
+                ObjectName = IntPtr.Zero,
+                SecurityDescriptor = IntPtr.Zero,
+                SecurityQualityOfService = hSecurityContextTrackingMode
+            };
+
+            GCHandle hObjectAttributes = GCHandle.Alloc(objectAttributes, GCHandleType.Pinned);
+
+            try
+            {
+                ntRetVal = fSyscallNtDuplicateToken(hWorkingToken, (uint)Winnt.ACCESS_MASK.MAXIMUM_ALLOWED, hObjectAttributes.AddrOfPinnedObject(), false, Winnt._TOKEN_TYPE.TokenImpersonation, ref phNewToken);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] NtDuplicateToken Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
                 return false;
             }
+            finally
+            {
+                hObjectAttributes.Free();
+            }
+
+            if (0 != ntRetVal)
+            {
+                Misc.GetNtError("NtOpenProcessToken", ntRetVal);
+                return false;
+            }
+
             Console.WriteLine(" [+] Duplicate Token Handle: 0x{0}", phNewToken.ToString("X4"));
 
-            if (!advapi32.ImpersonateLoggedOnUser(phNewToken))
+            ////////////////////////////////////////////////////////////////////////////////
+            // Impersonate a newly duplicated token
+            // advapi32.ImpersonateLoggedOnUser(phNewToken)            
+            ////////////////////////////////////////////////////////////////////////////////
+
+            IntPtr hNtSetInformationThread = Generic.GetSyscallStub("NtSetInformationThread");
+            MonkeyWorks.ntdll.NtSetInformationThread fSyscallNtSetInformationThread = (MonkeyWorks.ntdll.NtSetInformationThread)Marshal.GetDelegateForFunctionPointer(hNtSetInformationThread, typeof(MonkeyWorks.ntdll.NtSetInformationThread));
+
+            //If I get bored I can switch this over
+            IntPtr hThread = kernel32.GetCurrentThread();
+
+            try
             {
-                Misc.GetWin32Error("ImpersonateLoggedOnUser: ");
+               ntRetVal = fSyscallNtSetInformationThread(hThread, MonkeyWorks.ntdll._THREAD_INFORMATION_CLASS.ThreadImpersonationToken, ref phNewToken, (uint)Marshal.SizeOf(phNewToken));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] NtSetInformationThread Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+                return false;
+            }
+            finally
+            {
+                CloseHandle(hThread);
+            }
+
+            if (0 != ntRetVal)
+            {
+                Misc.GetNtError("NtSetInformationThread", ntRetVal);
+                Console.ReadKey();
                 return false;
             }
 
@@ -292,6 +371,12 @@ namespace Tokenvator.Plugins.AccessTokens
             return true;
         }
 
+        /// <summary>
+        /// Closes an handle
+        /// Converted to D/Invoke Syscalls
+        /// </summary>
+        /// <param name="handle"></param>
+        /// <returns></returns>
         protected bool CloseHandle(IntPtr handle)
         {
             IntPtr hNtClose = Generic.GetSyscallStub("NtClose");
@@ -305,30 +390,40 @@ namespace Tokenvator.Plugins.AccessTokens
             return true;
         }
 
+        /// <summary>
+        /// Default Deconstructor
+        /// </summary>
         ~AccessTokens()
         {
-
+            if (!Disposed)
+            {
+                Dispose();
+            }
         }
 
+        /// <summary>
+        /// Closes all the opened handles
+        /// Only Call D/Invoke Syscalls
+        /// </summary>
         public void Dispose()
         {
             try
             {
                 if (IntPtr.Zero != phNewToken)
                 {                    
-                    kernel32.CloseHandle(phNewToken);
+                    CloseHandle(phNewToken);
                 }
                 if (IntPtr.Zero != hExistingToken)
                 {
-                    kernel32.CloseHandle(hExistingToken);
+                    CloseHandle(hExistingToken);
                 }
                 if (IntPtr.Zero != hWorkingToken && currentProcessToken != hWorkingToken)
                 {
-                    kernel32.CloseHandle(hWorkingToken);
+                    CloseHandle(hWorkingToken);
                 }
                 if (IntPtr.Zero != hWorkingThreadToken)
                 {
-                    kernel32.CloseHandle(hWorkingThreadToken);
+                    CloseHandle(hWorkingThreadToken);
                 }
             }
             catch (Exception ex)
@@ -337,6 +432,10 @@ namespace Tokenvator.Plugins.AccessTokens
                 {
                     Console.WriteLine(ex.Message);
                 }
+            }
+            finally
+            {
+                Disposed = true;
             }
         }
     }
