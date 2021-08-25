@@ -223,34 +223,94 @@ namespace Tokenvator.Plugins.AccessTokens
             return true;
         }
 
-        ////////////////////////////////////////////////////////////////////////////////
-        // Opens a thread token
-        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Opens a thread token
+        /// Converted to D/Invoke Syscalls
+        /// </summary>
+        /// <param name="threadId"></param>
+        /// <param name="permissions"></param>
+        /// <returns></returns>
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
         public bool OpenThreadToken(uint threadId, uint permissions)
         {
-            IntPtr hThread = kernel32.OpenThread(ProcessThreadsApi.ThreadSecurityRights.THREAD_QUERY_INFORMATION, false, threadId);
+            ////////////////////////////////////////////////////////////////////////////////
+            // Open a limited handle to the thread via a syscall stub
+            // IntPtr hThread = kernel32.OpenThread(ProcessThreadsApi.ThreadSecurityRights.THREAD_QUERY_INFORMATION, false, threadId);
+            ////////////////////////////////////////////////////////////////////////////////
 
-            if (IntPtr.Zero == hThread)
+            IntPtr hNtOpenThread = Generic.GetSyscallStub("NtOpenThread");
+            MonkeyWorks.ntdll.NtOpenThread fSyscallNtOpenThread = (MonkeyWorks.ntdll.NtOpenThread)Marshal.GetDelegateForFunctionPointer(hNtOpenThread, typeof(MonkeyWorks.ntdll.NtOpenThread));
+
+            IntPtr hThread = new IntPtr();
+            MonkeyWorks.ntdll.OBJECT_ATTRIBUTES objectAttributes = new MonkeyWorks.ntdll.OBJECT_ATTRIBUTES();
+            MonkeyWorks.ntdll.CLIENT_ID clientId = new MonkeyWorks.ntdll.CLIENT_ID();
+            clientId.UniqueThread = new IntPtr(threadId);
+           
+            uint ntRetVal;
+            try
             {
-                Misc.GetWin32Error("OpenThread");
+                //ProcessThreadsApi.ThreadSecurityRights.THREAD_QUERY_INFORMATION
+                ntRetVal = fSyscallNtOpenThread(ref hThread, ProcessThreadsApi.ThreadSecurityRights.THREAD_QUERY_INFORMATION, ref objectAttributes, ref clientId);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] NtOpenThread Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
                 return false;
             }
-            Console.WriteLine("[*] Recieved Thread Handle 0x{0}", hThread.ToString("X4"));
 
-            bool retVal = kernel32.OpenThreadToken(hThread, permissions, false, ref hWorkingThreadToken);
-
-            if (!retVal || IntPtr.Zero == hWorkingThreadToken)
+            if (0 != ntRetVal)
             {
+                Misc.GetNtError("NtOpenThread", ntRetVal);
                 return false;
             }
-            Console.WriteLine("[*] Recieved Token Handle 0x{0}", hExistingToken.ToString("X4"));
-            kernel32.CloseHandle(hThread);
+            //Console.WriteLine("[*] Recieved Thread Handle 0x{0}", hThread.ToString("X4"));
+
+            ////////////////////////////////////////////////////////////////////////////////
+            // Open a handle to the thread token
+            // bool retVal = kernel32.OpenThreadToken(hThread, permissions, false, ref hWorkingThreadToken);
+            ////////////////////////////////////////////////////////////////////////////////
+
+            IntPtr hNtOpenThreadToken = Generic.GetSyscallStub("NtOpenThreadToken");
+            MonkeyWorks.ntdll.NtOpenThreadToken fSyscallNtOpenThreadToken = (MonkeyWorks.ntdll.NtOpenThreadToken)Marshal.GetDelegateForFunctionPointer(hNtOpenThreadToken, typeof(MonkeyWorks.ntdll.NtOpenThreadToken));
+
+            try
+            {
+                ntRetVal = fSyscallNtOpenThreadToken(hThread, permissions, false, ref hWorkingThreadToken);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] NtOpenThreadToken Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+                return false;
+            }
+            finally
+            {
+                CloseHandle(hThread);
+            }
+
+            if (0 != ntRetVal)
+            {
+                //Skip error message if no token exists
+                if (3221225596 != ntRetVal)
+                {
+                    Console.WriteLine(" [-] Unable to Open Process Token");
+                    Misc.GetNtError("NtOpenProcessToken", ntRetVal);
+                }
+                return false;
+            }
+
+            Console.WriteLine("[*] Recieved Token Handle 0x{0}", hWorkingThreadToken.ToString("X4"));
             return true;
         }
 
-        ////////////////////////////////////////////////////////////////////////////////
-        // Creates a new process with the duplicated token
-        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Creates a new process with the duplicated token
+        /// No conversions required
+        /// </summary>
+        /// <param name="newProcess"></param>
+        /// <returns></returns>
         public bool StartProcessAsUser(string newProcess)
         {
             Create createProcess;
@@ -298,7 +358,6 @@ namespace Tokenvator.Plugins.AccessTokens
             IntPtr hSecurityContextTrackingMode = Marshal.AllocHGlobal(Marshal.SizeOf(securityContextTrackingMode));
             Marshal.StructureToPtr(securityContextTrackingMode, hSecurityContextTrackingMode, false);
 
-            Console.WriteLine("_OBJECT_ATTRIBUTES");
             wudfwdm._OBJECT_ATTRIBUTES objectAttributes = new wudfwdm._OBJECT_ATTRIBUTES()
             {
                 Length = (uint)Marshal.SizeOf(typeof(wudfwdm._OBJECT_ATTRIBUTES)),
