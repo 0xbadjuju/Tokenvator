@@ -35,6 +35,10 @@ namespace Tokenvator.Plugins.AccessTokens
 
         internal delegate bool Create(IntPtr phNewToken, string newProcess, string arguments);
 
+        /// <summary>
+        /// Default constructor
+        /// </summary>
+        /// <param name="currentProcessToken"></param>
         public AccessTokens(IntPtr currentProcessToken)
         {        
             phNewToken = new IntPtr();
@@ -182,9 +186,12 @@ namespace Tokenvator.Plugins.AccessTokens
             return true;
         }
 
-        ////////////////////////////////////////////////////////////////////////////////
-        // List all process threads
-        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// List all threads for a given process
+        /// Converted to D/Invoke GetPebLdrModuleEntry/GetExportAddress
+        /// </summary>
+        /// <param name="processId"></param>
+        /// <returns></returns>
         public bool ListThreads(int processId)
         {
             if (0 == processId)
@@ -192,32 +199,60 @@ namespace Tokenvator.Plugins.AccessTokens
                 processId = Process.GetCurrentProcess().Id;
             }
 
-            IntPtr hSnapshot = kernel32.CreateToolhelp32Snapshot(TiHelp32.TH32CS_SNAPTHREAD, 0);
+            ////////////////////////////////////////////////////////////////////////////////
+            // Create a snapshot of all system threads that can be walked through
+            // IntPtr hSnapshot = kernel32.CreateToolhelp32Snapshot(TiHelp32.TH32CS_SNAPTHREAD, 0);
+            ////////////////////////////////////////////////////////////////////////////////
+
+            IntPtr hKernel32 = Generic.GetPebLdrModuleEntry("kernel32.dll");
+            IntPtr hCreateToolhelp32Snapshot = Generic.GetExportAddress(hKernel32, "CreateToolhelp32Snapshot");
+            MonkeyWorks.kernel32.CreateToolhelp32Snapshot fCreateToolhelp32Snapshot = (MonkeyWorks.kernel32.CreateToolhelp32Snapshot)Marshal.GetDelegateForFunctionPointer(hCreateToolhelp32Snapshot, typeof(MonkeyWorks.kernel32.CreateToolhelp32Snapshot));
+            IntPtr hSnapshot = fCreateToolhelp32Snapshot(TiHelp32.TH32CS_SNAPTHREAD, 0);
 
             if (IntPtr.Zero == hSnapshot)
             {
                 Misc.GetWin32Error("CreateToolhelp32Snapshot");
+                CloseHandle(hKernel32);
                 return false;
             }
 
-            TiHelp32.tagTHREADENTRY32 threadyEntry32 = new TiHelp32.tagTHREADENTRY32()
+            ////////////////////////////////////////////////////////////////////////////////
+            // Iterate through the first snapshot instance
+            // kernel32.Thread32First(hSnapshot, ref threadEntry32);
+            ////////////////////////////////////////////////////////////////////////////////
+
+            TiHelp32.tagTHREADENTRY32 threadEntry32 = new TiHelp32.tagTHREADENTRY32()
             {
                 dwSize = (uint)Marshal.SizeOf(typeof(TiHelp32.tagTHREADENTRY32))
             };
 
-            if (!kernel32.Thread32First(hSnapshot, ref threadyEntry32))
+            IntPtr hThread32First = Generic.GetExportAddress(hKernel32, "Thread32First");
+            MonkeyWorks.kernel32.Thread32First fThread32First = (MonkeyWorks.kernel32.Thread32First)Marshal.GetDelegateForFunctionPointer(hThread32First, typeof(MonkeyWorks.kernel32.Thread32First));
+            if (!fThread32First(hSnapshot, ref threadEntry32))
             {
                 Misc.GetWin32Error("Thread32First");
                 return false;
             }
 
-            if (threadyEntry32.th32OwnerProcessID == processId)
-                threads.Add(threadyEntry32.th32ThreadID);
-
-            while (kernel32.Thread32Next(hSnapshot, ref threadyEntry32))
+            if (threadEntry32.th32OwnerProcessID == processId)
             {
-                if (threadyEntry32.th32OwnerProcessID == processId)
-                    threads.Add(threadyEntry32.th32ThreadID);
+                threads.Add(threadEntry32.th32ThreadID);
+            }
+
+            ////////////////////////////////////////////////////////////////////////////////
+            // Iterate through the remainder of the snapshot instances
+            // kernel32.Thread32First(hSnapshot, ref threadEntry32);
+            ////////////////////////////////////////////////////////////////////////////////
+
+            IntPtr hThread32Next = Generic.GetExportAddress(hKernel32, "Thread32Next");
+            MonkeyWorks.kernel32.Thread32Next fThread32Next = (MonkeyWorks.kernel32.Thread32Next)Marshal.GetDelegateForFunctionPointer(hThread32Next, typeof(MonkeyWorks.kernel32.Thread32Next));
+
+            while (fThread32Next(hSnapshot, ref threadEntry32))
+            {
+                if (threadEntry32.th32OwnerProcessID == processId)
+                {
+                    threads.Add(threadEntry32.th32ThreadID);
+                }
             }
 
             return true;
