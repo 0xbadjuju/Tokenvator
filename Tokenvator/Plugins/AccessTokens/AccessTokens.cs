@@ -13,6 +13,8 @@ using DInvoke.DynamicInvoke;
 
 using System.Runtime.InteropServices;
 using System.Diagnostics;
+using System.Runtime.ExceptionServices;
+using System.Security;
 
 namespace Tokenvator.Plugins.AccessTokens
 {
@@ -88,59 +90,89 @@ namespace Tokenvator.Plugins.AccessTokens
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Sets hToken to a processes primary token
+        // Opens a process Token
+        // Converted to Dinvoke Syscalls
         ////////////////////////////////////////////////////////////////////////////////
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
         public virtual bool OpenProcessToken(int processId)
         {
-            /*
-            WindowsPrincipal windowsPrincipal = new WindowsPrincipal(WindowsIdentity.GetCurrent());
-            if (!windowsPrincipal.IsInRole(WindowsBuiltInRole.Administrator)
-                && !windowsPrincipal.IsInRole(WindowsBuiltInRole.SystemOperator))
+            ////////////////////////////////////////////////////////////////////////////////
+            // Open a limited handle to the process via a syscall stub
+            // IntPtr hProcess = kernel32.OpenProcess(ProcessThreadsApi.ProcessSecurityRights.PROCESS_QUERY_INFORMATION, false, (uint)processId);
+            ////////////////////////////////////////////////////////////////////////////////
+
+            IntPtr hNtOpenProcess = Generic.GetSyscallStub("NtOpenProcess");
+            MonkeyWorks.ntdll.NtOpenProcess fSyscallNtOpenProcess = (MonkeyWorks.ntdll.NtOpenProcess)Marshal.GetDelegateForFunctionPointer(hNtOpenProcess, typeof(MonkeyWorks.ntdll.NtOpenProcess));
+
+            IntPtr hProcess = new IntPtr();
+            MonkeyWorks.ntdll.OBJECT_ATTRIBUTES objectAttributes = new MonkeyWorks.ntdll.OBJECT_ATTRIBUTES();
+            MonkeyWorks.ntdll.CLIENT_ID clientId = new MonkeyWorks.ntdll.CLIENT_ID();
+            clientId.UniqueProcess = new IntPtr(processId);
+
+            uint ntRetVal = 0;
+            try
             {
-                Console.WriteLine("[-] Administrator privileges required");
+                ntRetVal = fSyscallNtOpenProcess(ref hProcess, ProcessThreadsApi.ProcessSecurityRights.PROCESS_QUERY_INFORMATION, ref objectAttributes, ref clientId);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] NtOpenProcess Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
                 return false;
             }
-            */
 
-            IntPtr hProcess = kernel32.OpenProcess(ProcessThreadsApi.ProcessSecurityRights.PROCESS_QUERY_INFORMATION, false, (uint)processId);
-
-            Console.WriteLine("[D] Calling D/Invoke");
-            
-            IntPtr pkernel32 = Generic.GetPebLdrModuleEntry("kernel32.dll");
-            IntPtr pOpenProcess = Generic.GetExportAddress(pkernel32, "OpenProcess");
-            object[] parameters =
+            if (0 != ntRetVal)
             {
-                Winnt.PROCESS_QUERY_INFORMATION, false, (uint)processId
-            };
-
-            IntPtr hProcess = (IntPtr)Generic.DynamicFunctionInvoke(pOpenProcess, typeof(MonkeyWorks.kernel32.OpenProcess), ref parameters);
-            //IntPtr hProcess = kernel32.OpenProcess(Winnt.PROCESS_QUERY_INFORMATION, false, (uint)processId);
-
-            if (IntPtr.Zero == hProcess)
-            {
-                Misc.GetWin32Error("OpenProcess");
+                Misc.GetNtError("NtOpenProcess", ntRetVal);
                 return false;
             }
             Console.WriteLine("[*] Recieved Process Handle 0x{0}", hProcess.ToString("X4"));
 
-            IntPtr pOpenProcessToken = Generic.GetExportAddress(pkernel32, "OpenProcessToken");
-            parameters = new object[]
-            {
-                hProcess, Winnt.TOKEN_ALL_ACCESS, hExistingToken
-            };
+            ////////////////////////////////////////////////////////////////////////////////
+            // Open a handle to the process token
+            // bool retVal = kernel32.OpenProcessToken(hProcess, (ulong)Winnt.TOKEN_ALL_ACCESS, out hExistingToken)
+            ////////////////////////////////////////////////////////////////////////////////
 
-            if (!kernel32.OpenProcessToken(hProcess, Winnt.TOKEN_ALL_ACCESS, out hExistingToken))
+            IntPtr hNtOpenProcessToken = Generic.GetSyscallStub("NtOpenProcessToken");
+            MonkeyWorks.ntdll.NtOpenProcessToken fSyscallNtOpenProcessToken = (MonkeyWorks.ntdll.NtOpenProcessToken)Marshal.GetDelegateForFunctionPointer(hNtOpenProcessToken, typeof(MonkeyWorks.ntdll.NtOpenProcessToken));
+
+            try
             {
-                if (!kernel32.OpenProcessToken(hProcess, (uint)Winnt.ACCESS_MASK.MAXIMUM_ALLOWED, out hExistingToken))
+                ntRetVal = fSyscallNtOpenProcessToken(hProcess, Winnt.TOKEN_ALL_ACCESS, ref hExistingToken);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] NtOpenProcessToken Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+                return false;
+            }
+
+            if (0 != ntRetVal)
+            {
+                Misc.GetNtError("NtOpenProcessToken", ntRetVal);
+
+                try
+                {
+                    ntRetVal = fSyscallNtOpenProcessToken(hProcess, (uint)Winnt.ACCESS_MASK.MAXIMUM_ALLOWED, ref hExistingToken);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("[-] NtOpenProcessToken Generated an Exception");
+                    Console.WriteLine("[-] {0}", ex.Message);
+                    return false;
+                }
+
+                if (0 != ntRetVal)
                 {
                     Console.WriteLine(" [-] Unable to Open Process Token");
-                    Misc.GetWin32Error("OpenProcessToken");
-                    kernel32.CloseHandle(hProcess);
+                    Misc.GetNtError("NtOpenProcessToken", ntRetVal);
+                    CloseHandle(hProcess);
                     return false;
                 }
             }
             Console.WriteLine("[*] Recieved Token Handle 0x{0}", hExistingToken.ToString("X4"));
-            kernel32.CloseHandle(hProcess);
+            CloseHandle(hProcess);
             return true;
         }
 
@@ -257,6 +289,19 @@ namespace Tokenvator.Plugins.AccessTokens
             }
 
             Console.WriteLine("[+] Operating as {0}", WindowsIdentity.GetCurrent().Name);
+            return true;
+        }
+
+        protected bool CloseHandle(IntPtr handle)
+        {
+            IntPtr hNtClose = Generic.GetSyscallStub("NtClose");
+            MonkeyWorks.ntdll.NtClose fSyscallhNtClose = (MonkeyWorks.ntdll.NtClose)Marshal.GetDelegateForFunctionPointer(hNtClose, typeof(MonkeyWorks.ntdll.NtClose));
+            uint ntRetVal = fSyscallhNtClose(handle);
+            if (0 != ntRetVal)
+            {
+                Misc.GetNtError("NtClose", ntRetVal);
+                return false;
+            }
             return true;
         }
 
