@@ -413,7 +413,7 @@ namespace Tokenvator
                     Console.WriteLine();
 
                     Winnt._TOKEN_TYPE tokenType;
-                    TokenInformation.GetElevationType(hToken, out tokenType);
+                    TokenInformation.GetTokenType(hToken, out tokenType);
                     TokenInformation.PrintElevation(hToken);
                 }
             }
