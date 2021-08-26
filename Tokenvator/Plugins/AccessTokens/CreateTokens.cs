@@ -232,9 +232,6 @@ namespace Tokenvator.Plugins.AccessTokens
                 return;
             }
 
-            uint LG_INCLUDE_INDIRECT = 0x0001;
-            uint MAX_PREFERRED_LENGTH = 0xFFFFFFFF;
-
             Console.WriteLine();
             Console.WriteLine("_SECURITY_QUALITY_OF_SERVICE");
             Winnt._SECURITY_QUALITY_OF_SERVICE securityContextTrackingMode = new Winnt._SECURITY_QUALITY_OF_SERVICE()
@@ -317,7 +314,17 @@ namespace Tokenvator.Plugins.AccessTokens
         private bool _CheckPrivileges()
         {
             bool exists, enabled;
-            TokenInformation.CheckTokenPrivilege(hWorkingToken, Winnt.SE_CREATETOKEN_NAME, out exists, out enabled);
+
+            using (TokenInformation ti = new TokenInformation(hWorkingToken))
+            {
+                ti.SetWorkingTokenToSelf();
+                if (!ti.CheckTokenPrivilege(Winnt.SE_CREATETOKEN_NAME, out exists, out enabled))
+                {
+                    Console.WriteLine("[-] Check Token Privilege Failed");
+                    return false;
+                }
+            }
+
             if (!exists)
             {
                 Console.WriteLine("[-] {0} is not present on the token", Winnt.SE_CREATETOKEN_NAME);
@@ -344,7 +351,17 @@ namespace Tokenvator.Plugins.AccessTokens
                 Console.WriteLine("[+] {0} is present and enabled on the token", Winnt.SE_CREATETOKEN_NAME);
             }
 
-            TokenInformation.CheckTokenPrivilege(hWorkingToken, Winnt.SE_SECURITY_NAME, out exists, out enabled);
+            using (TokenInformation ti = new TokenInformation(hWorkingToken))
+            {
+                ti.SetWorkingTokenToSelf();
+                if (!ti.CheckTokenPrivilege(Winnt.SE_SECURITY_NAME, out exists, out enabled))
+                {
+                    Console.WriteLine("[-] Check Token Privilege Failed");
+                    return false;
+                }
+
+            }
+
             if (!exists)
             {
                 Console.WriteLine("[-] {0} is not present on the token", Winnt.SE_SECURITY_NAME);
@@ -573,7 +590,7 @@ namespace Tokenvator.Plugins.AccessTokens
             for (int i = 0; i < tokenGroups.GroupCount; i++)
             {
                 string sid, account;
-                TokenInformation._ReadSidAndName(tokenGroups.Groups[i].Sid, out sid, out account);
+                TokenInformation.ReadSidAndName(tokenGroups.Groups[i].Sid, out sid, out account);
                 Console.WriteLine(" ({0}) {1,-50} {2}", i, sid, account);
             }
 

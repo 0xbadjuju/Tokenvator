@@ -1,7 +1,6 @@
 ﻿using System;
 using System.IO;
 using System.IO.Pipes;
-using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Threading;
 
@@ -69,9 +68,9 @@ namespace Tokenvator.Plugins.NamedPipes
         {
             string pipename = PSExec.GenerateUuid(12);
 
-            Thread thread = new Thread(() => _GetPipeToken(BASE_DIRECTORY + pipename));
+            Thread thread = new Thread(() => _GetPipeToken(pipename));
 
-            using (PSExec psExec = new PSExec("Tokenvator"))
+            using (PSExec psExec = new PSExec())
             {
                 if (!psExec.Connect("."))
                 {

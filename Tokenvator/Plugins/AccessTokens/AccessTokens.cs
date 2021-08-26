@@ -23,16 +23,18 @@ namespace Tokenvator.Plugins.AccessTokens
     {
         private bool Disposed = false;
 
-        protected IntPtr phNewToken;
-        protected IntPtr hExistingToken;
-        protected IntPtr currentProcessToken;
+        protected IntPtr phNewToken;// { private get; set; }
+        protected IntPtr hExistingToken;// { private get; set; }
+        protected IntPtr currentProcessToken;// { private get; set; }
 
-        protected IntPtr hWorkingToken;
-        protected IntPtr hWorkingThreadToken;
+        protected IntPtr hWorkingToken { get; private set; }
+        protected IntPtr hWorkingThreadToken { get; private set; }
 
         protected readonly List<uint> threads = new List<uint>();
 
         internal delegate bool Create(IntPtr phNewToken, string newProcess, string arguments);
+
+        private readonly IntPtr hNtClose;
 
         /// <summary>
         /// Default constructor
@@ -46,6 +48,8 @@ namespace Tokenvator.Plugins.AccessTokens
 
             hWorkingToken = new IntPtr();
             hWorkingThreadToken = new IntPtr();
+
+            hNtClose = Generic.GetSyscallStub("NtClose");
         }
 
         #region Get/Set
@@ -64,6 +68,15 @@ namespace Tokenvator.Plugins.AccessTokens
         public void SetWorkingTokenToRemote()
         {
             hWorkingToken = hExistingToken;
+            //Console.WriteLine("[*] Setting Working Token to Remote: 0x{0}", hWorkingToken.ToString("X4"));
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        // Sets hWorkingThreadToken to hExisingThreadToken
+        ////////////////////////////////////////////////////////////////////////////////
+        public void SetWorkingThreadTokenToRemote()
+        {
+            hWorkingThreadToken = hExistingToken;
             //Console.WriteLine("[*] Setting Working Token to Remote: 0x{0}", hWorkingToken.ToString("X4"));
         }
 
@@ -96,12 +109,14 @@ namespace Tokenvator.Plugins.AccessTokens
         }
         #endregion
 
+        ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
         /// Opens a process Token
         /// Converted to Dinvoke Syscalls 
         /// </summary>
         /// <param name="processId"></param>
         /// <returns></returns>
+        ////////////////////////////////////////////////////////////////////////////////
         [SecurityCritical]
         [HandleProcessCorruptedStateExceptions]
         public virtual bool OpenProcessToken(int processId)
@@ -185,12 +200,14 @@ namespace Tokenvator.Plugins.AccessTokens
             return true;
         }
 
+        ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
         /// List all threads for a given process
         /// Converted to D/Invoke GetPebLdrModuleEntry/GetExportAddress
         /// </summary>
         /// <param name="processId"></param>
-        /// <returns></returns>
+        /// <returns>Returns true if successful, returns false if an error or exception was generated</returns>
+        ////////////////////////////////////////////////////////////////////////////////
         public bool ListThreads(int processId)
         {
             if (0 == processId)
@@ -257,13 +274,15 @@ namespace Tokenvator.Plugins.AccessTokens
             return true;
         }
 
+        ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
         /// Opens a thread token
         /// Converted to D/Invoke Syscalls
         /// </summary>
         /// <param name="threadId"></param>
         /// <param name="permissions"></param>
-        /// <returns></returns>
+        /// <returns>Returns true if successful, returns false if an error or exception was generated</returns>
+        ////////////////////////////////////////////////////////////////////////////////
         [SecurityCritical]
         [HandleProcessCorruptedStateExceptions]
         public bool OpenThreadToken(uint threadId, uint permissions)
@@ -311,7 +330,7 @@ namespace Tokenvator.Plugins.AccessTokens
 
             try
             {
-                ntRetVal = fSyscallNtOpenThreadToken(hThread, permissions, false, ref hWorkingThreadToken);
+                ntRetVal = fSyscallNtOpenThreadToken(hThread, permissions, false, ref hExistingToken);
             }
             catch (Exception ex)
             {
@@ -323,6 +342,8 @@ namespace Tokenvator.Plugins.AccessTokens
             {
                 CloseHandle(hThread);
             }
+
+            SetWorkingThreadTokenToRemote();
 
             if (0 != ntRetVal)
             {
@@ -339,12 +360,14 @@ namespace Tokenvator.Plugins.AccessTokens
             return true;
         }
 
+        ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
         /// Creates a new process with the duplicated token
         /// No conversions required
         /// </summary>
         /// <param name="newProcess"></param>
-        /// <returns></returns>
+        /// <returns>Returns true if successful, returns false if an error or exception was generated</returns>
+        ////////////////////////////////////////////////////////////////////////////////
         public bool StartProcessAsUser(string newProcess)
         {
             Create createProcess;
@@ -472,7 +495,6 @@ namespace Tokenvator.Plugins.AccessTokens
         /// <returns></returns>
         protected bool CloseHandle(IntPtr handle)
         {
-            IntPtr hNtClose = Generic.GetSyscallStub("NtClose");
             MonkeyWorks.ntdll.NtClose fSyscallhNtClose = (MonkeyWorks.ntdll.NtClose)Marshal.GetDelegateForFunctionPointer(hNtClose, typeof(MonkeyWorks.ntdll.NtClose));
             uint ntRetVal = fSyscallhNtClose(handle);
             if (0 != ntRetVal)
@@ -483,9 +505,11 @@ namespace Tokenvator.Plugins.AccessTokens
             return true;
         }
 
+        ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
-        /// Default Deconstructor
+        /// Default Deconstructor, disposes if not already disposed
         /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////
         ~AccessTokens()
         {
             if (!Disposed)
@@ -494,11 +518,13 @@ namespace Tokenvator.Plugins.AccessTokens
             }
         }
 
+        ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
         /// Closes all the opened handles
         /// Only Call D/Invoke Syscalls
         /// </summary>
-        public void Dispose()
+        ////////////////////////////////////////////////////////////////////////////////
+        public virtual void Dispose()
         {
             try
             {

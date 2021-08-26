@@ -282,7 +282,15 @@ namespace Tokenvator
         private static void _GetSystem(CommandLineParsing cLP, IntPtr hToken)
         {
             bool exists, enabled;
-            TokenInformation.CheckTokenPrivilege(hToken, "SeDebugPrivilege", out exists, out enabled);
+            using (TokenInformation ti = new TokenInformation(hToken))
+            {
+                ti.SetWorkingTokenToSelf();
+                if (!ti.CheckTokenPrivilege(Winnt.SE_DEBUG_NAME, out exists, out enabled))
+                {
+                    Console.WriteLine("[-] Check Token Privilege Failed");
+                    return;
+                }
+            }
 
             if (exists)
             {
@@ -318,7 +326,11 @@ namespace Tokenvator
         private static void _GetTrustedInstaller(CommandLineParsing cLP, IntPtr hToken)
         {
             bool exists, enabled;
-            TokenInformation.CheckTokenPrivilege(hToken, "SeDebugPrivilege", out exists, out enabled);
+            using (TokenInformation ti = new TokenInformation(hToken))
+            {
+                ti.SetWorkingTokenToSelf();
+                ti.CheckTokenPrivilege(Winnt.SE_DEBUG_NAME, out exists, out enabled);
+            }
 
             if (exists)
             {

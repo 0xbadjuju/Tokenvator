@@ -576,7 +576,11 @@ namespace Tokenvator.Plugins.AccessTokens
         {
             bool exists, enabled;
             SetWorkingTokenToSelf();
-            TokenInformation.CheckTokenPrivilege(hWorkingToken, Winnt.SE_TCB_NAME, out exists, out enabled);
+
+            using (TokenInformation ti = new TokenInformation(hWorkingToken))
+            {
+                ti.CheckTokenPrivilege(Winnt.SE_TCB_NAME, out exists, out enabled);
+            }
 
             if (!exists)
             {

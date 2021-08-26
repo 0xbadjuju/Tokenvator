@@ -10,7 +10,7 @@ using DInvoke.DynamicInvoke;
 using Tokenvator.Resources;
 
 using MonkeyWorks.Unmanaged.Headers;
-using MonkeyWorks.Unmanaged.Libraries;
+//using MonkeyWorks.Unmanaged.Libraries;
 
 namespace Tokenvator.Plugins.AccessTokens
 {
@@ -29,8 +29,11 @@ namespace Tokenvator.Plugins.AccessTokens
         public Winnt._TOKEN_DEFAULT_DACL tokenDefaultDacl;
         public Winnt._TOKEN_DEFAULT_DACL_ACL tokenDefaultDaclAcl;
 
+        private readonly IntPtr hNtQueryInformationToken;
+
         public TokenInformation(IntPtr hToken) : base(hToken)
         {
+            hNtQueryInformationToken = Generic.GetSyscallStub("NtQueryInformationToken");
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -51,7 +54,7 @@ namespace Tokenvator.Plugins.AccessTokens
         /// IDisposable to free the allocated pointers
         /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        public void Dispose()
+        public override void Dispose()
         {
             tiDisposed = true;
 
@@ -246,13 +249,10 @@ namespace Tokenvator.Plugins.AccessTokens
             try
             {
                 tokenSource = (Winnt._TOKEN_SOURCE)Marshal.PtrToStructure(hTokenSource, typeof(Winnt._TOKEN_SOURCE));
-                if (0 == tokenSource.SourceName.Length)
-                {
-                    Misc.GetWin32Error("PtrToStructure");
-                }
             }
             catch (Exception ex)
             {
+                Console.WriteLine("[-] PtrToStructure Generated an Exception");
                 Console.WriteLine(ex.Message);
                 return;
             }
@@ -281,6 +281,7 @@ namespace Tokenvator.Plugins.AccessTokens
             }
             catch (Exception ex)
             {
+                Console.WriteLine("[-] PtrToStructure Generated an Exception");
                 Console.WriteLine(ex.Message);
                 return;
             }
@@ -291,7 +292,7 @@ namespace Tokenvator.Plugins.AccessTokens
             
             Console.WriteLine("[+] User: ");
             string sid, account;
-            _ReadSidAndName(tokenUser.User.Sid, out sid, out account);
+            ReadSidAndName(tokenUser.User.Sid, out sid, out account);
             Console.WriteLine("{0,-50} {1}", sid, account);
             return;
         }
@@ -313,6 +314,7 @@ namespace Tokenvator.Plugins.AccessTokens
             }
             catch (Exception ex)
             {
+                Console.WriteLine("[-] PtrToStructure Generated an Exception");
                 Console.WriteLine(ex.Message);
                 return false;
             }
@@ -326,7 +328,7 @@ namespace Tokenvator.Plugins.AccessTokens
             {
                 string sid, account;
                 sid = account = string.Empty;
-                _ReadSidAndName(tokenGroups.Groups[i].Sid, out sid, out account);
+                ReadSidAndName(tokenGroups.Groups[i].Sid, out sid, out account);
                 Console.WriteLine("{0,-50} {1}", sid, account);
             }
             return true;
@@ -351,6 +353,7 @@ namespace Tokenvator.Plugins.AccessTokens
             }
             catch (Exception ex)
             {
+                Console.WriteLine("[-] PtrToStructure Generated an Exception");
                 Console.WriteLine(ex.Message);
                 return;
             }
@@ -482,6 +485,7 @@ namespace Tokenvator.Plugins.AccessTokens
             }
             catch (Exception ex)
             {
+                Console.WriteLine("[-] PtrToStructure Generated an Exception");
                 Console.WriteLine(ex.Message);
                 return;
             }
@@ -492,7 +496,7 @@ namespace Tokenvator.Plugins.AccessTokens
 
             Console.WriteLine("[+] Owner: ");
             string sid, account;
-            _ReadSidAndName(tokenOwner.Owner, out sid, out account);
+            ReadSidAndName(tokenOwner.Owner, out sid, out account);
             Console.WriteLine("{0,-50} {1}", sid, account);
             return;
         }
@@ -513,6 +517,7 @@ namespace Tokenvator.Plugins.AccessTokens
             }
             catch (Exception ex)
             {
+                Console.WriteLine("[-] PtrToStructure Generated an Exception");
                 Console.WriteLine(ex.Message);
                 return;
             }
@@ -522,7 +527,7 @@ namespace Tokenvator.Plugins.AccessTokens
             }
 
             string primaryGroupSid, primaryGroupName;
-            _ReadSidAndName(tokenPrimaryGroup.PrimaryGroup, out primaryGroupSid, out primaryGroupName);
+            ReadSidAndName(tokenPrimaryGroup.PrimaryGroup, out primaryGroupSid, out primaryGroupName);
             Console.WriteLine("[+] Primary Group: ");
             Console.WriteLine("{0,-50} {1}", primaryGroupSid, primaryGroupName);
             return;
@@ -549,6 +554,7 @@ namespace Tokenvator.Plugins.AccessTokens
             }
             catch (Exception ex)
             {
+                Console.WriteLine("[-] PtrToStructure Generated an Exception");
                 Console.WriteLine(ex.Message);
                 return;
             }
@@ -565,21 +571,28 @@ namespace Tokenvator.Plugins.AccessTokens
 
         ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
-        /// 
+        /// Converts a pointers to an SID and returns it in its string/sddl form
+        /// advapi32.ConvertSidToStringSid(ref structSid, ref lpSid);
         /// </summary>
         /// <param name="pointer"></param>
         /// <param name="sid"></param>
         /// <param name="account"></param>
         ////////////////////////////////////////////////////////////////////////////////
-        public static void _ReadSidAndName(IntPtr pointer, out string sid, out string account)
+        public static void ReadSidAndName(IntPtr pointer, out string sid, out string account)
         {
+            IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
+
+            IntPtr hConvertSidToStringSidW = Generic.GetExportAddress(hadvapi32, "ConvertSidToStringSidW");
+            MonkeyWorks.advapi32.ConvertSidToStringSidW fConvertSidToStringSidW = (MonkeyWorks.advapi32.ConvertSidToStringSidW)Marshal.GetDelegateForFunctionPointer(hConvertSidToStringSidW, typeof(MonkeyWorks.advapi32.ConvertSidToStringSidW));
+
             sid = string.Empty;
             account = string.Empty;
             IntPtr lpSid = IntPtr.Zero;
             try
             {
                 Ntifs._SID structSid = (Ntifs._SID)Marshal.PtrToStructure(pointer, typeof(Ntifs._SID));
-                bool retVal = advapi32.ConvertSidToStringSid(ref structSid, ref lpSid);
+
+                bool retVal = fConvertSidToStringSidW(ref structSid, ref lpSid);
                 if (!retVal || IntPtr.Zero == lpSid)
                 {
                     Misc.GetWin32Error("ConvertSidToStringSid");
@@ -593,7 +606,7 @@ namespace Tokenvator.Plugins.AccessTokens
             }
             finally
             {
-                kernel32.LocalFree(lpSid);
+                Marshal.FreeHGlobal(lpSid);
             }
 
             try
@@ -607,89 +620,112 @@ namespace Tokenvator.Plugins.AccessTokens
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Checks if a Privilege Exists and is Enabled
+        /// <summary>
+        /// Checks if a Privilege Exists and is Enabled
+        /// Converted to a mix of D/Invoke Syscalls and GetPebLdrModuleEntry/GetExportAddress
+        /// </summary>
+        /// <param name="privilegeName"></param>
+        /// <param name="exists"></param>
+        /// <param name="enabled"></param>
+        /// <returns></returns>
         ////////////////////////////////////////////////////////////////////////////////
-        public static bool CheckTokenPrivilege(IntPtr hToken, string privilegeName, out bool exists, out bool enabled)
+        public bool CheckTokenPrivilege(string privilegeName, out bool exists, out bool enabled)
         {
             exists = false;
             enabled = false;
-            
-            ////////////////////////////////////////////////////////////////////////////////
-            uint TokenInfLength = 0;
-            advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrivileges, IntPtr.Zero, 0, out TokenInfLength);
-            if (TokenInfLength <= 0 || TokenInfLength > int.MaxValue)
+
+            IntPtr lpTokenInformation = _GetTokenInformation(Winnt._TOKEN_INFORMATION_CLASS.TokenPrivileges);
+
+            if (IntPtr.Zero == lpTokenInformation)
             {
-                Misc.GetWin32Error("GetTokenInformation - 1 " + TokenInfLength);
                 return false;
             }
-            IntPtr lpTokenInformation = Marshal.AllocHGlobal((int)TokenInfLength);
 
-            ////////////////////////////////////////////////////////////////////////////////
-            if (!advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrivileges, lpTokenInformation, TokenInfLength, out TokenInfLength))
+            Winnt._TOKEN_PRIVILEGES_ARRAY tokenPrivileges;
+            try
             {
-                Misc.GetWin32Error("GetTokenInformation - 2 " + TokenInfLength);
+                tokenPrivileges = (Winnt._TOKEN_PRIVILEGES_ARRAY)Marshal.PtrToStructure(lpTokenInformation, typeof(Winnt._TOKEN_PRIVILEGES_ARRAY));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] PtrToStructure Generated an Exception");
+                Console.WriteLine(ex.Message);
                 return false;
             }
-            Winnt._TOKEN_PRIVILEGES_ARRAY tokenPrivileges = (Winnt._TOKEN_PRIVILEGES_ARRAY)Marshal.PtrToStructure(lpTokenInformation, typeof(Winnt._TOKEN_PRIVILEGES_ARRAY));
-            Marshal.FreeHGlobal(lpTokenInformation);
-            
+            finally
+            {
+                Marshal.FreeHGlobal(lpTokenInformation);
+            }
 
+            IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
+
+            IntPtr hLookupPrivilegeName = Generic.GetExportAddress(hadvapi32, "LookupPrivilegeNameW");
+            MonkeyWorks.advapi32.LookupPrivilegeNameW fLookupPrivilegeName = (MonkeyWorks.advapi32.LookupPrivilegeNameW)Marshal.GetDelegateForFunctionPointer(hLookupPrivilegeName, typeof(MonkeyWorks.advapi32.LookupPrivilegeNameW));
+
+            IntPtr hNtPrivilegeCheck = Generic.GetSyscallStub("NtPrivilegeCheck");
+            MonkeyWorks.ntdll.NtPrivilegeCheck fSyscallNtPrivilegeCheck = (MonkeyWorks.ntdll.NtPrivilegeCheck)Marshal.GetDelegateForFunctionPointer(hNtPrivilegeCheck, typeof(MonkeyWorks.ntdll.NtPrivilegeCheck));
+
+            ////////////////////////////////////////////////////////////////////////////////
+            // Iterate through each returned privilege to check if it both exists and is enabled
             ////////////////////////////////////////////////////////////////////////////////
             for (int i = 0; i < tokenPrivileges.PrivilegeCount; i++)
             {
-                System.Text.StringBuilder lpName = new System.Text.StringBuilder();
-                int cchName = 0;
+                ////////////////////////////////////////////////////////////////////////////////
+                // Lookup the privilege name based upon the luid returned by GetTokenInformation
+                // advapi32.LookupPrivilegeName(null, lpLuid, null, ref cchName);
+                // advapi32.LookupPrivilegeName(null, lpLuid, lpName, ref cchName);
+                ////////////////////////////////////////////////////////////////////////////////
+
+                StringBuilder lpName = new StringBuilder();
+                uint cchName = 0;
                 IntPtr lpLuid = Marshal.AllocHGlobal(Marshal.SizeOf(tokenPrivileges.Privileges[i]));
                 Marshal.StructureToPtr(tokenPrivileges.Privileges[i].Luid, lpLuid, true);
-                try
+
+                fLookupPrivilegeName(null, lpLuid, null, ref cchName);
+                if (cchName <= 0 || cchName > int.MaxValue)
                 {
-                    advapi32.LookupPrivilegeName(null, lpLuid, null, ref cchName);
-                    if (cchName <= 0 || cchName > int.MaxValue)
-                    {
-                        Misc.GetWin32Error("LookupPrivilegeName Pass 1");
-                        continue;
-                    }
-
-                    lpName.EnsureCapacity(cchName + 1);
-                    if (!advapi32.LookupPrivilegeName(null, lpLuid, lpName, ref cchName))
-                    {
-                        Misc.GetWin32Error("LookupPrivilegeName Pass 2");
-                        continue;
-                    }
-
-                    if (lpName.ToString() != privilegeName)
-                    {
-                        continue;
-                    }
-                    exists = true;
-
-                    Winnt._PRIVILEGE_SET privilegeSet = new Winnt._PRIVILEGE_SET
-                    {
-                        PrivilegeCount = 1,
-                        Control = Winnt.PRIVILEGE_SET_ALL_NECESSARY,
-                        Privilege = new Winnt._LUID_AND_ATTRIBUTES[] { tokenPrivileges.Privileges[i] }
-                    };
-
-                    int pfResult = 0;
-                    if (!advapi32.PrivilegeCheck(hToken, ref privilegeSet, out pfResult))
-                    {
-                        Misc.GetWin32Error("PrivilegeCheck");
-                        continue;
-                    }
-                    enabled = Convert.ToBoolean(pfResult);
+                    Misc.GetWin32Error("LookupPrivilegeName Pass 1");
+                    continue;
                 }
-                catch (Exception ex)
+
+                lpName.EnsureCapacity((int)cchName + 1);
+                if (!fLookupPrivilegeName(null, lpLuid, lpName, ref cchName))
                 {
-                    Console.WriteLine(ex.Message);
-                    return false;
+                    Misc.GetWin32Error("LookupPrivilegeName Pass 2");
+                    continue;
                 }
-                finally
+
+                if (lpName.ToString() != privilegeName)
                 {
-                    Marshal.FreeHGlobal(lpLuid);
+                    continue;
                 }
+                exists = true;
+
+                ////////////////////////////////////////////////////////////////////////////////
+                // Check if the privilege is also enabled on the token
+                // advapi32.PrivilegeCheck(hToken, ref privilegeSet, out pfResult);
+                ////////////////////////////////////////////////////////////////////////////////
+
+                Winnt._PRIVILEGE_SET privilegeSet = new Winnt._PRIVILEGE_SET
+                {
+                    PrivilegeCount = 1,
+                    Control = Winnt.PRIVILEGE_SET_ALL_NECESSARY,
+                    Privilege = new Winnt._LUID_AND_ATTRIBUTES[] { tokenPrivileges.Privileges[i] }
+                };
+                int pfResult = 0;
+
+                uint ntRetVal = fSyscallNtPrivilegeCheck(hWorkingToken, ref privilegeSet, ref pfResult);
+
+                if (0 != ntRetVal)
+                {
+                    Misc.GetNtError("PrivilegeCheck", ntRetVal);
+                    continue;
+                }
+                enabled = Convert.ToBoolean(pfResult);
+
             }
             Console.WriteLine();
-            return false;
+            return true;
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -704,7 +740,6 @@ namespace Tokenvator.Plugins.AccessTokens
         [HandleProcessCorruptedStateExceptions]
         private IntPtr _GetTokenInformation(Winnt._TOKEN_INFORMATION_CLASS tokenInformationClass)
         {
-            IntPtr hNtQueryInformationToken = Generic.GetSyscallStub("NtQueryInformationToken");
             MonkeyWorks.ntdll.NtQueryInformationToken fSyscallNtQueryInformationToken = (MonkeyWorks.ntdll.NtQueryInformationToken)Marshal.GetDelegateForFunctionPointer(hNtQueryInformationToken, typeof(MonkeyWorks.ntdll.NtQueryInformationToken));
 
             IntPtr tokenInformation = IntPtr.Zero;

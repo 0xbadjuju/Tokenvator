@@ -221,15 +221,6 @@ namespace Tokenvator.Plugins.Enumeration
             ref uint cbSid
         );
 
-        public struct _ACL
-        {
-            byte AclRevision;
-            byte Sbz1;
-            short AclSize;
-            short AceCount;
-            short Sbz2;
-        }
-
         public enum _MULTIPLE_TRUSTEE_OPERATION
         {
             NO_MULTIPLE_TRUSTEE,
