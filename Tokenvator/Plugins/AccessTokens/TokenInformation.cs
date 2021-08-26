@@ -58,137 +58,6 @@ namespace Tokenvator.Plugins.AccessTokens
             base.Dispose();
         }
 
-        ////////////////////////////////////////////////////////////////////////////////
-        /// <summary>
-        /// Prints the elevation type of the token
-        /// No Conversions Required
-        /// https://blogs.msdn.microsoft.com/cjacks/2006/10/08/how-to-determine-if-a-user-is-a-member-of-the-administrators-group-with-uac-enabled-on-windows-vista/
-        /// </summary>
-        /// <param name="hToken"></param>
-        /// <returns></returns>
-        ////////////////////////////////////////////////////////////////////////////////
-        public static void PrintElevation(IntPtr hToken)
-        {
-
-            int output = -1;
-            if (!_QueryTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenElevationType, ref output))
-            {
-                Misc.GetWin32Error("TokenElevationType");
-                return;
-            }
-
-            switch ((Winnt.TOKEN_ELEVATION_TYPE)output)
-            {
-                case Winnt.TOKEN_ELEVATION_TYPE.TokenElevationTypeDefault:
-                    Console.WriteLine("[+] TokenElevationTypeDefault");
-                    Console.WriteLine("[*] Token: Not Split");
-                    //Console.WriteLine("ProcessIntegrity: Medium/Low");
-                    break;
-                case Winnt.TOKEN_ELEVATION_TYPE.TokenElevationTypeFull:
-                    Console.WriteLine("[+] TokenElevationTypeFull");
-                    Console.WriteLine("[*] Token: Split");
-                    Console.WriteLine("[+] ProcessIntegrity: High");
-                    break;
-                case Winnt.TOKEN_ELEVATION_TYPE.TokenElevationTypeLimited:
-                    Console.WriteLine("[-] TokenElevationTypeLimited");
-                    Console.WriteLine("[*] Token: Split");
-                    Console.WriteLine("[-] ProcessIntegrity: Medium/Low");
-                    Console.WriteLine("[!] Hint: Try to Bypass UAC");
-                    break;
-                default:
-                    Console.WriteLine("[-] Unknown integrity {0}", output);
-                    Console.WriteLine("[!] Trying anyway");
-                    break;
-            }
-        }
-
-        ////////////////////////////////////////////////////////////////////////////////
-        /// <summary>
-        /// Checks if the token is elevated
-        /// No Conversions Required
-        /// https://blogs.msdn.microsoft.com/cjacks/2006/10/08/how-to-determine-if-a-user-is-a-member-of-the-administrators-group-with-uac-enabled-on-windows-vista/
-        /// </summary>
-        /// <param name="hToken"></param>
-        /// <returns></returns>
-        ////////////////////////////////////////////////////////////////////////////////
-        public static bool CheckElevation(IntPtr hToken)
-        {
-            int output = -1;
-            if (!_QueryTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenElevationType, ref output))
-            {
-                Misc.GetWin32Error("TokenElevationType");
-                return false;
-            }
-
-            switch ((Winnt.TOKEN_ELEVATION_TYPE)output)
-            {
-                case Winnt.TOKEN_ELEVATION_TYPE.TokenElevationTypeDefault:;
-                    return false;
-                case Winnt.TOKEN_ELEVATION_TYPE.TokenElevationTypeFull:
-                    return true;
-                case Winnt.TOKEN_ELEVATION_TYPE.TokenElevationTypeLimited:
-                    return false;
-                default:
-                    return true;
-            }
-        }
-
-        ////////////////////////////////////////////////////////////////////////////////
-        /// <summary>
-        /// Prints the token and impersonation type of the token
-        /// No Conversions Required
-        /// </summary>
-        /// <param name="hToken"></param>
-        /// <param name="tokenType"></param>
-        /// <returns></returns>
-        ////////////////////////////////////////////////////////////////////////////////
-        public static bool GetTokenType(IntPtr hToken, out Winnt._TOKEN_TYPE tokenType)
-        {
-            int output = -1;
-            if (!_QueryTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenType, ref output))
-            {
-                Misc.GetWin32Error("TokenType");
-                tokenType = 0;
-                return false;
-            }
-
-            switch ((Winnt._TOKEN_TYPE)output)
-            {
-                case Winnt._TOKEN_TYPE.TokenPrimary:
-                    Console.WriteLine("[+] Primary Token");
-                    tokenType = Winnt._TOKEN_TYPE.TokenPrimary;
-                    return true;
-                case Winnt._TOKEN_TYPE.TokenImpersonation:
-                    tokenType = Winnt._TOKEN_TYPE.TokenImpersonation;
-                    if (!_QueryTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenImpersonationLevel, ref output))
-                    {
-                        return false;
-                    }
-                    switch ((Winnt._SECURITY_IMPERSONATION_LEVEL)output)
-                    {
-                        case Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityAnonymous:
-                            Console.WriteLine("[+] Anonymous Token");
-                            return true;
-                        case Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityIdentification:
-                            Console.WriteLine("[+] Identification Token");
-                            return true;
-                        case Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation:
-                            Console.WriteLine("[+] Impersonation Token");
-                            return true;
-                        case Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityDelegation:
-                            Console.WriteLine("[+] Delegation Token");
-                            return true;
-                        default:
-                            Console.WriteLine("[-] Unknown Impersionation Type");
-                            return false;
-                    }
-                default:
-                    Console.WriteLine("[-] Unknown Type {0}", output);
-                    tokenType = 0;
-                    return false;
-            }
-        }
-
         #region ThreadInformation
         ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
@@ -237,6 +106,133 @@ namespace Tokenvator.Plugins.AccessTokens
         #endregion
 
         #region GetTokenInformation
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Checks and Prints the elevation type of the token
+        /// No Conversions Required
+        /// https://blogs.msdn.microsoft.com/cjacks/2006/10/08/how-to-determine-if-a-user-is-a-member-of-the-administrators-group-with-uac-enabled-on-windows-vista/
+        /// </summary>
+        /// <param name="hToken"></param>
+        /// <returns>Return true if the token is elevated</returns>
+        ////////////////////////////////////////////////////////////////////////////////
+        public bool GetTokenElevation(bool printResults)
+        {
+            IntPtr hTokenElevationType = _GetTokenInformation(Winnt._TOKEN_INFORMATION_CLASS.TokenElevationType);
+            if (IntPtr.Zero == hTokenElevationType)
+            {
+                return false;
+            }
+
+            int output = Marshal.ReadInt32(hTokenElevationType);
+
+            switch ((Winnt.TOKEN_ELEVATION_TYPE)output)
+            {
+                case Winnt.TOKEN_ELEVATION_TYPE.TokenElevationTypeDefault:
+                    if (printResults)
+                    {
+                        Console.WriteLine("[+] TokenElevationTypeDefault");
+                        Console.WriteLine("[*] Token: Not Split");
+                        Console.WriteLine("[+] ProcessIntegrity: High");
+                    }
+                    return true;
+                case Winnt.TOKEN_ELEVATION_TYPE.TokenElevationTypeFull:
+                    if (printResults)
+                    {
+                        Console.WriteLine("[+] TokenElevationTypeFull");
+                        Console.WriteLine("[*] Token: Split");
+                        Console.WriteLine("[+] ProcessIntegrity: High");
+                    }
+                    return true;
+                case Winnt.TOKEN_ELEVATION_TYPE.TokenElevationTypeLimited:
+                    if (printResults)
+                    {
+                        Console.WriteLine("[-] TokenElevationTypeLimited");
+                        Console.WriteLine("[*] Token: Split");
+                        Console.WriteLine("[-] ProcessIntegrity: Medium/Low");
+                        Console.WriteLine("[!] Hint: Try to Bypass UAC");
+                    }
+                    return false;
+                default:
+                    if (printResults)
+                    {
+                        Console.WriteLine("[-] Unknown integrity {0}", output);
+                    }
+                    return false;
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Prints the token and impersonation type of the token
+        /// No Conversions Required
+        /// </summary>
+        /// <param name="hToken"></param>
+        /// <param name="tokenType"></param>
+        ////////////////////////////////////////////////////////////////////////////////
+        public void GetTokenType()
+        {
+            int output = -1;
+            IntPtr hTokenType = _GetTokenInformation(Winnt._TOKEN_INFORMATION_CLASS.TokenType);
+            try
+            {
+                output = Marshal.ReadInt32(hTokenType);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] ReadInt32 Generated an Exception");
+                Console.WriteLine(ex.Message);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(hTokenType);
+            }
+
+            switch ((Winnt._TOKEN_TYPE)output)
+            {
+                case Winnt._TOKEN_TYPE.TokenPrimary:
+                    Console.WriteLine("[+] Primary Token");
+                    return;
+
+                case Winnt._TOKEN_TYPE.TokenImpersonation:
+                    hTokenType = _GetTokenInformation(Winnt._TOKEN_INFORMATION_CLASS.TokenImpersonationLevel);
+                    try
+                    {
+                        output = Marshal.ReadInt32(hTokenType);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("[-] ReadInt32 Generated an Exception");
+                        Console.WriteLine(ex.Message);
+                    }
+                    finally
+                    {
+                        Marshal.FreeHGlobal(hTokenType);
+                    }
+
+                    switch ((Winnt._SECURITY_IMPERSONATION_LEVEL)output)
+                    {
+                        case Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityAnonymous:
+                            Console.WriteLine("[+] Anonymous Token");
+                            return;
+                        case Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityIdentification:
+                            Console.WriteLine("[+] Identification Token");
+                            return;
+                        case Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation:
+                            Console.WriteLine("[+] Impersonation Token");
+                            return;
+                        case Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityDelegation:
+                            Console.WriteLine("[+] Delegation Token");
+                            return;
+                        default:
+                            Console.WriteLine("[-] Unknown Impersionation Type");
+                            return;
+                    }
+                default:
+                    Console.WriteLine("[-] Unknown Type {0}", output);
+                    return;
+            }
+        }
+
         ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
         /// Displays the source of a token (user32, advapi, system)
@@ -371,6 +367,18 @@ namespace Tokenvator.Plugins.AccessTokens
             ////////////////////////////////////////////////////////////////////////////////
             // Iterate through the return privileges
             ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
+
+            IntPtr hLookupPrivilegeName = Generic.GetExportAddress(hadvapi32, "LookupPrivilegeNameW");
+            MonkeyWorks.advapi32.LookupPrivilegeNameW fLookupPrivilegeName = (MonkeyWorks.advapi32.LookupPrivilegeNameW)Marshal.GetDelegateForFunctionPointer(hLookupPrivilegeName, typeof(MonkeyWorks.advapi32.LookupPrivilegeNameW));
+
+            //IntPtr hPrivilegeCheck = Generic.GetExportAddress(hadvapi32, "PrivilegeCheck");
+            //MonkeyWorks.advapi32.PrivilegeCheck fPrivilegeCheck = (MonkeyWorks.advapi32.PrivilegeCheck)Marshal.GetDelegateForFunctionPointer(hPrivilegeCheck, typeof(MonkeyWorks.advapi32.PrivilegeCheck));
+
+            IntPtr hNtPrivilegeCheck = Generic.GetSyscallStub("NtPrivilegeCheck");
+            MonkeyWorks.ntdll.NtPrivilegeCheck fSyscallNtPrivilegeCheck = (MonkeyWorks.ntdll.NtPrivilegeCheck)Marshal.GetDelegateForFunctionPointer(hNtPrivilegeCheck, typeof(MonkeyWorks.ntdll.NtPrivilegeCheck));
+
+
             for (int i = 0; i < tokenPrivileges.PrivilegeCount; i++)
             {
                 StringBuilder lpName = new StringBuilder();
@@ -384,11 +392,7 @@ namespace Tokenvator.Plugins.AccessTokens
                 // advapi32.LookupPrivilegeName(null, lpLuid, null, ref cchName);
                 // advapi32.LookupPrivilegeName(null, lpLuid, lpName, ref cchName)
                 ////////////////////////////////////////////////////////////////////////////////
-
-                IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
-                IntPtr hLookupPrivilegeName = Generic.GetExportAddress(hadvapi32, "LookupPrivilegeNameW");
-                MonkeyWorks.advapi32.LookupPrivilegeNameW fLookupPrivilegeName = (MonkeyWorks.advapi32.LookupPrivilegeNameW)Marshal.GetDelegateForFunctionPointer(hLookupPrivilegeName, typeof(MonkeyWorks.advapi32.LookupPrivilegeNameW));
-
+                
                 try
                 {
                     fLookupPrivilegeName(null, lpLuid, null, ref cchName);
@@ -437,12 +441,10 @@ namespace Tokenvator.Plugins.AccessTokens
                     Privilege = new Winnt._LUID_AND_ATTRIBUTES[] { tokenPrivileges.Privileges[i] }
                 };
 
-                IntPtr hPrivilegeCheck = Generic.GetExportAddress(hadvapi32, "PrivilegeCheck");
-                MonkeyWorks.advapi32.PrivilegeCheck fPrivilegeCheck = (MonkeyWorks.advapi32.PrivilegeCheck)Marshal.GetDelegateForFunctionPointer(hPrivilegeCheck, typeof(MonkeyWorks.advapi32.PrivilegeCheck));
-
+                uint ntRetVal = 0;
                 try
                 {
-                    retVal = fPrivilegeCheck(hWorkingToken, ref privilegeSet, out pfResult);
+                    ntRetVal = fSyscallNtPrivilegeCheck(hWorkingToken, ref privilegeSet, ref pfResult);
                 }
                 catch (Exception ex)
                 {
@@ -454,9 +456,9 @@ namespace Tokenvator.Plugins.AccessTokens
                     Marshal.FreeHGlobal(lpLuid);
                 }
                 
-                if (!retVal)
+                if (0 != ntRetVal)
                 {
-                    Misc.GetWin32Error("PrivilegeCheck");
+                    Misc.GetNtError("NtPrivilegeCheck", ntRetVal);
                     continue;
                 }
                 Console.WriteLine("{0,-45}{1,-30}", lpName.ToString(), Convert.ToBoolean(pfResult));
@@ -559,45 +561,6 @@ namespace Tokenvator.Plugins.AccessTokens
             Console.WriteLine("[+] ACL Count: {0}", tokenDefaultDaclAcl.DefaultDacl.AceCount);
             return;
         }
-
-        ////////////////////////////////////////////////////////////////////////////////
-        /// <summary>
-        /// 
-        /// 
-        /// </summary>
-        /// <param name="tokenInformationClass"></param>
-        /// <returns></returns>
-        ////////////////////////////////////////////////////////////////////////////////
-        [SecurityCritical]
-        [HandleProcessCorruptedStateExceptions]
-        private IntPtr _GetTokenInformation(Winnt._TOKEN_INFORMATION_CLASS tokenInformationClass)
-        {
-            IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
-            IntPtr hGetTokenInformation = Generic.GetExportAddress(hadvapi32, "GetTokenInformation");
-            MonkeyWorks.advapi32.GetTokenInformation fGetTokenInformation = (MonkeyWorks.advapi32.GetTokenInformation)Marshal.GetDelegateForFunctionPointer(hGetTokenInformation, typeof(MonkeyWorks.advapi32.GetTokenInformation));
-
-            IntPtr tokenInformation = IntPtr.Zero;
-            try
-            {
-                uint returnLength = 0;
-                fGetTokenInformation(hWorkingToken, tokenInformationClass, tokenInformation, returnLength, out returnLength);
-
-                tokenInformation = Marshal.AllocHGlobal((int)returnLength);
-                if (!fGetTokenInformation(hWorkingToken, tokenInformationClass, tokenInformation, returnLength, out returnLength))
-                {
-                    Misc.GetWin32Error(string.Format("GetTokenInformation ({0}) - Pass 2", tokenInformationClass));
-                    return IntPtr.Zero;
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("[-] NtDuplicateToken Generated an Exception");
-                Console.WriteLine("[-] {0}", ex.Message);
-                return IntPtr.Zero;
-            }
-
-            return tokenInformation;
-        }
         #endregion
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -650,6 +613,7 @@ namespace Tokenvator.Plugins.AccessTokens
         {
             exists = false;
             enabled = false;
+            
             ////////////////////////////////////////////////////////////////////////////////
             uint TokenInfLength = 0;
             advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrivileges, IntPtr.Zero, 0, out TokenInfLength);
@@ -668,6 +632,7 @@ namespace Tokenvator.Plugins.AccessTokens
             }
             Winnt._TOKEN_PRIVILEGES_ARRAY tokenPrivileges = (Winnt._TOKEN_PRIVILEGES_ARRAY)Marshal.PtrToStructure(lpTokenInformation, typeof(Winnt._TOKEN_PRIVILEGES_ARRAY));
             Marshal.FreeHGlobal(lpTokenInformation);
+            
 
             ////////////////////////////////////////////////////////////////////////////////
             for (int i = 0; i < tokenPrivileges.PrivilegeCount; i++)
@@ -728,33 +693,42 @@ namespace Tokenvator.Plugins.AccessTokens
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Private function to query a token with an enumeration result
+        /// <summary>
+        /// Helper function for GetTokenInformation
+        /// Converted all GetTokenInformation calls to D/Invoke Syscall
+        /// </summary>
+        /// <param name="tokenInformationClass"></param>
+        /// <returns></returns>
         ////////////////////////////////////////////////////////////////////////////////
-        private static bool _QueryTokenInformation(IntPtr hToken, Winnt._TOKEN_INFORMATION_CLASS informationClass, ref int dwTokenInformation)
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
+        private IntPtr _GetTokenInformation(Winnt._TOKEN_INFORMATION_CLASS tokenInformationClass)
         {
-            uint tokenInformationLength = (uint)Marshal.SizeOf(typeof(uint));
-            IntPtr lpTokenInformation = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(uint)));
+            IntPtr hNtQueryInformationToken = Generic.GetSyscallStub("NtQueryInformationToken");
+            MonkeyWorks.ntdll.NtQueryInformationToken fSyscallNtQueryInformationToken = (MonkeyWorks.ntdll.NtQueryInformationToken)Marshal.GetDelegateForFunctionPointer(hNtQueryInformationToken, typeof(MonkeyWorks.ntdll.NtQueryInformationToken));
+
+            IntPtr tokenInformation = IntPtr.Zero;
             try
             {
-                uint returnLength = 0;
-                if (!advapi32.GetTokenInformation(hToken, informationClass, lpTokenInformation, tokenInformationLength, out returnLength))
+                ulong returnLength = 0;
+                fSyscallNtQueryInformationToken(hWorkingToken, tokenInformationClass, tokenInformation, returnLength, ref returnLength);
+                tokenInformation = Marshal.AllocHGlobal((int)returnLength);
+
+                uint ntRetVal = fSyscallNtQueryInformationToken(hWorkingToken, tokenInformationClass, tokenInformation, returnLength, ref returnLength);
+                if (0 != ntRetVal)
                 {
-                    Misc.GetWin32Error("GetTokenInformation");
-                    return false;
+                    Misc.GetNtError("NtQueryInformationToken", ntRetVal);
+                    return IntPtr.Zero;
                 }
-                dwTokenInformation = Marshal.ReadInt32(lpTokenInformation);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                Misc.GetWin32Error("GetTokenInformation");
+                Console.WriteLine("[-] NtDuplicateToken Generated an Exception");
                 Console.WriteLine("[-] {0}", ex.Message);
-                return false;
+                return IntPtr.Zero;
             }
-            finally
-            {
-                Marshal.FreeHGlobal(lpTokenInformation);
-            }
-            return true;
+
+            return tokenInformation;
         }
     }
 }

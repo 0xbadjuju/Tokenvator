@@ -235,7 +235,6 @@ namespace Tokenvator.Plugins.Enumeration
 
         ////////////////////////////////////////////////////////////////////////////////
         // Finds a process per user discovered
-        // ToDo: check if token is a primary token
         ////////////////////////////////////////////////////////////////////////////////
         public static Dictionary<string, uint> EnumerateTokens(bool findElevation)
         {
@@ -255,9 +254,12 @@ namespace Tokenvator.Plugins.Enumeration
                 kernel32.CloseHandle(hProcess);
                 if (findElevation)
                 {
-                    if (!TokenInformation.CheckElevation(hToken))
+                    using (TokenInformation ti = new TokenInformation(hToken))
                     {
-                        continue;
+                        if (!ti.GetTokenElevation(false))
+                        {
+                            continue;
+                        }
                     }
                 }
 
@@ -352,9 +354,15 @@ namespace Tokenvator.Plugins.Enumeration
                 }
                 kernel32.CloseHandle(hProcess);
 
-                if (findElevation && !TokenInformation.CheckElevation(hToken))
+                if (findElevation)
                 {
-                    continue;
+                    using (TokenInformation ti = new TokenInformation(hToken))
+                    { 
+                        if (!ti.GetTokenElevation(false))
+                        {
+                            continue;
+                        }
+                    }
                 }
 
                 uint dwLength = 0;

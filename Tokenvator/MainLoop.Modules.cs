@@ -412,9 +412,9 @@ namespace Tokenvator
                     t.GetTokenDefaultDacl();
                     Console.WriteLine();
 
-                    Winnt._TOKEN_TYPE tokenType;
-                    TokenInformation.GetTokenType(hToken, out tokenType);
-                    TokenInformation.PrintElevation(hToken);
+                    t.GetTokenType();
+
+                    t.GetTokenElevation(true);
                 }
             }
         }
