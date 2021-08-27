@@ -20,6 +20,7 @@ namespace Tokenvator.Resources
         public bool Remote { get; private set; }
         public string PipeName { get; private set; }
         public bool Impersonation { get; private set; }
+        public bool Legacy { get; private set; }
 
         public static List<string> privileges = new List<string> { "SeAssignPrimaryTokenPrivilege",
             "SeAuditPrivilege", "SeBackupPrivilege", "SeChangeNotifyPrivilege", "SeCreateGlobalPrivilege",
@@ -39,6 +40,7 @@ namespace Tokenvator.Resources
             arguments = new Dictionary<string, object>();
             Remote = false;
             Impersonation = false;
+            Legacy = false;
         }
 
         /// <summary>
@@ -47,11 +49,7 @@ namespace Tokenvator.Resources
         /// <param name="input"></param>
         public bool Parse(string input)
         {
-            //Console.WriteLine();
-            //Console.WriteLine(input);
             input = Regex.Replace(input, "(\"[^\"]*)(\\/)+([^\"]*[^:](?!\\\\)\")", "$1\0$3");
-            //Console.WriteLine(input);
-            //Console.WriteLine();
 
             string[] argumentAndData = input.Split(new string[] { "/" }, StringSplitOptions.RemoveEmptyEntries);
 
@@ -173,6 +171,15 @@ namespace Tokenvator.Resources
                 if (arguments.TryGetValue("impersonation", out pn))
                 {
                     Impersonation = true;
+                }
+            }
+
+            if (arguments.ContainsKey("legacy"))
+            {
+                object pn;
+                if (arguments.TryGetValue("legacy", out pn))
+                {
+                    Legacy = true;
                 }
             }
 

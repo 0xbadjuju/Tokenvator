@@ -31,6 +31,12 @@ namespace Tokenvator.Plugins.AccessTokens
 
         private readonly IntPtr hNtQueryInformationToken;
 
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Default Constructor
+        /// </summary>
+        /// <param name="hToken"></param>
+        ////////////////////////////////////////////////////////////////////////////////
         public TokenInformation(IntPtr hToken) : base(hToken)
         {
             hNtQueryInformationToken = Generic.GetSyscallStub("NtQueryInformationToken");

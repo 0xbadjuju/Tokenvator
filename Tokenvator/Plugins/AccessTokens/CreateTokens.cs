@@ -435,8 +435,6 @@ namespace Tokenvator.Plugins.AccessTokens
             if (0 != ntRetVal)
             {
                 Misc.GetNtError("NetUserGetLocalGroups", ntRetVal);
-                Misc.GetNtError("[-] {0}", ntRetVal);
-                //return false;
             }
 
             localgroupUserInfo = new lmaccess._LOCALGROUP_USERS_INFO_0[localEntriesRead];
@@ -452,7 +450,6 @@ namespace Tokenvator.Plugins.AccessTokens
             #endregion
 
             #region NetUserGetGroups
-            //Console.WriteLine(" - NetUserGetGroups");
             lmaccess._GROUP_USERS_INFO_0[] globalGroupUserInfo;// = new lmaccess._GROUP_USERS_INFO_0[0];
             ntRetVal = netapi32.NetUserGetGroups(
                 domain,
@@ -467,8 +464,6 @@ namespace Tokenvator.Plugins.AccessTokens
             if (0 != ntRetVal)
             {
                 Misc.GetNtError("NetUserGetGroups", ntRetVal);
-                Misc.GetNtError("[-] {0}", ntRetVal);
-                //return false;
             }
 
             globalGroupUserInfo = new lmaccess._GROUP_USERS_INFO_0[globalEntriesRead];
@@ -484,6 +479,8 @@ namespace Tokenvator.Plugins.AccessTokens
             #endregion
 
             #region Default Admin Entries
+
+            Console.WriteLine("[+] Default Admin Entries: {0}");
 
             uint groupsAttributes = (uint)(Winnt.SE_GROUP_ENABLED | Winnt.SE_GROUP_ENABLED_BY_DEFAULT | Winnt.SE_GROUP_MANDATORY);
 
@@ -537,6 +534,9 @@ namespace Tokenvator.Plugins.AccessTokens
             #endregion
 
             #region Custom Groups
+
+            Console.WriteLine("[+] Custom Entries: {0}");
+
             //Custom groups
             foreach (string group in groups)
             {
@@ -548,9 +548,17 @@ namespace Tokenvator.Plugins.AccessTokens
                     d = split[0];
                     groupname = split[1];
                 }
-                string sid = new NTAccount(d, groupname).Translate(typeof(SecurityIdentifier)).Value;
-                InitializeSid(sid, ref tokenGroups.Groups[extraGroups].Sid);
-                tokenGroups.Groups[extraGroups++].Attributes = groupsAttributes;
+
+                try
+                {
+                    string sid = new NTAccount(d, groupname).Translate(typeof(SecurityIdentifier)).Value;
+                    InitializeSid(sid, ref tokenGroups.Groups[extraGroups].Sid);
+                    tokenGroups.Groups[extraGroups++].Attributes = groupsAttributes;
+                }
+                catch (IdentityNotMappedException ex)
+                {
+                    Console.WriteLine(ex.Message);
+                }
             }
             #endregion
 
@@ -901,10 +909,9 @@ namespace Tokenvator.Plugins.AccessTokens
             string accountName = string.Empty;
             try
             {
-                accountName = new System.Security.Principal.SecurityIdentifier(sddl)
-                    .Translate(typeof(System.Security.Principal.NTAccount)).ToString();
+                accountName = new SecurityIdentifier(sddl).Translate(typeof(NTAccount)).ToString();
             }
-            catch (System.Security.Principal.IdentityNotMappedException ex)
+            catch (IdentityNotMappedException ex)
             {
                 Console.WriteLine(ex.Message);
             }

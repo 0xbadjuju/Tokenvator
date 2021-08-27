@@ -151,38 +151,6 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         //
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _CloneToken(bool remote, int processID, string command, IntPtr hToken)
-        {
-            if (!remote)
-            {
-                Console.WriteLine("[-] Unable to identify Process ID");
-                return;
-            }
-
-            if (!string.IsNullOrEmpty(command))
-                if (!remote)
-                    Console.WriteLine("[-] Unable to parse {0}", command);
-
-            using (TokenManipulation t = new TokenManipulation(hToken))
-            {
-                if (!t.OpenProcessToken(processID))
-                    return;
-                t.SetWorkingTokenToRemote();
-                if (!t.DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityDelegation))
-                {
-                    Console.WriteLine("[-] Unable to Duplicate with Delegation, attempting Impersonation");
-                    if (!t.DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation))
-                        return;
-                }
-
-                if (!t.AssignPrimaryToken())
-                    return;
-            }
-        }
-
-        ////////////////////////////////////////////////////////////////////////////////
-        //
-        ////////////////////////////////////////////////////////////////////////////////
         private static void _CloneToken(CommandLineParsing cLP, IntPtr hToken)
         {
             try
@@ -320,10 +288,55 @@ namespace Tokenvator
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Starts Windows Module Installer and impersonates or starts a process with 
-        // the cloned token. There are better ways of doing this net .O
+        /// <summary>
+        /// Delegates out to _GetTrustedInstallerLogon and _GetTrustedInstallerService
+        /// </summary>
+        /// <param name="cLP"></param>
+        /// <param name="hToken"></param>
         ////////////////////////////////////////////////////////////////////////////////
         private static void _GetTrustedInstaller(CommandLineParsing cLP, IntPtr hToken)
+        {
+            if (cLP.Legacy)
+            {
+                _GetTrustedInstallerService(cLP, hToken);
+            }
+            else
+            {
+                _GetTrustedInstallerLogon(cLP, hToken);
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Calls LogonUserExExW with NT SERVICE\TrustedInstaller listed as a group
+        /// </summary>
+        /// <param name="cLP"></param>
+        /// <param name="hToken"></param>
+        ////////////////////////////////////////////////////////////////////////////////
+        private static void _GetTrustedInstallerLogon(CommandLineParsing cLP, IntPtr hToken)
+        {
+            using (TokenManipulation t = new TokenManipulation(hToken))
+            {
+                t.LogonUser(
+                    "NT AUTHORITY", 
+                    "SYSTEM", 
+                    string.Empty, 
+                    "NT SERVICE\\TrustedInstaller",
+                     Winbase.LOGON_TYPE.LOGON32_LOGON_SERVICE, 
+                     cLP.Command, 
+                     cLP.Arguments
+                );
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Starts Windows Module Installer and impersonates or starts a process with 
+        /// </summary>
+        /// <param name="cLP"></param>
+        /// <param name="hToken"></param>
+        ////////////////////////////////////////////////////////////////////////////////
+        private static void _GetTrustedInstallerService(CommandLineParsing cLP, IntPtr hToken)
         {
             bool exists, enabled;
             using (TokenInformation ti = new TokenInformation(hToken))
@@ -632,6 +645,7 @@ namespace Tokenvator
                 username = split.LastOrDefault();
                 if (!cLP.GetData("password", out password))
                 {
+                    Console.WriteLine("[-] Password Not Set");
                     return;
                 }
                 Console.WriteLine("User Logon");
@@ -641,8 +655,8 @@ namespace Tokenvator
                 string[] split = username.Split('\\').ToArray();
                 username = split.LastOrDefault();
                 logonType = Winbase.LOGON_TYPE.LOGON32_LOGON_SERVICE;
+                Console.WriteLine("[*] Setting Logon Type to Serivce");
                 domain = "NT SERVICE";
-                Console.WriteLine("Service Logon");
             }
             else
             {
@@ -652,16 +666,19 @@ namespace Tokenvator
                         username = "LocalService";
                         logonType = Winbase.LOGON_TYPE.LOGON32_LOGON_SERVICE;
                         domain = "NT AUTHORITY";
+                        Console.WriteLine("[*] Setting Logon Type to Serivce");
                         break;
                     case "localsystem":
-                        username = "LocalSystem";
+                        username = "SYSTEM";//"LocalSystem";
                         logonType = Winbase.LOGON_TYPE.LOGON32_LOGON_SERVICE;
                         domain = "NT AUTHORITY";
+                        Console.WriteLine("[*] Setting Logon Type to Serivce");
                         break;
                     case "networkservice":
                         username = "Network Service";
                         logonType = Winbase.LOGON_TYPE.LOGON32_LOGON_SERVICE;
                         domain = "NT AUTHORITY";
+                        Console.WriteLine("[*] Setting Logon Type to Serivce");
                         break;
                     default:
                         cLP.GetData("password", out password);
