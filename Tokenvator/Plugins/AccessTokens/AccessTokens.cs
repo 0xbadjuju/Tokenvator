@@ -510,10 +510,33 @@ namespace Tokenvator.Plugins.AccessTokens
         /// <param name="handle"></param>
         /// <returns></returns>
         ////////////////////////////////////////////////////////////////////////////////
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
         protected bool CloseHandle(IntPtr handle)
         {
+            if (IntPtr.Zero == handle)
+            {
+                return true;
+            }
+
             MonkeyWorks.ntdll.NtClose fSyscallhNtClose = (MonkeyWorks.ntdll.NtClose)Marshal.GetDelegateForFunctionPointer(hNtClose, typeof(MonkeyWorks.ntdll.NtClose));
-            uint ntRetVal = fSyscallhNtClose(handle);
+
+            uint ntRetVal = 0;
+            try
+            {
+                ntRetVal = fSyscallhNtClose(handle);
+            }
+            catch (Exception ex)
+            {
+                if (!(ex is SEHException))
+                {
+                    Console.WriteLine("[-] NtCloseHandle Generated an Exception");
+                    Console.WriteLine("[-] {0}", ex.Message);
+                    return false;
+                }
+                return true;
+            }
+
             if (0 != ntRetVal)
             {
                 Misc.GetNtError("NtClose", ntRetVal);
@@ -543,36 +566,24 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         public virtual void Dispose()
         {
-            try
-            {
-                if (IntPtr.Zero != phNewToken)
-                {                    
-                    CloseHandle(phNewToken);
-                }
-                if (IntPtr.Zero != hExistingToken)
-                {
-                    CloseHandle(hExistingToken);
-                }
-                if (IntPtr.Zero != hWorkingToken && currentProcessToken != hWorkingToken)
-                {
-                    CloseHandle(hWorkingToken);
-                }
-                if (IntPtr.Zero != hWorkingThreadToken)
-                {
-                    CloseHandle(hWorkingThreadToken);
-                }
+            if (IntPtr.Zero != phNewToken)
+            {                    
+                CloseHandle(phNewToken);
             }
-            catch (Exception ex)
+            if (IntPtr.Zero != hExistingToken)
             {
-                if (!(ex is SEHException))
-                {
-                    Console.WriteLine(ex.Message);
-                }
+                CloseHandle(hExistingToken);
             }
-            finally
+            if (IntPtr.Zero != hWorkingToken && currentProcessToken != hWorkingToken)
             {
-                Disposed = true;
+                CloseHandle(hWorkingToken);
             }
+            if (IntPtr.Zero != hWorkingThreadToken)
+            {
+                CloseHandle(hWorkingThreadToken);
+            }
+
+            Disposed = true;
         }
     }
 }

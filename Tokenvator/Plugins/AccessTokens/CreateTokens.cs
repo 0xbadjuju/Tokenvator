@@ -32,7 +32,7 @@ namespace Tokenvator.Plugins.AccessTokens
         }
 
         //SeCreateTokenPrivilege
-        public void CreateToken(string[] groups, string command)
+        public void CreateToken(string command)
         {
             if (!_CheckPrivileges())
             {
@@ -295,7 +295,7 @@ namespace Tokenvator.Plugins.AccessTokens
             if (0 != ntRetVal)
             {
                 Misc.GetNtError("NtCreateToken", ntRetVal);
-                new TokenInformation(phNewToken).GetTokenUser();
+                return;
             }
 
             if (string.IsNullOrEmpty(command))
@@ -303,9 +303,11 @@ namespace Tokenvator.Plugins.AccessTokens
                 command = "cmd.exe";
             }
 
-            DesktopACL desktop = new DesktopACL();
-            desktop.OpenDesktop();
-            desktop.OpenWindow();
+            using (DesktopACL desktop = new DesktopACL())
+            {
+                desktop.OpenDesktop();
+                desktop.OpenWindow();
+            }
 
             SetWorkingTokenToNewToken();
             StartProcessAsUser(command);           

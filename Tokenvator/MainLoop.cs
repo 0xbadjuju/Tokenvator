@@ -156,9 +156,6 @@ namespace Tokenvator
 
                 switch (action)
                 {
-                    case "add_group":
-                        _AddGroup(cLP, hToken);
-                        break;
                     case "add_privilege":
                         _AddPrivilege(cLP);
                         break;
@@ -179,6 +176,9 @@ namespace Tokenvator
                         break;
                     case "detach_filter":
                         Filters.FilterDetach(cLP);
+                        break;
+                    case "disable_group":
+                        _DisableGroup(cLP, hToken);
                         break;
                     case "disable_privilege":
                         _AlterPrivilege(cLP, hToken, Winnt.TokenPrivileges.SE_PRIVILEGE_NONE);

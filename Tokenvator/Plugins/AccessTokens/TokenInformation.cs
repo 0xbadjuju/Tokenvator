@@ -21,13 +21,22 @@ namespace Tokenvator.Plugins.AccessTokens
         public bool tiDisposed = false;
 
         public Winnt._TOKEN_SOURCE tokenSource;
+        public IntPtr hTokenSource;
         public Ntifs._TOKEN_USER tokenUser;
+        public IntPtr hTokenUser;
         public Ntifs._TOKEN_GROUPS tokenGroups;
+        public IntPtr hTokenGroups;
         public Winnt._TOKEN_PRIVILEGES_ARRAY tokenPrivileges;
+        public IntPtr hTokenPrivileges;
         public Ntifs._TOKEN_OWNER tokenOwner;
+        public IntPtr hTokenOwner;
         public Winnt._TOKEN_PRIMARY_GROUP tokenPrimaryGroup;
+        public IntPtr hTokenPrimaryGroup;
         public Winnt._TOKEN_DEFAULT_DACL tokenDefaultDacl;
+        public IntPtr hTokenDefaultDacl;
         public Winnt._TOKEN_DEFAULT_DACL_ACL tokenDefaultDaclAcl;
+        public IntPtr hTokenElevationType;
+        public IntPtr hTokenType;
 
         private readonly IntPtr hNtQueryInformationToken;
 
@@ -63,6 +72,43 @@ namespace Tokenvator.Plugins.AccessTokens
         public override void Dispose()
         {
             tiDisposed = true;
+
+            if (IntPtr.Zero != hTokenSource)
+            {
+                Marshal.FreeHGlobal(hTokenSource);
+            }
+            if (IntPtr.Zero != hTokenUser)
+            {
+                Marshal.FreeHGlobal(hTokenUser);
+            }
+            if (IntPtr.Zero != hTokenGroups)
+            {
+                Marshal.FreeHGlobal(hTokenGroups);
+            }
+            if (IntPtr.Zero != hTokenPrivileges)
+            {
+                Marshal.FreeHGlobal(hTokenPrivileges);
+            }
+            if (IntPtr.Zero != hTokenOwner)
+            {
+                Marshal.FreeHGlobal(hTokenOwner);
+            }
+            if (IntPtr.Zero != hTokenPrimaryGroup)
+            {
+                Marshal.FreeHGlobal(hTokenPrimaryGroup);
+            }
+            if (IntPtr.Zero != hTokenDefaultDacl)
+            {
+                Marshal.FreeHGlobal(hTokenDefaultDacl);
+            }
+            if (IntPtr.Zero != hTokenElevationType)
+            {
+                Marshal.FreeHGlobal(hTokenElevationType);
+            }
+            if (IntPtr.Zero != hTokenType)
+            {
+                Marshal.FreeHGlobal(hTokenType);
+            }
 
             base.Dispose();
         }
@@ -126,7 +172,7 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         public bool GetTokenElevation(bool printResults)
         {
-            IntPtr hTokenElevationType = _GetTokenInformation(Winnt._TOKEN_INFORMATION_CLASS.TokenElevationType);
+            hTokenElevationType = _GetTokenInformation(Winnt._TOKEN_INFORMATION_CLASS.TokenElevationType);
             if (IntPtr.Zero == hTokenElevationType)
             {
                 return false;
@@ -181,7 +227,7 @@ namespace Tokenvator.Plugins.AccessTokens
         public void GetTokenType()
         {
             int output = -1;
-            IntPtr hTokenType = _GetTokenInformation(Winnt._TOKEN_INFORMATION_CLASS.TokenType);
+            hTokenType = _GetTokenInformation(Winnt._TOKEN_INFORMATION_CLASS.TokenType);
             try
             {
                 output = Marshal.ReadInt32(hTokenType);
@@ -212,10 +258,6 @@ namespace Tokenvator.Plugins.AccessTokens
                     {
                         Console.WriteLine("[-] ReadInt32 Generated an Exception");
                         Console.WriteLine(ex.Message);
-                    }
-                    finally
-                    {
-                        Marshal.FreeHGlobal(hTokenType);
                     }
 
                     switch ((Winnt._SECURITY_IMPERSONATION_LEVEL)output)
@@ -251,7 +293,7 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         public void GetTokenSource()
         {
-            IntPtr hTokenSource = _GetTokenInformation(Winnt._TOKEN_INFORMATION_CLASS.TokenSource);
+            hTokenSource = _GetTokenInformation(Winnt._TOKEN_INFORMATION_CLASS.TokenSource);
             try
             {
                 tokenSource = (Winnt._TOKEN_SOURCE)Marshal.PtrToStructure(hTokenSource, typeof(Winnt._TOKEN_SOURCE));
@@ -261,10 +303,6 @@ namespace Tokenvator.Plugins.AccessTokens
                 Console.WriteLine("[-] PtrToStructure Generated an Exception");
                 Console.WriteLine(ex.Message);
                 return;
-            }
-            finally
-            {
-                Marshal.FreeHGlobal(hTokenSource);
             }
 
             Console.WriteLine("[+] Source: " + new string(tokenSource.SourceName));
@@ -280,7 +318,7 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         public void GetTokenUser()
         {
-            IntPtr hTokenUser = _GetTokenInformation(Winnt._TOKEN_INFORMATION_CLASS.TokenUser);
+            hTokenUser = _GetTokenInformation(Winnt._TOKEN_INFORMATION_CLASS.TokenUser);
             try
             {
                 tokenUser = (Ntifs._TOKEN_USER)Marshal.PtrToStructure(hTokenUser, typeof(Ntifs._TOKEN_USER));
@@ -291,11 +329,7 @@ namespace Tokenvator.Plugins.AccessTokens
                 Console.WriteLine(ex.Message);
                 return;
             }
-            finally
-            {
-                Marshal.FreeHGlobal(hTokenUser);
-            }
-            
+
             Console.WriteLine("[+] User: ");
             string sid, account;
             ReadSidAndName(tokenUser.User.Sid, out sid, out account);
@@ -313,7 +347,7 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         public bool GetTokenGroups()
         {
-            IntPtr hTokenGroups = _GetTokenInformation(Winnt._TOKEN_INFORMATION_CLASS.TokenGroups);
+            hTokenGroups = _GetTokenInformation(Winnt._TOKEN_INFORMATION_CLASS.TokenGroups);
             try
             {
                 tokenGroups = (Ntifs._TOKEN_GROUPS)Marshal.PtrToStructure(hTokenGroups, typeof(Ntifs._TOKEN_GROUPS));
@@ -323,10 +357,6 @@ namespace Tokenvator.Plugins.AccessTokens
                 Console.WriteLine("[-] PtrToStructure Generated an Exception");
                 Console.WriteLine(ex.Message);
                 return false;
-            }
-            finally
-            {
-                Marshal.FreeHGlobal(hTokenGroups);
             }
 
             Console.WriteLine("[+] Enumerated {0} Groups: ", tokenGroups.GroupCount);
@@ -352,7 +382,7 @@ namespace Tokenvator.Plugins.AccessTokens
         public void GetTokenPrivileges()
         {
             Console.WriteLine("[*] Enumerating Token Privileges");
-            IntPtr hTokenPrivileges = _GetTokenInformation(Winnt._TOKEN_INFORMATION_CLASS.TokenPrivileges);
+            hTokenPrivileges = _GetTokenInformation(Winnt._TOKEN_INFORMATION_CLASS.TokenPrivileges);
             try
             {
                 tokenPrivileges = (Winnt._TOKEN_PRIVILEGES_ARRAY)Marshal.PtrToStructure(hTokenPrivileges, typeof(Winnt._TOKEN_PRIVILEGES_ARRAY));
@@ -362,10 +392,6 @@ namespace Tokenvator.Plugins.AccessTokens
                 Console.WriteLine("[-] PtrToStructure Generated an Exception");
                 Console.WriteLine(ex.Message);
                 return;
-            }
-            finally
-            {
-                Marshal.FreeHGlobal(hTokenPrivileges);
             }
 
             Console.WriteLine("[+] Enumerated {0} Privileges", tokenPrivileges.PrivilegeCount);
@@ -401,7 +427,7 @@ namespace Tokenvator.Plugins.AccessTokens
                 // advapi32.LookupPrivilegeName(null, lpLuid, null, ref cchName);
                 // advapi32.LookupPrivilegeName(null, lpLuid, lpName, ref cchName)
                 ////////////////////////////////////////////////////////////////////////////////
-                
+
                 try
                 {
                     fLookupPrivilegeName(null, lpLuid, null, ref cchName);
@@ -441,14 +467,14 @@ namespace Tokenvator.Plugins.AccessTokens
                 // Lookup if the privilege is enable
                 // advapi32.PrivilegeCheck(hWorkingToken, ref privilegeSet, out pfResult)
                 ////////////////////////////////////////////////////////////////////////////////
-                
-                int pfResult = 0;
+
                 Winnt._PRIVILEGE_SET privilegeSet = new Winnt._PRIVILEGE_SET
                 {
                     PrivilegeCount = 1,
                     Control = Winnt.PRIVILEGE_SET_ALL_NECESSARY,
                     Privilege = new Winnt._LUID_AND_ATTRIBUTES[] { tokenPrivileges.Privileges[i] }
                 };
+                bool pfResult = false;
 
                 uint ntRetVal = 0;
                 try
@@ -464,7 +490,7 @@ namespace Tokenvator.Plugins.AccessTokens
                 {
                     Marshal.FreeHGlobal(lpLuid);
                 }
-                
+
                 if (0 != ntRetVal)
                 {
                     Misc.GetNtError("NtPrivilegeCheck", ntRetVal);
@@ -484,7 +510,7 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         public void GetTokenOwner()
         {
-            IntPtr hTokenOwner = _GetTokenInformation(Winnt._TOKEN_INFORMATION_CLASS.TokenOwner);
+            hTokenOwner = _GetTokenInformation(Winnt._TOKEN_INFORMATION_CLASS.TokenOwner);
             try
             {
                 tokenOwner = (Ntifs._TOKEN_OWNER)Marshal.PtrToStructure(hTokenOwner, typeof(Ntifs._TOKEN_OWNER));
@@ -494,10 +520,6 @@ namespace Tokenvator.Plugins.AccessTokens
                 Console.WriteLine("[-] PtrToStructure Generated an Exception");
                 Console.WriteLine(ex.Message);
                 return;
-            }
-            finally
-            {
-                Marshal.FreeHGlobal(hTokenOwner);
             }
 
             Console.WriteLine("[+] Owner: ");
@@ -516,7 +538,7 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         public void GetTokenPrimaryGroup()
         {
-            IntPtr hTokenPrimaryGroup = _GetTokenInformation(Winnt._TOKEN_INFORMATION_CLASS.TokenPrimaryGroup);
+            hTokenPrimaryGroup = _GetTokenInformation(Winnt._TOKEN_INFORMATION_CLASS.TokenPrimaryGroup);
             try
             {
                 tokenPrimaryGroup = (Winnt._TOKEN_PRIMARY_GROUP)Marshal.PtrToStructure(hTokenPrimaryGroup, typeof(Winnt._TOKEN_PRIMARY_GROUP));
@@ -526,10 +548,6 @@ namespace Tokenvator.Plugins.AccessTokens
                 Console.WriteLine("[-] PtrToStructure Generated an Exception");
                 Console.WriteLine(ex.Message);
                 return;
-            }
-            finally
-            {
-                Marshal.FreeHGlobal(hTokenPrimaryGroup);
             }
 
             string primaryGroupSid, primaryGroupName;
@@ -548,7 +566,7 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         public void GetTokenDefaultDacl()
         {
-            IntPtr hTokenDefaultDacl = _GetTokenInformation(Winnt._TOKEN_INFORMATION_CLASS.TokenDefaultDacl);
+            hTokenDefaultDacl = _GetTokenInformation(Winnt._TOKEN_INFORMATION_CLASS.TokenDefaultDacl);
             try
             {
                 tokenDefaultDacl = (Winnt._TOKEN_DEFAULT_DACL)Marshal.PtrToStructure(hTokenDefaultDacl, typeof(Winnt._TOKEN_DEFAULT_DACL));
@@ -563,10 +581,6 @@ namespace Tokenvator.Plugins.AccessTokens
                 Console.WriteLine("[-] PtrToStructure Generated an Exception");
                 Console.WriteLine(ex.Message);
                 return;
-            }
-            finally
-            {
-                Marshal.FreeHGlobal(hTokenDefaultDacl);
             }
 
             string primaryGroup = Marshal.PtrToStringUni(tokenPrimaryGroup.PrimaryGroup);
@@ -718,7 +732,7 @@ namespace Tokenvator.Plugins.AccessTokens
                     Control = Winnt.PRIVILEGE_SET_ALL_NECESSARY,
                     Privilege = new Winnt._LUID_AND_ATTRIBUTES[] { tokenPrivileges.Privileges[i] }
                 };
-                int pfResult = 0;
+                bool pfResult = false;
 
                 uint ntRetVal = fSyscallNtPrivilegeCheck(hWorkingToken, ref privilegeSet, ref pfResult);
 

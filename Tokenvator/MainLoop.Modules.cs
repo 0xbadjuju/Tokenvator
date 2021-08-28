@@ -27,7 +27,7 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         //
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _AddGroup(CommandLineParsing cLP, IntPtr hToken)
+        private static void _DisableGroup(CommandLineParsing cLP, IntPtr hToken)
         {
             string groups;
             if (!cLP.GetData("groups", out groups))
@@ -35,14 +35,14 @@ namespace Tokenvator
                 return;
             }
 
-            using (TokenManipulation t = new TokenManipulation(hToken))
+            using (TokenManipulation tm = new TokenManipulation(hToken))
             {
-                if (cLP.Remote && t.OpenProcessToken(cLP.ProcessID))
-                    t.SetWorkingTokenToRemote();
+                if (cLP.Remote && tm.OpenProcessToken(cLP.ProcessID))
+                    tm.SetWorkingTokenToRemote();
                 else
-                    t.SetWorkingTokenToSelf();
+                    tm.SetWorkingTokenToSelf();
 
-                t.SetTokenGroup(groups, false);
+                tm.DisableTokenGroup(groups);
             }
         }
 
@@ -194,7 +194,7 @@ namespace Tokenvator
                     else
                     {
                         ct.SetWorkingTokenToSelf();
-                        ct.CreateToken(groups, cLP.Command);
+                        ct.CreateToken(cLP.Command);
                     }
                 }
             }
