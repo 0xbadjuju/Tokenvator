@@ -22,7 +22,7 @@ namespace Tokenvator.Resources
         public bool Impersonation { get; private set; }
         public bool Legacy { get; private set; }
 
-        public static List<string> privileges = new List<string> { "SeAssignPrimaryTokenPrivilege",
+        public static List<string> Privileges = new List<string> { "SeAssignPrimaryTokenPrivilege",
             "SeAuditPrivilege", "SeBackupPrivilege", "SeChangeNotifyPrivilege", "SeCreateGlobalPrivilege",
             "SeCreatePagefilePrivilege", "SeCreatePermanentPrivilege", "SeCreateSymbolicLinkPrivilege",
             "SeCreateTokenPrivilege", "SeDebugPrivilege", "SeEnableDelegationPrivilege",
@@ -33,7 +33,8 @@ namespace Tokenvator.Resources
             "SeShutdownPrivilege", "SeSyncAgentPrivilege", "SeSystemEnvironmentPrivilege",
             "SeSystemProfilePrivilege", "SeSystemtimePrivilege", "SeTakeOwnershipPrivilege",
             "SeTcbPrivilege", "SeTimeZonePrivilege", "SeTrustedCredManAccessPrivilege",
-            "SeUndockPrivilege", "SeUnsolicitedInputPrivilege" };
+            "SeUndockPrivilege", "SeUnsolicitedInputPrivilege", 
+            "SeDelegateSessionUserImpersonatePrivilege" };
 
         public CommandLineParsing()
         {
@@ -283,10 +284,10 @@ namespace Tokenvator.Resources
         private static bool _ParsePrivileges(string input, out string output)
         {
             //privileges.Any(s => s.Equals(input, StringComparison.OrdinalIgnoreCase))
-            int index = privileges.FindIndex(x => x.Equals(input.Trim(), StringComparison.OrdinalIgnoreCase));
+            int index = Privileges.FindIndex(x => x.Equals(input.Trim(), StringComparison.OrdinalIgnoreCase));
             if (-1 != index)
             {
-                output = privileges[index];
+                output = Privileges[index];
                 return true;
             }
             else

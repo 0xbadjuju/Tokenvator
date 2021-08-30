@@ -532,6 +532,7 @@ namespace Tokenvator.Plugins.AccessTokens
                 {
                     Console.WriteLine("[-] NtCloseHandle Generated an Exception");
                     Console.WriteLine("[-] {0}", ex.Message);
+                    Console.WriteLine("[-] {0}",  (new StackTrace()).GetFrame(1).GetMethod().Name);
                     return false;
                 }
                 return true;
@@ -540,6 +541,7 @@ namespace Tokenvator.Plugins.AccessTokens
             if (0 != ntRetVal)
             {
                 Misc.GetNtError("NtClose", ntRetVal);
+                Console.WriteLine("[-] {0}", (new StackTrace()).GetFrame(1).GetMethod().Name);
                 return false;
             }
             return true;
@@ -567,19 +569,26 @@ namespace Tokenvator.Plugins.AccessTokens
         public virtual void Dispose()
         {
             if (IntPtr.Zero != phNewToken)
-            {                    
+            {
+                //Console.WriteLine("phNewToken");
                 CloseHandle(phNewToken);
             }
             if (IntPtr.Zero != hExistingToken)
             {
+                //Console.WriteLine("hExistingToken");
                 CloseHandle(hExistingToken);
             }
+            /*
+            This should be covered by the other closed handles
             if (IntPtr.Zero != hWorkingToken && currentProcessToken != hWorkingToken)
             {
+                Console.WriteLine("hWorkingToken");
                 CloseHandle(hWorkingToken);
             }
+            */
             if (IntPtr.Zero != hWorkingThreadToken)
             {
+                //Console.WriteLine("hWorkingThreadToken");
                 CloseHandle(hWorkingThreadToken);
             }
 

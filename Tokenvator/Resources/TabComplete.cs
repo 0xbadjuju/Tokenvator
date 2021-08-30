@@ -189,7 +189,7 @@ namespace Tokenvator
                 switch (flag)
                 {
                     case "privilege":
-                        candidate = CommandLineParsing.privileges.FirstOrDefault(i => i != item && i.StartsWith(item, true, System.Globalization.CultureInfo.InvariantCulture));
+                        candidate = CommandLineParsing.Privileges.FirstOrDefault(i => i != item && i.StartsWith(item, true, System.Globalization.CultureInfo.InvariantCulture));
                         string[] j = input.Split(new string[] { ":" }, StringSplitOptions.None);
                         string k = string.Join(":", j.Take(j.Length - 1));
                         ResetLine();

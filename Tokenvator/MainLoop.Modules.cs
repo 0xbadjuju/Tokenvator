@@ -398,7 +398,7 @@ namespace Tokenvator
                     t.SetWorkingTokenToSelf();
                 }
 
-                hToken = t.GetWorkingToken();
+                //hToken = t.GetWorkingToken();
 
                 Console.WriteLine("[*] Primary Token");
                 t.GetTokenUser();
@@ -705,22 +705,46 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         private static void _NukePrivileges(CommandLineParsing cLP, IntPtr hToken)
         {
-            using (TokenManipulation t = new TokenManipulation(hToken))
+            using (TokenInformation ti = new TokenInformation(hToken))
             {
                 if (cLP.Remote)
                 {
-                    t.SetWorkingTokenToRemote();
-                    if (!t.OpenProcessToken(cLP.ProcessID))
+                    if (!ti.OpenProcessToken(cLP.ProcessID))
                     {
                         return;
                     }
+                    ti.SetWorkingTokenToRemote();
                 }
                 else
                 {
-                    t.SetWorkingTokenToSelf();
+                    ti.SetWorkingTokenToSelf();
                 }
 
-                t.DisableAndRemoveAllTokenPrivileges();
+                ti.GetTokenPrivileges();
+                using (TokenManipulation tm = new TokenManipulation(ti.GetWorkingToken()))
+                {
+                    tm.SetWorkingTokenToSelf();
+
+                    foreach (string privilege in ti.Privileges)
+                    {
+                        int index = CommandLineParsing.Privileges.FindIndex(x => x.Equals(privilege, StringComparison.OrdinalIgnoreCase));
+                        if (-1 != index)
+                        {
+                            if (!tm.SetTokenPrivilege(CommandLineParsing.Privileges[index], Winnt.TokenPrivileges.SE_PRIVILEGE_REMOVED))
+                            {
+                                tm.SetTokenPrivilege(CommandLineParsing.Privileges[index], Winnt.TokenPrivileges.SE_PRIVILEGE_NONE);
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine("[-] Privilege \"{0}\" not indexed", privilege);
+                            Console.WriteLine("[-] A bug report would be appreciated");
+                        }
+                        Thread.Sleep(1000);
+                    }
+                }
+
+                ti.GetTokenPrivileges();
             }
         }
 
@@ -1223,7 +1247,7 @@ namespace Tokenvator
         {
             if ("privileges" == input.ToLower())
             {
-                foreach (string item in TokenManipulation.validPrivileges)
+                foreach (string item in CommandLineParsing.Privileges)
                 {
                     Console.WriteLine(item);
                 }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using System.Security;
@@ -10,6 +11,7 @@ using DInvoke.DynamicInvoke;
 using Tokenvator.Resources;
 
 using MonkeyWorks.Unmanaged.Headers;
+
 //using MonkeyWorks.Unmanaged.Libraries;
 
 namespace Tokenvator.Plugins.AccessTokens
@@ -38,6 +40,8 @@ namespace Tokenvator.Plugins.AccessTokens
         public IntPtr hTokenElevationType;
         public IntPtr hTokenType;
 
+        public List<string> Privileges { get; private set; }
+
         private readonly IntPtr hNtQueryInformationToken;
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -49,6 +53,8 @@ namespace Tokenvator.Plugins.AccessTokens
         public TokenInformation(IntPtr hToken) : base(hToken)
         {
             hNtQueryInformationToken = Generic.GetSyscallStub("NtQueryInformationToken");
+
+            Privileges = new List<string>();
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -404,15 +410,14 @@ namespace Tokenvator.Plugins.AccessTokens
             ////////////////////////////////////////////////////////////////////////////////
             IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
 
-            IntPtr hLookupPrivilegeName = Generic.GetExportAddress(hadvapi32, "LookupPrivilegeNameW");
-            MonkeyWorks.advapi32.LookupPrivilegeNameW fLookupPrivilegeName = (MonkeyWorks.advapi32.LookupPrivilegeNameW)Marshal.GetDelegateForFunctionPointer(hLookupPrivilegeName, typeof(MonkeyWorks.advapi32.LookupPrivilegeNameW));
+            IntPtr hLookupPrivilegeNameW = Generic.GetExportAddress(hadvapi32, "LookupPrivilegeNameW");
+            MonkeyWorks.advapi32.LookupPrivilegeNameW fLookupPrivilegeNameW = (MonkeyWorks.advapi32.LookupPrivilegeNameW)Marshal.GetDelegateForFunctionPointer(hLookupPrivilegeNameW, typeof(MonkeyWorks.advapi32.LookupPrivilegeNameW));
 
             //IntPtr hPrivilegeCheck = Generic.GetExportAddress(hadvapi32, "PrivilegeCheck");
             //MonkeyWorks.advapi32.PrivilegeCheck fPrivilegeCheck = (MonkeyWorks.advapi32.PrivilegeCheck)Marshal.GetDelegateForFunctionPointer(hPrivilegeCheck, typeof(MonkeyWorks.advapi32.PrivilegeCheck));
 
             IntPtr hNtPrivilegeCheck = Generic.GetSyscallStub("NtPrivilegeCheck");
             MonkeyWorks.ntdll.NtPrivilegeCheck fSyscallNtPrivilegeCheck = (MonkeyWorks.ntdll.NtPrivilegeCheck)Marshal.GetDelegateForFunctionPointer(hNtPrivilegeCheck, typeof(MonkeyWorks.ntdll.NtPrivilegeCheck));
-
 
             for (int i = 0; i < tokenPrivileges.PrivilegeCount; i++)
             {
@@ -430,7 +435,7 @@ namespace Tokenvator.Plugins.AccessTokens
 
                 try
                 {
-                    fLookupPrivilegeName(null, lpLuid, null, ref cchName);
+                    fLookupPrivilegeNameW(null, lpLuid, null, ref cchName);
                 }
                 catch (Exception ex)
                 {
@@ -449,7 +454,7 @@ namespace Tokenvator.Plugins.AccessTokens
                 bool retVal = false;
                 try
                 {
-                    retVal = fLookupPrivilegeName(null, lpLuid, lpName, ref cchName);
+                    retVal = fLookupPrivilegeNameW(null, lpLuid, lpName, ref cchName);
                 }
                 catch (Exception ex)
                 {
@@ -497,6 +502,11 @@ namespace Tokenvator.Plugins.AccessTokens
                     continue;
                 }
                 Console.WriteLine("{0,-45}{1,-30}", lpName.ToString(), Convert.ToBoolean(pfResult));
+
+                if (!Privileges.Contains(lpName.ToString()))
+                {
+                    Privileges.Add(lpName.ToString().Trim());
+                }
             }
             Console.WriteLine();
         }
