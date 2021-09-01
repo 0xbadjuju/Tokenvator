@@ -1,20 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
+using System.Security;
 using System.Security.Principal;
 using System.Text;
 
 using DInvoke.DynamicInvoke;
-using DInvoke.ManualMap;
-using DInvoke.Data;
 
 using Tokenvator.Resources;
 using Tokenvator.Plugins.Enumeration;
 
 using MonkeyWorks.Unmanaged.Headers;
-using System.Runtime.ExceptionServices;
-using System.Security;
-using MonkeyWorks.Unmanaged.Libraries;
 
 namespace Tokenvator.Plugins.AccessTokens
 {
@@ -554,13 +551,15 @@ namespace Tokenvator.Plugins.AccessTokens
             ////////////////////////////////////////////////////////////////////////////////
             // GetExportAddress was returning the wrong address for NetUserGetLocalGroups
             // Using Kernel32.GetProcAddress which was returning the correct address
-            // IntPtr hNetUserGetLocalGroups2 = kernel32.GetProcAddress(hnetapi32, "NetUserGetLocalGroups");
             ////////////////////////////////////////////////////////////////////////////////
             IntPtr hkernel32 = Generic.GetPebLdrModuleEntry("kernel32.dll");
             IntPtr hGetProcAddress = Generic.GetExportAddress(hkernel32, "GetProcAddress");
-            MonkeyWorks.kernel32.GetProcAddress fGetProcAddress = (MonkeyWorks.kernel32.GetProcAddress)Marshal.GetDelegateForFunctionPointer(hGetProcAddress, typeof(MonkeyWorks.kernel32.GetProcAddress));            
-    
-            #region NetUserGetLocalGroups       
+            MonkeyWorks.kernel32.GetProcAddress fGetProcAddress = (MonkeyWorks.kernel32.GetProcAddress)Marshal.GetDelegateForFunctionPointer(hGetProcAddress, typeof(MonkeyWorks.kernel32.GetProcAddress));
+
+            #region NetUserGetLocalGroups    
+            ////////////////////////////////////////////////////////////////////////////////
+            // IntPtr hNetUserGetLocalGroups = kernel32.GetProcAddress(hnetapi32, "NetUserGetLocalGroups");
+            ////////////////////////////////////////////////////////////////////////////////
             IntPtr hNetUserGetLocalGroups = IntPtr.Zero;
             try
             {
@@ -637,15 +636,28 @@ namespace Tokenvator.Plugins.AccessTokens
 
             #region NetUserGetGroups
             ////////////////////////////////////////////////////////////////////////////////
+            // IntPtr hNetUserGetGroups = kernel32.GetProcAddress(hnetapi32, "NetUserGetGroups");
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hNetUserGetGroups = IntPtr.Zero;
+            try
+            {
+                hNetUserGetGroups = fGetProcAddress(hnetapi32, "NetUserGetGroups");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] GetProcAddress Generated an Exception");
+                Console.WriteLine(ex.Message);
+            }
+
+            ////////////////////////////////////////////////////////////////////////////////
             //netapi32.NetUserGetGroups(domain, userName.ToLower(), 0, out bufPtr, -1, ref globalEntriesRead, ref globalEotalEntriesRead);
             ////////////////////////////////////////////////////////////////////////////////
-            IntPtr hNetUserGetGroups = Generic.GetExportAddress(hnetapi32, "NetUserGetGroups");
             MonkeyWorks.netapi32.NetUserGetGroups fNetUserGetGroups = (MonkeyWorks.netapi32.NetUserGetGroups)Marshal.GetDelegateForFunctionPointer(hNetUserGetGroups, typeof(MonkeyWorks.netapi32.NetUserGetGroups));
 
             lmaccess._GROUP_USERS_INFO_0[] globalGroupUserInfo;
             try
             {
-                netRetVal = netapi32.NetUserGetGroups(
+                netRetVal = fNetUserGetGroups(
                     domain,
                     userName.ToLower(),
                     0,
