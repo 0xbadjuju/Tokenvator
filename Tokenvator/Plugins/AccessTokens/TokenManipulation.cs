@@ -14,7 +14,7 @@ using Tokenvator.Plugins.Enumeration;
 using Tokenvator.Plugins.Execution;
 
 using MonkeyWorks.Unmanaged.Headers;
-//using MonkeyWorks.Unmanaged.Libraries;
+using MonkeyWorks.Unmanaged.Libraries;
 
 namespace Tokenvator.Plugins.AccessTokens
 {
@@ -246,14 +246,14 @@ namespace Tokenvator.Plugins.AccessTokens
 
             IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
             IntPtr hLogonUserW = Generic.GetExportAddress(hadvapi32, "LogonUserW");
-            MonkeyWorks.advapi32.LogonUserW fLLogonUserW = (MonkeyWorks.advapi32.LogonUserW)Marshal.GetDelegateForFunctionPointer(hLogonUserW, typeof(MonkeyWorks.advapi32.LogonUserW));
+            MonkeyWorks.advapi32.LogonUserW fLogonUserW = (MonkeyWorks.advapi32.LogonUserW)Marshal.GetDelegateForFunctionPointer(hLogonUserW, typeof(MonkeyWorks.advapi32.LogonUserW));
 
             bool retVal = false;
             try
             {
-                fLLogonUserW(username, domain, password, logonType, Winbase.LOGON_PROVIDER.LOGON32_PROVIDER_DEFAULT, out hExistingToken);
+                retVal = fLogonUserW(username, domain, password, logonType, Winbase.LOGON_PROVIDER.LOGON32_PROVIDER_DEFAULT, out hExistingToken);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Console.WriteLine("[-] LogonUserW Generated an Exception");
                 Console.WriteLine("[-] {0}", ex.Message);
@@ -335,12 +335,12 @@ namespace Tokenvator.Plugins.AccessTokens
 
             IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
             IntPtr hLogonUserExExW = Generic.GetExportAddress(hadvapi32, "LogonUserExExW");
-            MonkeyWorks.advapi32.LogonUserExExW fLLogonUserW = (MonkeyWorks.advapi32.LogonUserExExW)Marshal.GetDelegateForFunctionPointer(hLogonUserExExW, typeof(MonkeyWorks.advapi32.LogonUserExExW));
+            MonkeyWorks.advapi32.LogonUserExExW fLogonUserW = (MonkeyWorks.advapi32.LogonUserExExW)Marshal.GetDelegateForFunctionPointer(hLogonUserExExW, typeof(MonkeyWorks.advapi32.LogonUserExExW));
 
             bool retVal = false;
             try
             {
-                fLLogonUserW(username, domain, password, logonType, Winbase.LOGON_PROVIDER.LOGON32_PROVIDER_DEFAULT, ref tokenGroups, out hExistingToken, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+                retVal = fLogonUserW(username, domain, password, logonType, Winbase.LOGON_PROVIDER.LOGON32_PROVIDER_DEFAULT, ref tokenGroups, out hExistingToken, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
             }
             catch(Exception ex)
             {

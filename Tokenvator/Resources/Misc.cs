@@ -66,6 +66,22 @@ namespace Tokenvator.Resources
 
         ////////////////////////////////////////////////////////////////////////////////
         ////////////////////////////////////////////////////////////////////////////////
+        public static void GetNetApiError(string location, uint netError)
+        {
+            if (1722 == netError)
+            {
+                Console.WriteLine("[*] Unable to contact Domain Controller");
+            }
+            else
+            {
+                Console.WriteLine(" [-] Function {0} failed: ", location);
+                Console.WriteLine(" [-] {0}", (MonkeyWorks.Unmanaged.Libraries.DInvoke.netapi32.NET_API_STATUS)netError);
+
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        ////////////////////////////////////////////////////////////////////////////////
         public static void GetNtError(string location, uint ntError)
         {
             uint win32Error = ntdll.RtlNtStatusToDosError(ntError);

