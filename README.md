@@ -16,4 +16,6 @@ Author: Alexander Polce Leary (@0xbadjuju), NetSPI - 2018
 
 License: BSD 3-Clause
 
-Required Dependencies: None
+Dependencies: 
+[MonkeyWorks](https://github.com/0xbadjuju/MonkeyWorks)
+[DInvoke](https://github.com/TheWover/DInvoke)
