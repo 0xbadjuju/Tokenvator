@@ -5,6 +5,8 @@ using System.Security.Principal;
 using System.Text;
 
 using DInvoke.DynamicInvoke;
+using DInvoke.ManualMap;
+using DInvoke.Data;
 
 using Tokenvator.Resources;
 using Tokenvator.Plugins.Enumeration;
@@ -518,11 +520,13 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
         /// Creates the TOKEN_GROUPS Structure
-        /// Converted to D/Invoke GetPebLdrModuleEntry/GetExportAddress/LoadModuleFromDisk
+        /// Converted to D/Invoke GetPebLdrModuleEntry/GetExportAddress
         /// </summary>
         /// <param name="command"></param>
         /// <returns></returns>
         ////////////////////////////////////////////////////////////////////////////////
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
         internal bool CreateTokenGroups(string domain, string userName, out Ntifs._TOKEN_GROUPS tokenGroups, out Winnt._TOKEN_PRIMARY_GROUP tokenPrimaryGroup, string[] groups)
         {
             Console.WriteLine("[*] _TOKEN_GROUPS");
@@ -531,6 +535,11 @@ namespace Tokenvator.Plugins.AccessTokens
             tokenGroups.Initialize();
             tokenPrimaryGroup = new Winnt._TOKEN_PRIMARY_GROUP();
 
+            uint LG_INCLUDE_INDIRECT = 0x0001;
+
+            ////////////////////////////////////////////////////////////////////////////////
+            // hnetapi32 = kernel32.LoadLibrary("netapi32.dll");
+            ////////////////////////////////////////////////////////////////////////////////
             IntPtr hnetapi32 = Generic.GetPebLdrModuleEntry("netapi32.dll");
             if (IntPtr.Zero == hnetapi32)
             {
@@ -542,35 +551,50 @@ namespace Tokenvator.Plugins.AccessTokens
                 }
             }
 
-            uint LG_INCLUDE_INDIRECT = 0x0001;
-
-            #region NetUserGetLocalGroups
             ////////////////////////////////////////////////////////////////////////////////
+            // GetExportAddress was returning the wrong address for NetUserGetLocalGroups
+            // Using Kernel32.GetProcAddress which was returning the correct address
+            // IntPtr hNetUserGetLocalGroups2 = kernel32.GetProcAddress(hnetapi32, "NetUserGetLocalGroups");
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hkernel32 = Generic.GetPebLdrModuleEntry("kernel32.dll");
+            IntPtr hGetProcAddress = Generic.GetExportAddress(hkernel32, "GetProcAddress");
+            MonkeyWorks.kernel32.GetProcAddress fGetProcAddress = (MonkeyWorks.kernel32.GetProcAddress)Marshal.GetDelegateForFunctionPointer(hGetProcAddress, typeof(MonkeyWorks.kernel32.GetProcAddress));            
+    
+            #region NetUserGetLocalGroups       
+            IntPtr hNetUserGetLocalGroups = IntPtr.Zero;
+            try
+            {
+                hNetUserGetLocalGroups = fGetProcAddress(hnetapi32, "NetUserGetLocalGroups");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] GetProcAddress Generated an Exception");
+                Console.WriteLine(ex.Message);
+            }
+
+            /*
+            byte[] bytes = System.IO.File.ReadAllBytes(@"C:\Windows\System32\netapi32.dll");
+            PE.PE_MANUAL_MAP ManMapTest3 = Map.MapModuleToMemory(bytes);
+            Generic.CallMappedDLLModule(ManMapTest3.PEINFO, ManMapTest3.ModuleBase);
+            hNetUserGetLocalGroups = Generic.GetExportAddress(hnetapi32, 240);
+            fNetUserGetLocalGroups = (MonkeyWorks.netapi32.NetUserGetLocalGroups)Marshal.GetDelegateForFunctionPointer(hNetUserGetLocalGroups, typeof(MonkeyWorks.netapi32.NetUserGetLocalGroups));
+            */
+
+            ////////////////////////////////////////////////////////////////////////////////
+            // This failed hard with directly calling GetExportAddress against hnetapi32
             // ntRetVal = netapi32.NetUserGetLocalGroups(domain, userName.ToLower(), 0, LG_INCLUDE_INDIRECT, out bufPtr, -1, ref localEntriesRead, ref localTotalEntriesRead);
             ////////////////////////////////////////////////////////////////////////////////
-            IntPtr hNetUserGetLocalGroups = Generic.GetExportAddress(hnetapi32, "NetUserGetLocalGroups");
-            MonkeyWorks.netapi32.NetUserGetLocalGroups fNetUserGetLocalGroups = (MonkeyWorks.netapi32.NetUserGetLocalGroups)Marshal.GetDelegateForFunctionPointer(hNetUserGetLocalGroups, typeof(MonkeyWorks.netapi32.NetUserGetLocalGroups));
-
             lmaccess._LOCALGROUP_USERS_INFO_0[] localgroupUserInfo;
             IntPtr bufPtr = IntPtr.Zero;
 
-            uint ntRetVal = netapi32.NetUserGetLocalGroups(
-                domain,
-                userName.ToLower(),
-                0,
-                LG_INCLUDE_INDIRECT,
-                out bufPtr,
-                -1,
-                ref localEntriesRead,
-                ref localTotalEntriesRead
-            );
+            MonkeyWorks.netapi32.NetUserGetLocalGroups fNetUserGetLocalGroups = (MonkeyWorks.netapi32.NetUserGetLocalGroups)Marshal.GetDelegateForFunctionPointer(hNetUserGetLocalGroups, typeof(MonkeyWorks.netapi32.NetUserGetLocalGroups));
 
-            /*
+            uint netRetVal = 0;
             try
             {
-                ntRetVal = fNetUserGetLocalGroups(
-                    domain,
-                    userName.ToLower(),
+                netRetVal = fNetUserGetLocalGroups(
+                    ref domain,
+                    ref userName,
                     0,
                     LG_INCLUDE_INDIRECT,
                     out bufPtr,
@@ -584,10 +608,10 @@ namespace Tokenvator.Plugins.AccessTokens
                 Console.WriteLine("[-] NetUserGetLocalGroups Generated an Exception");
                 Console.WriteLine(ex);
             }
-            */
-            if (0 != ntRetVal)
+
+            if (0 != netRetVal)
             {
-                Misc.GetNetApiError("NetUserGetLocalGroups", ntRetVal);
+                Misc.GetNetApiError("NetUserGetLocalGroups", netRetVal);
 
             }
 
@@ -621,7 +645,7 @@ namespace Tokenvator.Plugins.AccessTokens
             lmaccess._GROUP_USERS_INFO_0[] globalGroupUserInfo;
             try
             {
-                ntRetVal = netapi32.NetUserGetGroups(
+                netRetVal = netapi32.NetUserGetGroups(
                     domain,
                     userName.ToLower(),
                     0,
@@ -637,9 +661,9 @@ namespace Tokenvator.Plugins.AccessTokens
                 Console.WriteLine(ex.Message);
             }
 
-            if (0 != ntRetVal)
+            if (0 != netRetVal)
             {
-                Misc.GetNetApiError("NetUserGetGroups", ntRetVal);
+                Misc.GetNetApiError("NetUserGetGroups", netRetVal);
             }
 
             globalGroupUserInfo = new lmaccess._GROUP_USERS_INFO_0[globalEntriesRead];
