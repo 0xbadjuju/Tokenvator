@@ -76,7 +76,6 @@ namespace Tokenvator.Resources
             {
                 Console.WriteLine(" [-] Function {0} failed: ", location);
                 Console.WriteLine(" [-] {0}", (MonkeyWorks.Unmanaged.Libraries.DInvoke.netapi32.NET_API_STATUS)netError);
-
             }
         }
 

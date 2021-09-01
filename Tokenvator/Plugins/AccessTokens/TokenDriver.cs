@@ -1,18 +1,24 @@
 ﻿using System;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
+using System.Security;
 using System.Text;
 using Microsoft.Win32;
 using Microsoft.Win32.SafeHandles;
 
+using DInvoke.DynamicInvoke;
+
 using Tokenvator.Resources;
 
 using MonkeyWorks.Unmanaged.Headers;
-using MonkeyWorks.Unmanaged.Libraries;
+//using MonkeyWorks.Unmanaged.Libraries;
 
 
 namespace Tokenvator.Plugins.AccessTokens
 {
+    using MonkeyWorks = MonkeyWorks.Unmanaged.Libraries.DInvoke;
+
     class TokenDriver : IDisposable
     {
         internal enum PRIVILEGES : ulong
@@ -353,37 +359,100 @@ namespace Tokenvator.Plugins.AccessTokens
         }
 
         ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Creates and loads a driver
+        /// Converted to D/Invoke GetPebLdrModuleEntry/GetExportAddress
+        /// </summary>
+        /// <param name="lpBinaryPathName"></param>
+        /// <returns></returns>
         ////////////////////////////////////////////////////////////////////////////////
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
         public bool LoadDriverSC(string lpBinaryPathName)
         {
-            IntPtr hSCManager = advapi32.OpenSCManager(
-                string.Empty,
-                string.Empty, 
-                Winsvc.dwSCManagerDesiredAccess.SC_MANAGER_CREATE_SERVICE
-            );
+            IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
+
+            ////////////////////////////////////////////////////////////////////////////////
+            // advapi32.OpenSCManager(string.Empty,string.Empty, Winsvc.dwSCManagerDesiredAccess.SC_MANAGER_CREATE_SERVICE);
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hOpenSCManager = Generic.GetExportAddress(hadvapi32, "OpenSCManagerW");
+            MonkeyWorks.advapi32.OpenSCManagerW fOpenSCManager = (MonkeyWorks.advapi32.OpenSCManagerW)Marshal.GetDelegateForFunctionPointer(hOpenSCManager, typeof(MonkeyWorks.advapi32.OpenSCManagerW));
+
+            IntPtr hSCManager = IntPtr.Zero;
+            try
+            {
+                hSCManager = fOpenSCManager(
+                    string.Empty,
+                    string.Empty,
+                    Winsvc.dwSCManagerDesiredAccess.SC_MANAGER_CREATE_SERVICE
+                );
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine("[-] OpenSCManagerW Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+                return false;
+            }
+
             if (IntPtr.Zero == hSCManager)
             {
                 Misc.GetWin32Error("OpenSCManager");
                 return false;
             }
 
-            IntPtr hService = advapi32.CreateService(
-                hSCManager,
-                "ScTokenDriver", "ScTokenDriver",
-                Winsvc.dwDesiredAccess.SERVICE_START,
-                Winsvc.dwServiceType.SERVICE_KERNEL_DRIVER,
-                Winsvc.dwStartType.SERVICE_DEMAND_START,
-                Winsvc.dwErrorControl.SERVICE_ERROR_NORMAL,
-                lpBinaryPathName,
-                string.Empty, string.Empty, string.Empty, string.Empty, string.Empty
-            );
+            ////////////////////////////////////////////////////////////////////////////////
+            // advapi32.OpenSCManager(string.Empty,string.Empty, Winsvc.dwSCManagerDesiredAccess.SC_MANAGER_CREATE_SERVICE);
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hCreateServiceW = Generic.GetExportAddress(hadvapi32, "CreateServiceW");
+            MonkeyWorks.advapi32.CreateServiceW fCreateServiceW = (MonkeyWorks.advapi32.CreateServiceW)Marshal.GetDelegateForFunctionPointer(hCreateServiceW, typeof(MonkeyWorks.advapi32.CreateServiceW));
+
+            IntPtr hService = IntPtr.Zero;
+            try
+            {
+                hService = fCreateServiceW(
+                    hSCManager,
+                    "ScTokenDriver",
+                    "ScTokenDriver",
+                    Winsvc.dwDesiredAccess.SERVICE_START,
+                    Winsvc.dwServiceType.SERVICE_KERNEL_DRIVER,
+                    Winsvc.dwStartType.SERVICE_DEMAND_START,
+                    Winsvc.dwErrorControl.SERVICE_ERROR_NORMAL,
+                    lpBinaryPathName,
+                    string.Empty, string.Empty, string.Empty, string.Empty, string.Empty
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] CreateServiceW Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+                return false;
+            }
+
             if (IntPtr.Zero == hService)
             {
                 Misc.GetWin32Error("CreateService");
                 return false;
             }
 
-            if (!advapi32.StartService(hService, 0, new string[0]))
+            ////////////////////////////////////////////////////////////////////////////////
+            // advapi32.StartService(hService, 0, new string[0])
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hStartServiceW = Generic.GetExportAddress(hadvapi32, "StartServiceW");
+            MonkeyWorks.advapi32.StartServiceW fStartServiceW = (MonkeyWorks.advapi32.StartServiceW)Marshal.GetDelegateForFunctionPointer(hStartServiceW, typeof(MonkeyWorks.advapi32.StartServiceW));
+
+            bool retVat = false;
+            try
+            {
+                retVat = fStartServiceW(hService, 0, new string[0]);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] StartServiceW Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+                return false;
+            }
+
+            if (!retVat)
             {
                 Misc.GetWin32Error("StartService");
                 return false;

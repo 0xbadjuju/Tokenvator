@@ -111,6 +111,7 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         // UAC Token Magic - Deprecated
         ////////////////////////////////////////////////////////////////////////////////
+        /*
         private static void _BypassUAC(CommandLineParsing cLP, IntPtr hToken)
         {
             Console.WriteLine("[*] Notice: This no longer working on versions of Windows 10 > 1703");
@@ -135,6 +136,7 @@ namespace Tokenvator
                 }
             }
         }
+        */
 
         ////////////////////////////////////////////////////////////////////////////////
         //

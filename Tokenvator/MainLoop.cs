@@ -159,9 +159,11 @@ namespace Tokenvator
                     case "add_privilege":
                         _AddPrivilege(cLP);
                         break;
+                        /*
                     case "bypassuac":
                         _BypassUAC(cLP, hToken);
                         break;
+                        */
                     case "clear_desktop_acl":
                         _ClearDesktopACL();
                         break;
