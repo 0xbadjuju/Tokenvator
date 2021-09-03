@@ -12,6 +12,8 @@ using Tokenvator.Resources;
 using Tokenvator.Plugins.Enumeration;
 
 using MonkeyWorks.Unmanaged.Headers;
+using System.Diagnostics;
+using Tokenvator.Plugins.Execution;
 
 namespace Tokenvator.Plugins.AccessTokens
 {
@@ -286,7 +288,7 @@ namespace Tokenvator.Plugins.AccessTokens
 
             Console.WriteLine();
 
-            using (DesktopACL desktop = new DesktopACL())
+            using (DesktopACL desktop = new DesktopACL(hWorkingToken))
             {
                 desktop.OpenDesktop();
                 desktop.OpenWindow();
@@ -393,7 +395,7 @@ namespace Tokenvator.Plugins.AccessTokens
                 command = "cmd.exe";
             }
 
-            using (DesktopACL desktop = new DesktopACL())
+            using (DesktopACL desktop = new DesktopACL(hWorkingToken))
             {
                 desktop.OpenDesktop();
                 desktop.OpenWindow();
@@ -413,8 +415,6 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         private bool _CheckPrivileges()
         {
-            bool exists, enabled;
-
             using (TokenInformation ti = new TokenInformation(hWorkingToken))
             {
                 ti.SetWorkingTokenToSelf();
@@ -423,30 +423,12 @@ namespace Tokenvator.Plugins.AccessTokens
                 // Checks if SeCreateTokenPrivilege is present and enabled on the token
                 // if it present but not enabled on the token, it is automatically enabled
                 ////////////////////////////////////////////////////////////////////////////////
-                if (!ti.CheckTokenPrivilege(Winnt.SE_CREATETOKEN_NAME, out exists, out enabled))
-                {
-                    Console.WriteLine("[-] Check Token Privilege Failed");
-                    return false;
-                }
-                if (!exists)
+                if (!ti.CheckTokenPrivilege(Winnt.SE_CREATETOKEN_NAME))
                 {
                     Console.WriteLine("[-] {0} is not present on the token", Winnt.SE_CREATETOKEN_NAME);
                     Console.WriteLine("[-] Steal_Token lsass cmd.exe");
                     Console.WriteLine("[-] Add_Privilege SeCreateTokenPrivilege");
                     return false;
-                }
-                if (!enabled)
-                {
-                    Console.WriteLine("[-] {0} is not enabled on the token", Winnt.SE_CREATETOKEN_NAME);
-                    Console.WriteLine("[*] Enabling {0} on the token", Winnt.SE_CREATETOKEN_NAME);
-                    using (TokenManipulation tm = new TokenManipulation(hWorkingToken))
-                    {
-                        tm.SetWorkingTokenToSelf();
-                        if (!tm.SetTokenPrivilege(Winnt.SE_CREATETOKEN_NAME, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED))
-                        {
-                            return false;
-                        }
-                    }
                 }
                 else
                 {
@@ -457,30 +439,12 @@ namespace Tokenvator.Plugins.AccessTokens
                 // Checks if SeSecurityPrivilege is present and enabled on the token
                 // if it present but not enabled on the token, it is automatically enabled
                 ////////////////////////////////////////////////////////////////////////////////
-                if (!ti.CheckTokenPrivilege(Winnt.SE_SECURITY_NAME, out exists, out enabled))
-                {
-                    Console.WriteLine("[-] Check Token Privilege Failed");
-                    return false;
-                }
-                if (!exists)
+                if (!ti.CheckTokenPrivilege(Winnt.SE_SECURITY_NAME))
                 {
                     Console.WriteLine("[-] {0} is not present on the token", Winnt.SE_SECURITY_NAME);
                     Console.WriteLine("[-] This should be present on existing high integrity tokens");
                     Console.WriteLine("[-] Add_Privilege SeCreateTokenPrivilege");
                     return false;
-                }
-                if (!enabled)
-                {
-                    Console.WriteLine("[-] {0} is not enabled on the token", Winnt.SE_SECURITY_NAME);
-                    Console.WriteLine("[*] Enabling {0} on the token", Winnt.SE_SECURITY_NAME);
-                    using (TokenManipulation tm = new TokenManipulation(hWorkingToken))
-                    {
-                        tm.SetWorkingTokenToSelf();
-                        if (!tm.SetTokenPrivilege(Winnt.SE_SECURITY_NAME, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED))
-                        {
-                            return false;
-                        }
-                    }
                 }
                 else
                 {
@@ -1009,6 +973,178 @@ namespace Tokenvator.Plugins.AccessTokens
 
         ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
+        /// Logs on a user to create a new token for that user
+        /// Useful for impersonating NetworkService or LocalService
+        /// </summary>
+        /// <param name="domain"></param>
+        /// <param name="username"></param>
+        /// <param name="password"></param>
+        /// <param name="logonType"></param>
+        /// <param name="command"></param>
+        /// <param name="arguments"></param>
+        ////////////////////////////////////////////////////////////////////////////////
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
+        public void LogonUser(string domain, string username, string password, Winbase.LOGON_TYPE logonType, string command, string arguments)
+        {
+            ////////////////////////////////////////////////////////////////////////////////
+            // Call LogonUser - this will trigger a logon event, but is sometimes the better than the alternative
+            // advapi32.LogonUser(username, domain, password, logonType, Winbase.LOGON_PROVIDER.LOGON32_PROVIDER_DEFAULT, out hExistingToken)
+            ////////////////////////////////////////////////////////////////////////////////
+
+            IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
+            IntPtr hLogonUserW = Generic.GetExportAddress(hadvapi32, "LogonUserW");
+            MonkeyWorks.advapi32.LogonUserW fLogonUserW = (MonkeyWorks.advapi32.LogonUserW)Marshal.GetDelegateForFunctionPointer(hLogonUserW, typeof(MonkeyWorks.advapi32.LogonUserW));
+
+            bool retVal = false;
+            try
+            {
+                retVal = fLogonUserW(username, domain, password, logonType, Winbase.LOGON_PROVIDER.LOGON32_PROVIDER_DEFAULT, out hExistingToken);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] LogonUserW Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+                return;
+            }
+
+            if (!retVal)
+            {
+                Misc.GetWin32Error("LogonUserW");
+                return;
+            }
+            Console.WriteLine("[+] Logged On {0}", username.TrimEnd());
+
+            if (Winbase.LOGON_TYPE.LOGON32_LOGON_SERVICE == logonType)
+            {
+                if (!_SetTokenSessionId(Process.GetCurrentProcess().SessionId))
+                {
+                    Console.WriteLine(" [-] Unable to Update Token Session ID, this is likely to cause problems with this token");
+                }
+            }
+
+            using (DesktopACL da = new DesktopACL(hWorkingToken))
+            {
+                da.OpenWindow();
+                da.OpenDesktop();
+            }
+
+            if (string.IsNullOrEmpty(command))
+            {
+                SetWorkingTokenToRemote();
+                ImpersonateUser();
+            }
+            else
+            {
+                //This should probably be handled in class
+                Create createProcess;
+                if (0 == Process.GetCurrentProcess().SessionId)
+                {
+                    createProcess = CreateProcess.CreateProcessWithLogonW;
+                }
+                else
+                {
+                    createProcess = CreateProcess.CreateProcessWithTokenW;
+                }
+
+                createProcess(hExistingToken, command, arguments);
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Logs on a user to create a new token for that user with custom groups
+        /// Useful for doing things like getting trustedinstaller
+        /// Converted to D/Invoke GetPebLdrModuleEntry/GetExportAddress
+        /// </summary>
+        /// <param name="domain"></param>
+        /// <param name="username"></param>
+        /// <param name="password"></param>
+        /// <param name="groups"></param>
+        /// <param name="logonType"></param>
+        /// <param name="command"></param>
+        /// <param name="arguments"></param>
+        ////////////////////////////////////////////////////////////////////////////////
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
+        public void LogonUser(string domain, string username, string password, string groups, Winbase.LOGON_TYPE logonType, string command, string arguments)
+        {
+            ////////////////////////////////////////////////////////////////////////////////
+            // Create the token groups structure
+            ////////////////////////////////////////////////////////////////////////////////
+
+            SetWorkingTokenToSelf();
+
+            Ntifs._TOKEN_GROUPS tokenGroups;
+            Winnt._TOKEN_PRIMARY_GROUP tokenPrimaryGroup;
+            using (CreateTokens ct = new CreateTokens(hWorkingToken))
+            {
+                ct.CreateTokenGroups(domain, username, out tokenGroups, out tokenPrimaryGroup, groups.Split(','));
+            }
+
+            ////////////////////////////////////////////////////////////////////////////////
+            // Call LogonUserExExW which allows us to manually specify the groups
+            // advapi32.LogonUserExExW(username, domain, password, logonType, Winbase.LOGON_PROVIDER.LOGON32_PROVIDER_DEFAULT, ref tokenGroups, out hExistingToken, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero)
+            ////////////////////////////////////////////////////////////////////////////////
+
+            IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
+            IntPtr hLogonUserExExW = Generic.GetExportAddress(hadvapi32, "LogonUserExExW");
+            MonkeyWorks.advapi32.LogonUserExExW fLogonUserW = (MonkeyWorks.advapi32.LogonUserExExW)Marshal.GetDelegateForFunctionPointer(hLogonUserExExW, typeof(MonkeyWorks.advapi32.LogonUserExExW));
+
+            bool retVal = false;
+            try
+            {
+                retVal = fLogonUserW(username, domain, password, logonType, Winbase.LOGON_PROVIDER.LOGON32_PROVIDER_DEFAULT, ref tokenGroups, out hExistingToken, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] LogonUserExExW Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+                return;
+            }
+
+            if (!retVal)
+            {
+                Misc.GetWin32Error("LogonUserExExW");
+                return;
+            }
+            Console.WriteLine("[+] Logged On {0}", username.TrimEnd());
+
+            if (Winbase.LOGON_TYPE.LOGON32_LOGON_SERVICE == logonType)
+            {
+                //Is this needed?
+                SetWorkingTokenToRemote();
+                if (!_SetTokenSessionId(Process.GetCurrentProcess().SessionId))
+                {
+                    Console.WriteLine(" [-] Unable to Update Token Session ID, this is likely to cause problems with this token");
+                }
+            }
+
+            using (DesktopACL da = new DesktopACL(hWorkingToken))
+            {
+                da.OpenWindow();
+                da.OpenDesktop();
+            }
+
+            if (string.IsNullOrEmpty(command))
+            {
+                SetWorkingTokenToRemote();
+                ImpersonateUser();
+            }
+            else
+            {
+                Create createProcess;
+                if (0 == Process.GetCurrentProcess().SessionId)
+                    createProcess = CreateProcess.CreateProcessWithLogonW;
+                else
+                    createProcess = CreateProcess.CreateProcessWithTokenW;
+
+                createProcess(hExistingToken, command, arguments);
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
         /// Looks up the right/privileges assigned to a user / group based on a policy
         /// Converted to D/Invoke GetPebLdrModuleEntry/GetExportAddress
         /// </summary>
@@ -1369,6 +1505,69 @@ namespace Tokenvator.Plugins.AccessTokens
             }
 
             Console.WriteLine(" [+] {0,-20} {1}", sddl, accountName);
+            return true;
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Updates the token session ID to the specified session
+        /// Does this even work?
+        /// Converted to D/Invoke GetPebLdrModuleEntry/GetExportAddress
+        /// </summary>
+        /// <param name="sessionId"></param>
+        /// <returns>Return true if completed without error</returns>
+        ////////////////////////////////////////////////////////////////////////////////
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
+        private bool _SetTokenSessionId(int sessionId)
+        {
+            SetWorkingTokenToSelf();
+
+            using (TokenInformation ti = new TokenInformation(hWorkingToken))
+            {
+                ti.SetWorkingTokenToSelf();
+                if (!ti.CheckTokenPrivilege(Winnt.SE_TCB_NAME))
+                {
+                    return false;
+                }
+            }
+
+            Console.WriteLine("[*] Updating Token Session ID to {0}", sessionId);
+
+            ////////////////////////////////////////////////////////////////////////////////
+            // Update the token information to the current Session ID
+            // advapi32.SetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenSessionId, handle.AddrOfPinnedObject(), sizeof(uint));
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
+            IntPtr hSetTokenInformation = Generic.GetExportAddress(hadvapi32, "SetTokenInformation");
+            MonkeyWorks.advapi32.SetTokenInformation fSetTokenInformation = (MonkeyWorks.advapi32.SetTokenInformation)Marshal.GetDelegateForFunctionPointer(hSetTokenInformation, typeof(MonkeyWorks.advapi32.SetTokenInformation));
+
+            GCHandle handle = GCHandle.Alloc(sessionId, GCHandleType.Pinned);
+            bool retVal = false;
+            try
+            {
+                retVal = fSetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenSessionId, handle.AddrOfPinnedObject(), sizeof(uint));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] NtAdjustPrivilegesToken Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+                return false;
+            }
+            finally
+            {
+                if (null != handle && handle.IsAllocated)
+                {
+                    handle.Free();
+                }
+            }
+
+            if (!retVal)
+            {
+                Misc.GetWin32Error("SetTokenInformation");
+                return false;
+            }
+
             return true;
         }
     }

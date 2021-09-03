@@ -141,9 +141,9 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         //
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _ClearDesktopACL()
+        private static void _ClearDesktopACL(IntPtr hToken)
         {
-            using (DesktopACL dA = new DesktopACL())
+            using (DesktopACL dA = new DesktopACL(hToken))
             {
                 dA.OpenWindow();
                 dA.OpenDesktop();
@@ -251,41 +251,28 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         private static void _GetSystem(CommandLineParsing cLP, IntPtr hToken)
         {
-            bool exists, enabled;
             using (TokenInformation ti = new TokenInformation(hToken))
             {
                 ti.SetWorkingTokenToSelf();
-                if (!ti.CheckTokenPrivilege(Winnt.SE_DEBUG_NAME, out exists, out enabled))
+                if (!ti.CheckTokenPrivilege(Winnt.SE_DEBUG_NAME))
                 {
-                    Console.WriteLine("[-] Check Token Privilege Failed");
-                    return;
-                }
-            }
-
-            if (exists)
-            {
-                using (TokenManipulation t = new TokenManipulation(hToken))
-                {
-                    t.SetWorkingTokenToSelf();
-
-                    if (!enabled)
-                    {
-                        t.SetTokenPrivilege(Winnt.SE_DEBUG_NAME, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED);
-                    }
-
-                    
                     if (string.IsNullOrEmpty(cLP.Command))
-                        t.GetSystem();
+                        NamedPipes.GetSystem();
                     else
-                        t.GetSystem(cLP.CommandAndArgs);
+                        NamedPipes.GetSystem(cLP.Command, cLP.Arguments);
                 }
-            }
-            else
-            {
-                if (string.IsNullOrEmpty(cLP.Command))
-                    NamedPipes.GetSystem();
                 else
-                    NamedPipes.GetSystem(cLP.Command, cLP.Arguments);
+                {
+                    using (TokenManipulation t = new TokenManipulation(hToken))
+                    {
+                        t.SetWorkingTokenToSelf();
+
+                        if (string.IsNullOrEmpty(cLP.Command))
+                            t.GetSystem();
+                        else
+                            t.GetSystem(cLP.CommandAndArgs);
+                    }
+                }
             }
         }
 
@@ -317,9 +304,9 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         private static void _GetTrustedInstallerLogon(CommandLineParsing cLP, IntPtr hToken)
         {
-            using (TokenManipulation t = new TokenManipulation(hToken))
+            using (CreateTokens ct = new CreateTokens(hToken))
             {
-                t.LogonUser(
+                ct.LogonUser(
                     "NT AUTHORITY", 
                     "SYSTEM", 
                     string.Empty, 
@@ -340,31 +327,25 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         private static void _GetTrustedInstallerService(CommandLineParsing cLP, IntPtr hToken)
         {
-            bool exists, enabled;
             using (TokenInformation ti = new TokenInformation(hToken))
             {
                 ti.SetWorkingTokenToSelf();
-                ti.CheckTokenPrivilege(Winnt.SE_DEBUG_NAME, out exists, out enabled);
-            }
-
-            if (exists)
-            {
-                using (TokenManipulation t = new TokenManipulation(hToken))
+                if (!ti.CheckTokenPrivilege(Winnt.SE_DEBUG_NAME))
                 {
-                    t.SetWorkingTokenToSelf();
-
-                    if (!enabled)
-                        t.SetTokenPrivilege(Winnt.SE_DEBUG_NAME, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED);
-
-                    if (string.IsNullOrEmpty(cLP.Command))
-                        t.GetTrustedInstaller();
-                    else
-                        t.GetTrustedInstaller(cLP.CommandAndArgs);
+                    Console.WriteLine("[-] Unable to proceed");
+                    return;
                 }
-            }
-            else
-            {
-                Console.WriteLine("[-] SeDebugPrivilege Is Not Assigned to Token");
+                else
+                {
+                    using (TokenManipulation tm = new TokenManipulation(hToken))
+                    {
+                        tm.SetWorkingTokenToSelf();
+                        if (string.IsNullOrEmpty(cLP.Command))
+                            tm.GetTrustedInstaller();
+                        else
+                            tm.GetTrustedInstaller(cLP.CommandAndArgs);
+                    }
+                }
             }
         }
 
@@ -688,16 +669,16 @@ namespace Tokenvator
                 }
             }
 
-            using (TokenManipulation t = new TokenManipulation(hToken))
+            using (CreateTokens ct = new CreateTokens(hToken))
             {
                 string groups;
                 if (cLP.GetData("groups", out groups))
                 {
-                    t.LogonUser(domain, username, password, groups, logonType, cLP.Command, cLP.Arguments);
+                    ct.LogonUser(domain, username, password, groups, logonType, cLP.Command, cLP.Arguments);
                 }
                 else
                 {
-                    t.LogonUser(domain, username, password, logonType, cLP.Command, cLP.Arguments);
+                    ct.LogonUser(domain, username, password, logonType, cLP.Command, cLP.Arguments);
                 }
             }
         }

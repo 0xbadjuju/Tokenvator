@@ -165,7 +165,7 @@ namespace Tokenvator
                         break;
                         */
                     case "clear_desktop_acl":
-                        _ClearDesktopACL();
+                        _ClearDesktopACL(hToken);
                         break;
                     case "clone_token":
                         _CloneToken(cLP, hToken);

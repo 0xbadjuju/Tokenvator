@@ -655,14 +655,12 @@ namespace Tokenvator.Plugins.AccessTokens
         /// Converted to a mix of D/Invoke Syscalls and GetPebLdrModuleEntry/GetExportAddress
         /// </summary>
         /// <param name="privilegeName"></param>
-        /// <param name="exists"></param>
-        /// <param name="enabled"></param>
         /// <returns></returns>
         ////////////////////////////////////////////////////////////////////////////////
-        public bool CheckTokenPrivilege(string privilegeName, out bool exists, out bool enabled)
+        public bool CheckTokenPrivilege(string privilegeName)
         {
-            exists = false;
-            enabled = false;
+            bool exists = false;
+            bool enabled = false;
 
             IntPtr lpTokenInformation = _GetTokenInformation(Winnt._TOKEN_INFORMATION_CLASS.TokenPrivileges);
 
@@ -752,8 +750,27 @@ namespace Tokenvator.Plugins.AccessTokens
                     continue;
                 }
                 enabled = Convert.ToBoolean(pfResult);
-
+                break;
             }
+
+            if (!exists)
+            {
+                Console.WriteLine("[-] Privileges {0} does not exist on the token");
+                return false;
+            }
+
+            if (!enabled)
+            {
+                using(TokenManipulation tm = new TokenManipulation(hWorkingToken))
+                {
+                    if (!tm.SetTokenPrivilege(privilegeName, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED))
+                    {
+                        Console.WriteLine("[-] Unable to enable privilege {0}");
+                        return false;
+                    }
+                }
+            }
+
             Console.WriteLine();
             return true;
         }

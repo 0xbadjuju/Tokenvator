@@ -17,23 +17,45 @@ namespace Tokenvator.Plugins.Enumeration
         private IntPtr pSid = IntPtr.Zero;
         private IntPtr ppSecurityDescriptor = IntPtr.Zero;
 
+        private IntPtr hToken;
+
+        ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
-        /// 
+        /// Default Constructor
+        /// No Conversions Required
         /// </summary>
-        internal DesktopACL()
+        ////////////////////////////////////////////////////////////////////////////////
+        internal DesktopACL(IntPtr hToken)
         {
             Console.WriteLine("[*] Updating Desktop DACL");
             ptrWinSta0 = Marshal.StringToHGlobalUni("WinSta0");
+            this.hToken = hToken;
         }
 
-
+        ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
+        /// Opens a handle to the window station
         /// 
         /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////
         internal void OpenWindow()
         {
+            using (TokenInformation ti = new TokenInformation(hToken))
+            {
+                ti.SetWorkingTokenToSelf();
+                if (!ti.CheckTokenPrivilege(Winnt.SE_SECURITY_NAME))
+                {
+                    Console.WriteLine("[-] {0} is not present on the token", Winnt.SE_SECURITY_NAME);
+                    return;
+                }
+                else
+                {
+                    Console.WriteLine("[+] {0} is present and enabled on the token", Winnt.SE_SECURITY_NAME);
+                }
+            }
+
             IntPtr hWinStation = user32.OpenWindowStationW(
-                "WinSta0", 
+                ptrWinSta0, 
                 false,
                 Winuser.WindowStationSecurity.ACCESS_SYSTEM_SECURITY
                 | Winuser.WindowStationSecurity.READ_CONTROL
@@ -50,9 +72,11 @@ namespace Tokenvator.Plugins.Enumeration
             _SetDACL(hWinStation);
         }
 
+        ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
-        /// 
+        /// Opens a handle to the desktop
         /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////
         internal void OpenDesktop()
         {
             IntPtr hDesktop = user32.OpenDesktopA(
@@ -75,7 +99,9 @@ namespace Tokenvator.Plugins.Enumeration
         /// </summary>
         /// <param name="handle"></param>
         private void _SetDACL(IntPtr handle)
-        { 
+        {
+            ////////////////////////////////////////////////////////////////////////////////
+            //
             ////////////////////////////////////////////////////////////////////////////////
             IntPtr ppsidOwner, ppsidGroup, ppDacl, ppSacl;
             ppsidOwner = ppsidGroup = ppDacl = ppSacl = IntPtr.Zero;
@@ -88,16 +114,20 @@ namespace Tokenvator.Plugins.Enumeration
 
             if (0 != status)
             {
+                Console.WriteLine(status);
                 Misc.GetWin32Error("GetSecurityInfo");
                 return;
             }
-            else if (IntPtr.Zero == ppDacl)
+            
+            if (IntPtr.Zero == ppDacl)
             {
                 Misc.GetWin32Error("ppDacl");
                 return;
             }
             Console.WriteLine(" [+] Recieved DACL : 0x{0}", ppDacl.ToString("X4"));
 
+            ////////////////////////////////////////////////////////////////////////////////
+            // 
             ////////////////////////////////////////////////////////////////////////////////
             uint size = 0;
             advapi32.CreateWellKnownSid(Winnt.WELL_KNOWN_SID_TYPE.WinWorldSid, IntPtr.Zero, IntPtr.Zero, ref size);
@@ -117,7 +147,7 @@ namespace Tokenvator.Plugins.Enumeration
             Console.WriteLine(" [+] Create Everyone Sid - Pass 2 : 0x{0}", pSid.ToString("X4"));
 
             ////////////////////////////////////////////////////////////////////////////////
-            Accctrl._TRUSTEE_W trustee = new Accctrl._TRUSTEE_W
+            Accctrl._TRUSTEE_A trustee = new Accctrl._TRUSTEE_A
             {
                 pMultipleTrustee = IntPtr.Zero,
                 MultipleTrusteeOperation = Accctrl._MULTIPLE_TRUSTEE_OPERATION.NO_MULTIPLE_TRUSTEE,
@@ -126,23 +156,25 @@ namespace Tokenvator.Plugins.Enumeration
                 ptstrName = pSid
             };
 
-            Accctrl._EXPLICIT_ACCESS_W explicitAccess = new Accctrl._EXPLICIT_ACCESS_W
+            Accctrl._EXPLICIT_ACCESS_A explicitAccess = new Accctrl._EXPLICIT_ACCESS_A
             {
-                grfAccessPermissions = Winuser.WindowStationSecurity.WINSTA_ALL_ACCESS, //0xf03ff,
+                grfAccessPermissions = 0xf03ff,
                 grfAccessMode = Accctrl._ACCESS_MODE.GRANT_ACCESS,
-                grfInheritance = Accctrl.Inheritance.SUB_OBJECTS_ONLY_INHERIT, //1,
+                grfInheritance = 1,
                 Trustee = trustee
             };
 
             IntPtr newAcl = new IntPtr();
-            status = advapi32.SetEntriesInAclW(1, ref explicitAccess, ppDacl, ref newAcl);
+            status = advapi32.SetEntriesInAclA(1, ref explicitAccess, ppDacl, ref newAcl);
 
             if (0 != status)
             {
+                Console.WriteLine(status);
                 Misc.GetWin32Error("SetEntriesInAclW");
                 return;
             }
-            else if (IntPtr.Zero == newAcl)
+           
+            if (IntPtr.Zero == newAcl)
             {
                 Misc.GetWin32Error("newAcl");
                 return;
@@ -159,6 +191,7 @@ namespace Tokenvator.Plugins.Enumeration
 
             if (0 != status)
             {
+                Console.WriteLine(status);
                 Misc.GetWin32Error("SetSecurityInfo");
                 return;
             }
