@@ -43,6 +43,7 @@ namespace Tokenvator.Plugins.AccessTokens
         public List<string> Privileges { get; private set; }
 
         private readonly IntPtr hNtQueryInformationToken;
+        private readonly IntPtr hadvapi32;
 
         ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
@@ -53,6 +54,7 @@ namespace Tokenvator.Plugins.AccessTokens
         public TokenInformation(IntPtr hToken) : base(hToken)
         {
             hNtQueryInformationToken = Generic.GetSyscallStub("NtQueryInformationToken");
+            hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
 
             Privileges = new List<string>();
         }
@@ -414,8 +416,6 @@ namespace Tokenvator.Plugins.AccessTokens
             ////////////////////////////////////////////////////////////////////////////////
             // Iterate through the return privileges
             ////////////////////////////////////////////////////////////////////////////////
-            IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
-
             IntPtr hLookupPrivilegeNameW = Generic.GetExportAddress(hadvapi32, "LookupPrivilegeNameW");
             MonkeyWorks.advapi32.LookupPrivilegeNameW fLookupPrivilegeNameW = (MonkeyWorks.advapi32.LookupPrivilegeNameW)Marshal.GetDelegateForFunctionPointer(hLookupPrivilegeNameW, typeof(MonkeyWorks.advapi32.LookupPrivilegeNameW));
 
@@ -614,10 +614,8 @@ namespace Tokenvator.Plugins.AccessTokens
         /// <param name="sid"></param>
         /// <param name="account"></param>
         ////////////////////////////////////////////////////////////////////////////////
-        public static void ReadSidAndName(IntPtr pointer, out string sid, out string account)
+        public void ReadSidAndName(IntPtr pointer, out string sid, out string account)
         {
-            IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
-
             IntPtr hConvertSidToStringSidW = Generic.GetExportAddress(hadvapi32, "ConvertSidToStringSidW");
             MonkeyWorks.advapi32.ConvertSidToStringSidW fConvertSidToStringSidW = (MonkeyWorks.advapi32.ConvertSidToStringSidW)Marshal.GetDelegateForFunctionPointer(hConvertSidToStringSidW, typeof(MonkeyWorks.advapi32.ConvertSidToStringSidW));
 
@@ -690,8 +688,6 @@ namespace Tokenvator.Plugins.AccessTokens
             {
                 Marshal.FreeHGlobal(lpTokenInformation);
             }
-
-            IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
 
             IntPtr hLookupPrivilegeName = Generic.GetExportAddress(hadvapi32, "LookupPrivilegeNameW");
             MonkeyWorks.advapi32.LookupPrivilegeNameW fLookupPrivilegeName = (MonkeyWorks.advapi32.LookupPrivilegeNameW)Marshal.GetDelegateForFunctionPointer(hLookupPrivilegeName, typeof(MonkeyWorks.advapi32.LookupPrivilegeNameW));

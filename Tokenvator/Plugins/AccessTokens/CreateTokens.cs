@@ -768,11 +768,14 @@ namespace Tokenvator.Plugins.AccessTokens
 
             Console.WriteLine("[*] Adding Groups");
 
-            for (int i = 0; i < tokenGroups.GroupCount; i++)
+            using (TokenInformation ti = new TokenInformation(IntPtr.Zero))
             {
-                string sid, account;
-                TokenInformation.ReadSidAndName(tokenGroups.Groups[i].Sid, out sid, out account);
-                Console.WriteLine(" ({0}) {1,-20} {2}", i, sid, account);
+                for (int i = 0; i < tokenGroups.GroupCount; i++)
+                {
+                    string sid, account;
+                    ti.ReadSidAndName(tokenGroups.Groups[i].Sid, out sid, out account);
+                    Console.WriteLine(" ({0}) {1,-20} {2}", i, sid, account);
+                }
             }
 
             return true;

@@ -1,34 +1,66 @@
 ﻿using System;
+using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
+using System.Security;
 using System.Text;
 
 using Tokenvator.Resources;
 
 using DInvoke.DynamicInvoke;
 using MonkeyWorks.Unmanaged.Headers;
-using MonkeyWorks.Unmanaged.Libraries;
+//using MonkeyWorks.Unmanaged.Libraries;
 
 namespace Tokenvator.Plugins.Execution
 {
+    using MonkeyWorks = MonkeyWorks.Unmanaged.Libraries.DInvoke;
+
     static class CreateProcess
     {
         ////////////////////////////////////////////////////////////////////////////////
-        // Wrapper for ProcessWithLogonW
+        /// <summary>
+        /// Wrapper for CreateProcessWithLogonW
+        /// Converted to GetPebLdrModuleEntry/GetExportAddress
+        /// </summary>
+        /// <param name="phNewToken"></param>
+        /// <param name="name"></param>
+        /// <param name="arguments"></param>
+        /// <returns></returns>
         ////////////////////////////////////////////////////////////////////////////////
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
         public static bool CreateProcessWithLogonW(IntPtr phNewToken, string name, string arguments)
         {
-            IntPtr padvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
-            IntPtr pImpersonateLoggedOnUser = Generic.GetExportAddress(padvapi32, "ImpersonateLoggedOnUser");
-            object[] paramaters = { phNewToken };
-            bool retVal = (bool)Generic.DynamicFunctionInvoke(pImpersonateLoggedOnUser, typeof(Win32.Delegates.OpenProcess), ref paramaters);
+            ////////////////////////////////////////////////////////////////////////////////
+            // advapi32.ImpersonateLoggedOnUser(phNewToken)
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
+            IntPtr hImpersonateLoggedOnUser = Generic.GetExportAddress(hadvapi32, "ImpersonateLoggedOnUser");
+            MonkeyWorks.advapi32.ImpersonateLoggedOnUser fImpersonateLoggedOnUser = (MonkeyWorks.advapi32.ImpersonateLoggedOnUser)Marshal.GetDelegateForFunctionPointer(hImpersonateLoggedOnUser, typeof(MonkeyWorks.advapi32.ImpersonateLoggedOnUser));
 
-
-            if (IntPtr.Zero != phNewToken && !advapi32.ImpersonateLoggedOnUser(phNewToken))
+            bool retVal = false;
+            try
             {
-                Console.WriteLine("[-] Token Impersonation Failed");
+                retVal = fImpersonateLoggedOnUser(phNewToken);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] ImpersonateLoggedOnUser Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+                return false;
+            }
+
+
+            if (IntPtr.Zero != phNewToken && !retVal)
+            {
                 Misc.GetWin32Error("ImpersonateLoggedOnUser");
                 return false;
             }
+
+            ////////////////////////////////////////////////////////////////////////////////
+            // advapi32.RevertToSelf();
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hRevertToSelf = Generic.GetExportAddress(hadvapi32, "RevertToSelf");
+            MonkeyWorks.advapi32.RevertToSelf fRevertToSelf = (MonkeyWorks.advapi32.RevertToSelf)Marshal.GetDelegateForFunctionPointer(hRevertToSelf, typeof(MonkeyWorks.advapi32.RevertToSelf));
 
             if (name.Contains("\\"))
             {
@@ -36,7 +68,15 @@ namespace Tokenvator.Plugins.Execution
                 if (!System.IO.File.Exists(name))
                 {
                     Console.WriteLine("[-] File Not Found");
-                    advapi32.RevertToSelf();
+                    try
+                    {
+                        fRevertToSelf();
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("[-] RevertToSelf Generated an Exception");
+                        Console.WriteLine("[-] {0}", ex.Message);
+                    }
                     return false;
                 }
             }
@@ -46,10 +86,24 @@ namespace Tokenvator.Plugins.Execution
                 if (string.Empty == name)
                 {
                     Console.WriteLine("[-] Unable to find file");
-                    advapi32.RevertToSelf();
+                    try
+                    {
+                        fRevertToSelf();
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("[-] RevertToSelf Generated an Exception");
+                        Console.WriteLine("[-] {0}", ex.Message);
+                    }
                     return false;
                 }
             }
+
+            ////////////////////////////////////////////////////////////////////////////////
+            // advapi32.CreateProcessWithLogonW("i","j","k", Winbase.LOGON_FLAGS.LOGON_NETCREDENTIALS_ONLY, name, name, Winbase.CREATION_FLAGS.CREATE_DEFAULT_ERROR_MODE, IntPtr.Zero, Environment.CurrentDirectory, ref startupInfo, out processInformation)
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hCreateProcessWithLogonW = Generic.GetExportAddress(hadvapi32, "CreateProcessWithLogonW");
+            MonkeyWorks.advapi32.CreateProcessWithLogonW fCreateProcessWithLogonW = (MonkeyWorks.advapi32.CreateProcessWithLogonW)Marshal.GetDelegateForFunctionPointer(hCreateProcessWithLogonW, typeof(MonkeyWorks.advapi32.CreateProcessWithLogonW));
 
             Console.WriteLine("[*] CreateProcessWithLogonW");
             Winbase._STARTUPINFO startupInfo = new Winbase._STARTUPINFO
@@ -57,7 +111,12 @@ namespace Tokenvator.Plugins.Execution
                 cb = (uint)Marshal.SizeOf(typeof(Winbase._STARTUPINFO))
             };
             Winbase._PROCESS_INFORMATION processInformation;
-            if (!advapi32.CreateProcessWithLogonW("i","j","k",
+
+            retVal = false;
+            try
+            {
+                retVal = fCreateProcessWithLogonW(
+                string.Empty, string.Empty, string.Empty,
                 Winbase.LOGON_FLAGS.LOGON_NETCREDENTIALS_ONLY,
                 name,
                 name,
@@ -65,22 +124,55 @@ namespace Tokenvator.Plugins.Execution
                 IntPtr.Zero,
                 Environment.CurrentDirectory,
                 ref startupInfo,
-                out processInformation
-            ))
+                out processInformation);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] CreateProcessWithLogonW Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+                return false;
+            }
+
+            if (!retVal)
             {
                 Misc.GetWin32Error("CreateProcessWithLogonW");
-                advapi32.RevertToSelf();
+                try
+                {
+                    fRevertToSelf();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("[-] RevertToSelf Generated an Exception");
+                    Console.WriteLine("[-] {0}", ex.Message);
+                }
+
                 return false;
             }
             
             Console.WriteLine(" [+] Created process: {0}", processInformation.dwProcessId);
             Console.WriteLine(" [+] Created thread:  {0}", processInformation.dwThreadId);
-            advapi32.RevertToSelf();
+            Misc.GetWin32Error("CreateProcessWithLogonW");
+            try
+            {
+                fRevertToSelf();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] RevertToSelf Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+            }
             return true;
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Wrapper for CreateProcessWithTokenW
+        /// <summary>
+        /// Wrapper for CreateProcessWithTokenW
+        /// Converted to GetPebLdrModuleEntry/GetExportAddress
+        /// </summary>
+        /// <param name="phNewToken"></param>
+        /// <param name="name"></param>
+        /// <param name="arguments"></param>
+        /// <returns></returns>
         ////////////////////////////////////////////////////////////////////////////////
         public static bool CreateProcessWithTokenW(IntPtr phNewToken, string name, string arguments)
         {
@@ -102,24 +194,44 @@ namespace Tokenvator.Plugins.Execution
                     return false;
                 }
             }
-            
+
+            ////////////////////////////////////////////////////////////////////////////////
+            // !advapi32.CreateProcessWithTokenW(phNewToken, Winbase.LOGON_FLAGS.LOGON_NETCREDENTIALS_ONLY, name, name + " " + arguments, Winbase.CREATION_FLAGS.NONE, IntPtr.Zero, Environment.CurrentDirectory, ref startupInfo, out processInformation)
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
+            IntPtr hCreateProcessWithTokenW = Generic.GetExportAddress(hadvapi32, "CreateProcessWithTokenW");
+            MonkeyWorks.advapi32.CreateProcessWithTokenW fCreateProcessWithTokenW = (MonkeyWorks.advapi32.CreateProcessWithTokenW)Marshal.GetDelegateForFunctionPointer(hCreateProcessWithTokenW, typeof(MonkeyWorks.advapi32.CreateProcessWithTokenW));
+
             Console.WriteLine("[*] CreateProcessWithTokenW");
             Winbase._STARTUPINFO startupInfo = new Winbase._STARTUPINFO
             {
                 cb = (uint)Marshal.SizeOf(typeof(Winbase._STARTUPINFO))
             };
             Winbase._PROCESS_INFORMATION processInformation;
-            if (!advapi32.CreateProcessWithTokenW(
-                phNewToken,
-                Winbase.LOGON_FLAGS.LOGON_NETCREDENTIALS_ONLY,
-                name,
-                name + " " + arguments,
-                Winbase.CREATION_FLAGS.NONE,
-                IntPtr.Zero,
-                Environment.CurrentDirectory,
-                ref startupInfo,
-                out processInformation
-            ))
+
+            bool retVal = false;
+            try
+            {
+                retVal = fCreateProcessWithTokenW(
+                    phNewToken,
+                    Winbase.LOGON_FLAGS.LOGON_NETCREDENTIALS_ONLY,
+                    name,
+                    name + " " + arguments,
+                    Winbase.CREATION_FLAGS.NONE,
+                    IntPtr.Zero,
+                    Environment.CurrentDirectory,
+                    ref startupInfo,
+                    out processInformation
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] RevertToSelf Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+                return false;
+            }
+       
+            if (!retVal)
             {
                 if (267 == Marshal.GetLastWin32Error())
                 {
@@ -139,13 +251,37 @@ namespace Tokenvator.Plugins.Execution
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        //
+        /// <summary>
+        /// Returns the full path to an executable specified by just its name
+        /// Converted to GetPebLdrModuleEntry/GetExportAddress
+        /// </summary>
+        /// <param name="name"></param>
+        /// <returns></returns>
         ////////////////////////////////////////////////////////////////////////////////
         public static string FindFilePath(string name)
         {
+            ////////////////////////////////////////////////////////////////////////////////
+            // kernel32.SearchPath(null, name, null, (uint)lpFileName.Capacity, lpFileName, ref lpFilePart);
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hkernel32 = Generic.GetPebLdrModuleEntry("kernel32.dll");
+            IntPtr hSearchPathW = Generic.GetExportAddress(hkernel32, "SearchPathW");
+            MonkeyWorks.kernel32.SearchPathW fSearchPathW = (MonkeyWorks.kernel32.SearchPathW)Marshal.GetDelegateForFunctionPointer(hSearchPathW, typeof(MonkeyWorks.kernel32.SearchPathW));
+
             StringBuilder lpFileName = new StringBuilder(260);
             IntPtr lpFilePart = new IntPtr();
-            uint result = kernel32.SearchPath(null, name, null, (uint)lpFileName.Capacity, lpFileName, ref lpFilePart);
+
+            uint result = 0;
+            try
+            {
+                result = fSearchPathW(null, name, null, (uint)lpFileName.Capacity, lpFileName, ref lpFilePart);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] RevertToSelf Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+                return string.Empty;
+            }
+
             if (string.Empty == lpFileName.ToString())
             {
                 Console.WriteLine(new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()).Message);

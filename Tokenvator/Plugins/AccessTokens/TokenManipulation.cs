@@ -256,7 +256,7 @@ namespace Tokenvator.Plugins.AccessTokens
             string sid, account;
             for (int i = 0; i < ti.tokenGroups.GroupCount; i++) 
             {
-                TokenInformation.ReadSidAndName(ti.tokenGroups.Groups[i].Sid, out sid, out account);
+                ti.ReadSidAndName(ti.tokenGroups.Groups[i].Sid, out sid, out account);
                 if (string.Equals(group, account, StringComparison.OrdinalIgnoreCase))
                 {
                     ti.tokenGroups.Groups[i].Attributes ^= (uint)Winnt.SE_GROUP_ENABLED;
