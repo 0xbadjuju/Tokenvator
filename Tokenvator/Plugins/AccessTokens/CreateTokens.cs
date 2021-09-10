@@ -290,6 +290,7 @@ namespace Tokenvator.Plugins.AccessTokens
 
             using (DesktopACL desktop = new DesktopACL(hWorkingToken))
             {
+                desktop.LoadModule();
                 desktop.OpenDesktop();
                 desktop.OpenWindow();
             }
@@ -397,6 +398,7 @@ namespace Tokenvator.Plugins.AccessTokens
 
             using (DesktopACL desktop = new DesktopACL(hWorkingToken))
             {
+                desktop.LoadModule();
                 desktop.OpenDesktop();
                 desktop.OpenWindow();
             }
@@ -1015,16 +1017,9 @@ namespace Tokenvator.Plugins.AccessTokens
             }
             Console.WriteLine("[+] Logged On {0}", username.TrimEnd());
 
-            if (Winbase.LOGON_TYPE.LOGON32_LOGON_SERVICE == logonType)
-            {
-                if (!_SetTokenSessionId(Process.GetCurrentProcess().SessionId))
-                {
-                    Console.WriteLine(" [-] Unable to Update Token Session ID, this is likely to cause problems with this token");
-                }
-            }
-
             using (DesktopACL da = new DesktopACL(hWorkingToken))
             {
+                da.LoadModule();
                 da.OpenWindow();
                 da.OpenDesktop();
             }
@@ -1110,18 +1105,9 @@ namespace Tokenvator.Plugins.AccessTokens
             }
             Console.WriteLine("[+] Logged On {0}", username.TrimEnd());
 
-            if (Winbase.LOGON_TYPE.LOGON32_LOGON_SERVICE == logonType)
-            {
-                //Is this needed?
-                SetWorkingTokenToRemote();
-                if (!_SetTokenSessionId(Process.GetCurrentProcess().SessionId))
-                {
-                    Console.WriteLine(" [-] Unable to Update Token Session ID, this is likely to cause problems with this token");
-                }
-            }
-
             using (DesktopACL da = new DesktopACL(hWorkingToken))
             {
+                da.LoadModule();
                 da.OpenWindow();
                 da.OpenDesktop();
             }
@@ -1511,7 +1497,7 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
         /// Updates the token session ID to the specified session
-        /// Does this even work?
+        /// Doesn't work on PrimaryTokens
         /// Converted to D/Invoke GetPebLdrModuleEntry/GetExportAddress
         /// </summary>
         /// <param name="sessionId"></param>

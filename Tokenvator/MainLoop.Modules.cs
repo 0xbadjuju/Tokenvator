@@ -145,6 +145,7 @@ namespace Tokenvator
         {
             using (DesktopACL dA = new DesktopACL(hToken))
             {
+                dA.LoadModule();
                 dA.OpenWindow();
                 dA.OpenDesktop();
             }
@@ -217,7 +218,7 @@ namespace Tokenvator
                 Console.WriteLine("[-] Username not specified");
                 return;
             }
-            Dictionary<uint, string> processes = UserSessions.EnumerateUserProcesses(false, user);
+            Dictionary<uint, string> processes = UserSessions.EnumerateUserProcesses(user);
             Console.WriteLine("{0,-30}{1,-30}", "Process ID", "Process Name");
             Console.WriteLine("{0,-30}{1,-30}", "----------", "------------");
             foreach (uint pid in processes.Keys)

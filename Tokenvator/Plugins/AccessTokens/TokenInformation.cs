@@ -322,7 +322,7 @@ namespace Tokenvator.Plugins.AccessTokens
         /// advapi32.GetTokenInformation(hWorkingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenUser, IntPtr.Zero, 0, out returnLength);
         /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        public void GetTokenUser()
+        public string GetTokenUser(bool showOutput = true)
         {
             hTokenUser = _GetTokenInformation(Winnt._TOKEN_INFORMATION_CLASS.TokenUser);
             try
@@ -333,14 +333,20 @@ namespace Tokenvator.Plugins.AccessTokens
             {
                 Console.WriteLine("[-] PtrToStructure Generated an Exception");
                 Console.WriteLine(ex.Message);
-                return;
+                return string.Empty;
             }
 
-            Console.WriteLine("[+] User: ");
+            if (showOutput)
+            {
+                Console.WriteLine("[+] User: ");
+            }
             string sid, account;
             ReadSidAndName(tokenUser.User.Sid, out sid, out account);
-            Console.WriteLine("{0,-50} {1}", sid, account);
-            return;
+            if (showOutput)
+            {
+                Console.WriteLine("{0,-50} {1}", sid, account);
+            }
+            return account;
         }
 
         ////////////////////////////////////////////////////////////////////////////////

