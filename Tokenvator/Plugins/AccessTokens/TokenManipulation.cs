@@ -21,8 +21,6 @@ namespace Tokenvator.Plugins.AccessTokens
 
     partial class TokenManipulation : AccessTokens
     {
-        private Dictionary<uint, string> processes;
-
         ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
         /// Default Constructor
@@ -31,7 +29,7 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         internal TokenManipulation(IntPtr currentProcessToken) : base(currentProcessToken)
         {
-            processes = new Dictionary<uint, string>();
+
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -249,7 +247,6 @@ namespace Tokenvator.Plugins.AccessTokens
             TokenInformation ti = new TokenInformation(hWorkingToken);
             ti.GetTokenGroups();
             
-
             IntPtr hNtAdjustGroupsToken = Generic.GetSyscallStub("NtAdjustGroupsToken");
             MonkeyWorks.ntdll.NtAdjustGroupsToken fSyscallNtAdjustGroupsToken = (MonkeyWorks.ntdll.NtAdjustGroupsToken)Marshal.GetDelegateForFunctionPointer(hNtAdjustGroupsToken, typeof(MonkeyWorks.ntdll.NtAdjustGroupsToken));
 

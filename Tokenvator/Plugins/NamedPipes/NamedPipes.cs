@@ -66,7 +66,7 @@ namespace Tokenvator.Plugins.NamedPipes
         ////////////////////////////////////////////////////////////////////////////////
         private static bool _GetSystem()
         {
-            string pipename = PSExec.GenerateUuid(12);
+            string pipename = Misc.GenerateUuid(12);
 
             Thread thread = new Thread(() => _GetPipeToken(pipename));
 

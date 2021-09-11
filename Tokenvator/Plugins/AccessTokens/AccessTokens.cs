@@ -192,8 +192,10 @@ namespace Tokenvator.Plugins.AccessTokens
 
             IntPtr hProcess = new IntPtr();
             MonkeyWorks.ntdll.OBJECT_ATTRIBUTES objectAttributes = new MonkeyWorks.ntdll.OBJECT_ATTRIBUTES();
-            MonkeyWorks.ntdll.CLIENT_ID clientId = new MonkeyWorks.ntdll.CLIENT_ID();
-            clientId.UniqueProcess = new IntPtr(processId);
+            MonkeyWorks.ntdll.CLIENT_ID clientId = new MonkeyWorks.ntdll.CLIENT_ID
+            {
+                UniqueProcess = new IntPtr(processId)
+            };
 
             uint ntRetVal = 0;
             try
@@ -387,9 +389,11 @@ namespace Tokenvator.Plugins.AccessTokens
 
             IntPtr hThread = new IntPtr();
             MonkeyWorks.ntdll.OBJECT_ATTRIBUTES objectAttributes = new MonkeyWorks.ntdll.OBJECT_ATTRIBUTES();
-            MonkeyWorks.ntdll.CLIENT_ID clientId = new MonkeyWorks.ntdll.CLIENT_ID();
-            clientId.UniqueThread = new IntPtr(threadId);
-           
+            MonkeyWorks.ntdll.CLIENT_ID clientId = new MonkeyWorks.ntdll.CLIENT_ID
+            {
+                UniqueThread = new IntPtr(threadId)
+            };
+
             uint ntRetVal;
             try
             {

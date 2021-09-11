@@ -15,7 +15,7 @@ namespace Tokenvator
 {
     partial class MainLoop
     {
-        private static string context = "(Tokens) > ";
+        private const string context = "(Tokens) > ";
         public static string[,] options = new string[,] {
             {"Info", "all", "-", "Info /All"},
             {"Help", "Command", "-", "Help List_Filter_Instances"},
@@ -129,6 +129,7 @@ namespace Tokenvator
                 hToken = tempToken = IntPtr.Zero;
 
                 bool remote = _GetProcessID(input, out processID, out command);
+
                 if (!remote)
                 {
                     hProcess = hBackup;
@@ -144,7 +145,9 @@ namespace Tokenvator
                         }
                     }
                 }
+
                 string action = Misc.NextItem(ref input);
+
                 CommandLineParsing cLP = new CommandLineParsing();
                 if (!string.Equals(action, input, StringComparison.OrdinalIgnoreCase))
                 {
