@@ -21,20 +21,22 @@ namespace Tokenvator.Plugins.MiniFilters
 
         ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
-        /// 
+        /// Default constructor
+        /// No Conversion Required
         /// </summary>
         /// <param name="filterName"></param>
         ////////////////////////////////////////////////////////////////////////////////
         internal FilterInstance(string filterName) : base()
         {
             this.filterName = filterName;
-
         }
 
         ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
-        /// 
+        /// Iterates through the first filter instance
+        /// Converted to D/Invoke GetExportAddress
         /// </summary>
+        /// <returns></returns>
         ////////////////////////////////////////////////////////////////////////////////
         [SecurityCritical]
         [HandleProcessCorruptedStateExceptions]
@@ -105,7 +107,8 @@ namespace Tokenvator.Plugins.MiniFilters
 
         ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
-        /// 
+        /// Iterates through the subsequent filter instances after the first
+        /// Converted to D/Invoke GetExportAddress
         /// </summary>
         /// <returns></returns>
         ////////////////////////////////////////////////////////////////////////////////
@@ -181,7 +184,8 @@ namespace Tokenvator.Plugins.MiniFilters
 
         ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
-        /// 
+        /// Prints the Filter instances output
+        /// No Conversion Required
         /// </summary>
         /// <param name="baseAddress"></param>
         ////////////////////////////////////////////////////////////////////////////////
@@ -216,7 +220,8 @@ namespace Tokenvator.Plugins.MiniFilters
 
         ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
-        /// 
+        /// Default Deconsturctor
+        /// No Conversion Required
         /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
         ~FilterInstance()
@@ -229,7 +234,8 @@ namespace Tokenvator.Plugins.MiniFilters
 
         ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
-        /// 
+        /// IDisposable - closes the handle to the filter instances
+        /// Converted to D/Invoke GetExportAddress
         /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
         [SecurityCritical]

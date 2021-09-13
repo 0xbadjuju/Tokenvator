@@ -180,7 +180,7 @@ namespace Tokenvator
                         _UnInstallDriver(cLP);
                         break;
                     case "detach_filter":
-                        Filters.FilterDetach(cLP);
+                        _FilterDetach(cLP);
                         break;
                     case "disable_group":
                         _DisableGroup(cLP, hToken);
@@ -298,7 +298,7 @@ namespace Tokenvator
                         _UnInstallDriver(cLP);
                         break;
                     case "unload_filter":
-                        Filters.Unload(cLP);
+                        _FilterUnload(cLP);
                         break;
                     case "whoami":
                         Console.WriteLine("[*] Operating as {0}", WindowsIdentity.GetCurrent().Name);

@@ -27,28 +27,6 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         //
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _DisableGroup(CommandLineParsing cLP, IntPtr hToken)
-        {
-            string groups;
-            if (!cLP.GetData("groups", out groups))
-            {
-                return;
-            }
-
-            using (TokenManipulation tm = new TokenManipulation(hToken))
-            {
-                if (cLP.Remote && tm.OpenProcessToken(cLP.ProcessID))
-                    tm.SetWorkingTokenToRemote();
-                else
-                    tm.SetWorkingTokenToSelf();
-
-                tm.DisableTokenGroup(groups);
-            }
-        }
-
-        ////////////////////////////////////////////////////////////////////////////////
-        //
-        ////////////////////////////////////////////////////////////////////////////////
         private static void _AddPrivilege(CommandLineParsing cLP)
         {
             TokenDriver.PRIVILEGES priv = Misc.ParseEnum<TokenDriver.PRIVILEGES>(cLP.Privilege);
@@ -204,6 +182,78 @@ namespace Tokenvator
             catch (AccessViolationException ex)
             {
                 Console.WriteLine(ex);
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        //
+        ////////////////////////////////////////////////////////////////////////////////
+        private static void _DisableGroup(CommandLineParsing cLP, IntPtr hToken)
+        {
+            string groups;
+            if (!cLP.GetData("groups", out groups))
+            {
+                return;
+            }
+
+            using (TokenManipulation tm = new TokenManipulation(hToken))
+            {
+                if (cLP.Remote && tm.OpenProcessToken(cLP.ProcessID))
+                    tm.SetWorkingTokenToRemote();
+                else
+                    tm.SetWorkingTokenToSelf();
+
+                tm.DisableTokenGroup(groups);
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        //
+        ////////////////////////////////////////////////////////////////////////////////
+        private static void _FilterDetach(CommandLineParsing cLP)
+        {
+            string filter;
+            if (!cLP.GetData("filter", out filter))
+            {
+                Console.WriteLine("[-] /Filter: Not Specified");
+                return;
+            }
+
+            string volume;
+            if (!cLP.GetData("volume", out volume))
+            {
+                Console.WriteLine("[-] /Volume: Not Specified");
+                return;
+            }
+
+            string instance;
+            if (!cLP.GetData("instance", out instance))
+            {
+                Console.WriteLine("[-] /Instance: Not Specified");
+                return;
+            }
+
+            using (Filters f = new Filters())
+            {
+                f.FilterDetach(filter, volume, instance);
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        //
+        ////////////////////////////////////////////////////////////////////////////////
+        private static void _FilterUnload(CommandLineParsing cLP)
+        {
+            string filter;
+            if (!cLP.GetData("filter", out filter))
+            {
+                Console.WriteLine("[-] Filter Not Specified");
+                return;
+            }
+
+            using (Filters f = new Filters())
+            {
+                f.FilterUnload(filter);
             }
         }
 

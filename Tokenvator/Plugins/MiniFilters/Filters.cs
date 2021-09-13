@@ -5,7 +5,7 @@ using System.Security;
 using DInvoke.DynamicInvoke;
 
 using MonkeyWorks.Unmanaged.Headers;
-using MonkeyWorks.Unmanaged.Libraries;
+//using MonkeyWorks.Unmanaged.Libraries;
 
 using Tokenvator.Resources;
 
@@ -17,8 +17,10 @@ namespace Tokenvator.Plugins.MiniFilters
     {
         private bool disposed = false;
 
-        protected uint ERROR_FLT_FILTER_NOT_FOUND = 2149515283;
-        protected uint ERROR_INSUFFICIENT_BUFFER = 2147942522;
+        protected const uint ERROR_FLT_FILTER_NOT_FOUND = 2149515283;
+        protected const uint ERROR_INSUFFICIENT_BUFFER = 2147942522;
+        protected const uint ERROR_PRIVILEGE_NOT_HELD = 2147943714;
+        protected const uint ERROR_FLT_DO_NOT_DETACH = 2149515280;
 
         protected IntPtr hfltlib;
 
@@ -27,17 +29,18 @@ namespace Tokenvator.Plugins.MiniFilters
 
         ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
-        /// 
+        /// Default constructor
+        /// No Conversion Required
         /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
         public Filters()
         {
-            Console.WriteLine();
         }
 
         ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
-        /// 
+        /// Loads the fltlib.dll for invocation
+        /// Converted to D/Invoke GetPebLdrModuleEntry/LoadModuleFromDisk
         /// </summary>
         /// <returns></returns>
         ////////////////////////////////////////////////////////////////////////////////
@@ -61,8 +64,10 @@ namespace Tokenvator.Plugins.MiniFilters
 
         ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
-        /// 
+        /// Iterates through the first filter returned by the handle
+        /// Converted to D/Invoke GetExportAddress
         /// </summary>
+        /// <returns></returns>
         ////////////////////////////////////////////////////////////////////////////////
         [SecurityCritical]
         [HandleProcessCorruptedStateExceptions]
@@ -127,8 +132,10 @@ namespace Tokenvator.Plugins.MiniFilters
 
         ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
-        /// 
+        /// Iterates through the subsequent filters after the first
+        /// Converted to D/Invoke GetExportAddress
         /// </summary>
+        /// <returns></returns>
         ////////////////////////////////////////////////////////////////////////////////
         [SecurityCritical]
         [HandleProcessCorruptedStateExceptions]
@@ -193,6 +200,13 @@ namespace Tokenvator.Plugins.MiniFilters
             return true;
         }
 
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Prints the Filters and altitudes output
+        /// No Conversion Required
+        /// </summary>
+        /// <param name="baseAddress"></param>
+        ////////////////////////////////////////////////////////////////////////////////
         private static void Print(IntPtr baseAddress)
         {
             var info = (FltUserStructures._FILTER_AGGREGATE_BASIC_INFORMATION)Marshal.PtrToStructure(baseAddress, typeof(FltUserStructures._FILTER_AGGREGATE_BASIC_INFORMATION));
@@ -235,72 +249,92 @@ namespace Tokenvator.Plugins.MiniFilters
             while (0 != offset);
         }
 
-        internal static void FilterDetach(CommandLineParsing cLP)
-        {
-            string filter;
-            if (!cLP.GetData("filter", out filter))
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Detaches an instance of a minifilter
+        /// Converted to D/Invoke GetExportAddress
+        /// </summary>
+        /// <param name="cLP"></param>
+        ////////////////////////////////////////////////////////////////////////////////
+        internal void FilterDetach(string filter, string volume, string instance)
+        {      
+            ////////////////////////////////////////////////////////////////////////////////
+            // fltlib.FilterDetach(filter, volume, instance);
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hFilterDetach = Generic.GetExportAddress(hfltlib, "FilterDetach");
+            MonkeyWorks.fltlib.FilterDetach fFilterDetach = (MonkeyWorks.fltlib.FilterDetach)Marshal.GetDelegateForFunctionPointer(hFilterDetach, typeof(MonkeyWorks.fltlib.FilterDetach));
+
+            uint retVal = 0;
+            try
             {
-                Console.WriteLine("[-] /Filter: Not Specified");
+                retVal = fFilterDetach(filter, volume, instance);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] FilterDetach Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
                 return;
             }
 
-            string instance;
-            if (!cLP.GetData("instance", out instance))
+            if (0 != retVal)
             {
-                Console.WriteLine("[-] /Instance: Not Specified");
-                return;
-            }
-
-            string volume;
-            if (!cLP.GetData("volume", out volume))
-            {
-                Console.WriteLine("[-] /Volume: Not Specified");
-                return;
-            }
-
-            uint result = fltlib.FilterDetach(filter, volume, instance);
-            if (0 != result)
-            {
-                if (2147943714 == result)
+                if (ERROR_PRIVILEGE_NOT_HELD == retVal)
                 {
                     Console.WriteLine("[-] Privilege Not Held (Probably SeLoadDriverPrivilege)");
                     return;
                 }
-                else if (2149515280 == result)
+                else if (ERROR_FLT_DO_NOT_DETACH == retVal)
                 {
                     Console.WriteLine("[-] Filter does not have a detach routine");
                     return;
                 }
-                Console.WriteLine("FilterDetach Failed: 0x{0}", result.ToString("X4"));
+                Console.WriteLine("FilterDetach Failed: 0x{0}", retVal.ToString("X4"));
                 return;
             }
 
             Console.WriteLine("[+] Filter Detached");
         }
 
-        internal static void Unload(CommandLineParsing cLP)
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Unloads a loaded minifilter
+        /// Converted to D/Invoke GetExportAddress
+        /// </summary>
+        /// <param name="cLP"></param>
+        ////////////////////////////////////////////////////////////////////////////////
+        internal void FilterUnload(string filter)
         {
-            string filter;
-            if (!cLP.GetData("filter", out filter))
+            ////////////////////////////////////////////////////////////////////////////////
+            // fltlib.FilterUnload(filter);
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hFilterUnload = Generic.GetExportAddress(hfltlib, "FilterUnload");
+            MonkeyWorks.fltlib.FilterUnload fFilterUnload = (MonkeyWorks.fltlib.FilterUnload)Marshal.GetDelegateForFunctionPointer(hFilterUnload, typeof(MonkeyWorks.fltlib.FilterUnload));
+
+            uint retVal = 0;
+            try
             {
-                Console.WriteLine("[-] Filter Not Specified");
+                retVal = fFilterUnload(filter);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] FilterUnload Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
                 return;
             }
 
-            uint result = fltlib.FilterUnload(filter);
-            if (0 != result)
+            if (0 != retVal)
             {
-                if (2147943714 == result)
+                if (ERROR_PRIVILEGE_NOT_HELD == retVal)
                 {
                     Console.WriteLine("[-] Privilege Not Held (Probably SeLoadDriverPrivilege)");
                     return;
                 }
-                else if (2149515280 == result)
+                else if (ERROR_FLT_DO_NOT_DETACH == retVal)
                 {
                     Console.WriteLine("[-] Filter does not have a detach routine");
                     return;
                 }
-                Console.WriteLine("FilterUnload Failed: 0x{0}", result.ToString("X4"));
+                Console.WriteLine("FilterUnload Failed: 0x{0}", retVal.ToString("X4"));
                 return;
             }
             Console.WriteLine("[+] Filter Unloaded");
@@ -308,7 +342,8 @@ namespace Tokenvator.Plugins.MiniFilters
 
         ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
-        /// 
+        /// Default Deconsturctor
+        /// No Conversion Required
         /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
         ~Filters()
@@ -321,7 +356,8 @@ namespace Tokenvator.Plugins.MiniFilters
 
         ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
-        /// 
+        /// IDisposable - closes the handle to the filters
+        /// Converted to D/Invoke GetExportAddress
         /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
         [SecurityCritical]
