@@ -1,65 +1,196 @@
 ﻿using System;
+using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
+using System.Security;
+using DInvoke.DynamicInvoke;
 
 using MonkeyWorks.Unmanaged.Headers;
 using MonkeyWorks.Unmanaged.Libraries;
-
 
 using Tokenvator.Resources;
 
 namespace Tokenvator.Plugins.MiniFilters
 {
+    using MonkeyWorks = MonkeyWorks.Unmanaged.Libraries.DInvoke;
+
     class Filters : IDisposable
     {
+        private bool disposed = false;
+
+        protected uint ERROR_FLT_FILTER_NOT_FOUND = 2149515283;
+        protected uint ERROR_INSUFFICIENT_BUFFER = 2147942522;
+
+        protected IntPtr hfltlib;
+
         protected IntPtr hFilters = IntPtr.Zero;
         //private FltUserStructures._FILTER_AGGREGATE_BASIC_INFORMATION info;
 
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// 
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////
         public Filters()
         {
             Console.WriteLine();
         }
 
-        internal virtual void First()
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        ////////////////////////////////////////////////////////////////////////////////
+        internal bool Load()
         {
+            hfltlib = Generic.GetPebLdrModuleEntry("fltlib.dll");
+            if (IntPtr.Zero == hfltlib)
+            {
+                hfltlib = Generic.LoadModuleFromDisk("fltlib.dll");
+                if (IntPtr.Zero == hfltlib)
+                {
+                    Console.WriteLine("Unable to load fltlib.dll");
+
+                    disposed = true;
+
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// 
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
+        internal virtual bool First()
+        {
+            ////////////////////////////////////////////////////////////////////////////////
+            // First call to function to get buffer size
+            // fltlib.FilterFindFirst(FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, IntPtr.Zero, 0, ref dwBytesReturned, ref hFilters);
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hFilterFindFirst = Generic.GetExportAddress(hfltlib, "FilterFindFirst");
+            MonkeyWorks.fltlib.FilterFindFirst fFilterFindFirst = (MonkeyWorks.fltlib.FilterFindFirst)Marshal.GetDelegateForFunctionPointer(hFilterFindFirst, typeof(MonkeyWorks.fltlib.FilterFindFirst));
+
+            uint dwBytesReturned = 0;
+            uint retVal = 0;
+            try
+            {
+                retVal = fFilterFindFirst(FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, IntPtr.Zero, 0, ref dwBytesReturned, ref hFilters);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] FilterFindFirst Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+                return false;
+            }
+
+            //Buffer too small is expected result
+            if (ERROR_INSUFFICIENT_BUFFER != retVal || 0 == dwBytesReturned)
+            {
+                return false;
+            }
+
+            ////////////////////////////////////////////////////////////////////////////////
+            // fltlib.FilterFindFirst(FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, lpBuffer, dwBytesReturned, ref dwBytesReturned, ref hFilters);
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr lpBuffer = Marshal.AllocHGlobal((int)dwBytesReturned);
+
+            try
+            {
+                retVal = fFilterFindFirst(FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, lpBuffer, dwBytesReturned, ref dwBytesReturned, ref hFilters);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] FilterFindFirst Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+                return false;
+            }
+
+            if (0 != retVal)
+            {
+                Misc.GetWin32Error("FilterFindFirst");
+                return false;
+            }
+
             Console.WriteLine("{0,8} {1,9} {2,8} {3,-10}", "Frame ID", "Instances", "Altitude", "Filter Name");
             Console.WriteLine("{0,8} {1,9} {2,8} {3,-10}", "--------", "---------", "--------", "-----------");
 
-            uint dwBytesReturned = 0;
-            uint result = fltlib.FilterFindFirst(FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, IntPtr.Zero, 0, ref dwBytesReturned, ref hFilters);
-
-            if (2147942522 != result || 0 == dwBytesReturned)
-            {
-                return;
-            }
-            IntPtr lpBuffer = Marshal.AllocHGlobal((int)dwBytesReturned);            
-            fltlib.FilterFindFirst(FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, lpBuffer, dwBytesReturned, ref dwBytesReturned, ref hFilters);
-            
             Print(lpBuffer);
             Marshal.FreeHGlobal(lpBuffer);
+
+            return true;
         }
 
-        internal virtual void Next()
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// 
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
+        internal virtual bool Next()
         {
             if (IntPtr.Zero == hFilters)
             {
-                return;
+                return false;
             }
 
-            uint result = 0;
+            ////////////////////////////////////////////////////////////////////////////////
+            // First call to function to get buffer size
+            // fltlib.FilterFindNext(hFilters, FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, IntPtr.Zero, 0, out lpBytesReturned)
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hFilterFindNext = Generic.GetExportAddress(hfltlib, "FilterFindNext");
+            MonkeyWorks.fltlib.FilterFindNext fFilterFindNext = (MonkeyWorks.fltlib.FilterFindNext)Marshal.GetDelegateForFunctionPointer(hFilterFindNext, typeof(MonkeyWorks.fltlib.FilterFindNext));
+
+            uint lpBytesReturned = 0;
+            uint retVal = 0;
             do
             {
-                uint lpBytesReturned = 0;
-                if (2147942522 != fltlib.FilterFindNext(hFilters, FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, IntPtr.Zero, 0, out lpBytesReturned))
+                try
+                {
+                    retVal = fFilterFindNext(hFilters, FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, IntPtr.Zero, 0, ref lpBytesReturned);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("[-] FilterFindNext Generated an Exception");
+                    Console.WriteLine("[-] {0}", ex.Message);
+                    return false;
+                }
+
+                if (ERROR_INSUFFICIENT_BUFFER != retVal)
                 {
                     break;
                 }
+
+                ////////////////////////////////////////////////////////////////////////////////
+                // fltlib.FilterFindNext(hFilters, FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, lpBuffer, lpBytesReturned, out lpBytesReturned)
+                ////////////////////////////////////////////////////////////////////////////////
                 IntPtr lpBuffer = Marshal.AllocHGlobal((int)lpBytesReturned);
-                result = fltlib.FilterFindNext(hFilters, FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, lpBuffer, lpBytesReturned, out lpBytesReturned);
-                                
-                Print(lpBuffer);
-                Marshal.FreeHGlobal(lpBuffer);
+                
+                try
+                {
+                    retVal = fFilterFindNext(hFilters, FltUserStructures._FILTER_INFORMATION_CLASS.FilterAggregateBasicInformation, lpBuffer, lpBytesReturned, ref lpBytesReturned);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("[-] FilterFindNext Generated an Exception");
+                    Console.WriteLine("[-] {0}", ex.Message);
+                    return false;
+                }
+
+                if (0 == retVal)
+                {
+                    Print(lpBuffer);
+                    Marshal.FreeHGlobal(lpBuffer);
+                }
             }
-            while (0 == result);
+            while (0 == retVal);
+
+            return true;
         }
 
         private static void Print(IntPtr baseAddress)
@@ -175,14 +306,50 @@ namespace Tokenvator.Plugins.MiniFilters
             Console.WriteLine("[+] Filter Unloaded");
         }
 
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// 
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////
         ~Filters()
         {
-            Dispose();
+            if (!disposed)
+            {
+                Dispose();
+            }
         }
 
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// 
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
         public virtual void Dispose()
         {
-            fltlib.FilterFindClose(hFilters);
+            ////////////////////////////////////////////////////////////////////////////////
+            // Closes the filter handle
+            // fltlib.FilterFindClose(hFilters);
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hFilterFindClose = Generic.GetExportAddress(hfltlib, "FilterFindClose");
+            MonkeyWorks.fltlib.FilterFindClose fFilterFindClose = (MonkeyWorks.fltlib.FilterFindClose)Marshal.GetDelegateForFunctionPointer(hFilterFindClose, typeof(MonkeyWorks.fltlib.FilterFindClose));
+
+            uint retVal = 0;
+            try
+            {
+                retVal = fFilterFindClose(hFilters);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] FilterFindClose Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+                return;
+            }
+            finally
+            {
+                disposed = true;
+            }
         }
     }
 }

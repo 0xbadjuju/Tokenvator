@@ -1,7 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-
+using System.Management;
 using MonkeyWorks.Unmanaged.Libraries;
 
 using Tokenvator.Plugins.Execution;
@@ -65,6 +66,7 @@ namespace Tokenvator.Resources
             return new string(Enumerable.Repeat(chars, length).Select(s => s[random.Next(s.Length)]).ToArray());
         }
 
+        #region Error Reporting
         ////////////////////////////////////////////////////////////////////////////////
         ////////////////////////////////////////////////////////////////////////////////
         public static void GetLsaNtError(string location, uint ntError)
@@ -104,6 +106,37 @@ namespace Tokenvator.Resources
         {
             Console.WriteLine(" [-] Function {0} failed: ", location);
             Console.WriteLine(" [-] {0}", new System.ComponentModel.Win32Exception(System.Runtime.InteropServices.Marshal.GetLastWin32Error()).Message);
+        }
+        #endregion
+
+        ////////////////////////////////////////////////////////////////////////////////
+        ////////////////////////////////////////////////////////////////////////////////
+        public static uint GetProcessId(string processName)
+        {
+            uint ProcessId = 0;
+
+            List<ManagementObject> systemProcesses = new List<ManagementObject>();
+            ManagementScope scope = new ManagementScope(@"\\.\root\cimv2");
+            scope.Connect();
+            if (!scope.IsConnected)
+            {
+                Console.WriteLine("[-] Failed to connect to WMI");
+            }
+
+            Console.WriteLine(" [*] Querying for service: " + processName);
+            ObjectQuery query = new ObjectQuery("SELECT * FROM Win32_Service WHERE Name = \'" + processName + "\'");
+            ManagementObjectSearcher objectSearcher = new ManagementObjectSearcher(scope, query);
+            ManagementObjectCollection objectCollection = objectSearcher.Get();
+            if (objectCollection == null)
+            {
+                Console.WriteLine("ManagementObjectCollection");
+            }
+            foreach (ManagementObject managementObject in objectCollection)
+            {
+                ProcessId = (uint)managementObject["ProcessId"];
+            }
+            Console.WriteLine(" [+] Returned PID: " + ProcessId);
+            return ProcessId;
         }
 
         ////////////////////////////////////////////////////////////////////////////////

@@ -21,10 +21,14 @@ namespace Tokenvator.Plugins.Execution
 
         private bool disposed;
 
-        private IntPtr hadvapi32;
+        private readonly IntPtr hadvapi32;
 
         ////////////////////////////////////////////////////////////////////////////////
-        //
+        /// <summary>
+        /// Constructor - Service name provided
+        ///  No Conversions Required 
+        /// </summary>
+        /// <param name="serviceName"></param>
         ////////////////////////////////////////////////////////////////////////////////
         public PSExec(string serviceName)
         {
@@ -34,7 +38,10 @@ namespace Tokenvator.Plugins.Execution
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        //
+        /// <summary>
+        /// Constructor - Service name not specified
+        /// No Conversions Required 
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
         public PSExec()
         {
@@ -44,7 +51,10 @@ namespace Tokenvator.Plugins.Execution
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        //
+        /// <summary>
+        /// Default Deconstructor
+        /// No Conversions Required 
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
         ~PSExec()
         {

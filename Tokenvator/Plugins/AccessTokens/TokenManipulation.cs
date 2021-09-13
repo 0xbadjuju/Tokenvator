@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using System.Security;
@@ -12,7 +12,6 @@ using Tokenvator.Plugins.Enumeration;
 using Tokenvator.Plugins.Execution;
 
 using MonkeyWorks.Unmanaged.Headers;
-using System.Diagnostics;
 //using MonkeyWorks.Unmanaged.Libraries;
 
 namespace Tokenvator.Plugins.AccessTokens
@@ -21,6 +20,8 @@ namespace Tokenvator.Plugins.AccessTokens
 
     partial class TokenManipulation : AccessTokens
     {
+        private const string TRUSTED_INSTALLER = "TrustedInstaller";
+
         ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
         /// Default Constructor
@@ -159,19 +160,39 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         public bool GetTrustedInstaller(string newProcess)
         {
+            const string TRUSTED_INSTALLER = "TrustedInstaller";
+
             Console.WriteLine("[+] Getting NT AUTHORITY\\SYSTEM privileges");
             //This is required for duplicate token
             GetSystem();
             Console.WriteLine(" [*] Running as: {0}", WindowsIdentity.GetCurrent().Name);
 
+            /*
             Services services = new Services("TrustedInstaller");
             if (!services.StartService())
             {
                 Misc.GetWin32Error("StartService");
                 return false;
             }
+            */
 
-            if (!OpenProcessToken((int)services.GetServiceProcessId()))
+            using (PSExec psexec = new PSExec(TRUSTED_INSTALLER))
+            {
+                if (!psexec.Connect("."))
+                {
+                    return false;
+                }
+                if (!psexec.Open())
+                {
+                    return false;
+                }
+                if (!psexec.Start())
+                {
+                    return false;
+                }
+            }
+
+            if (!OpenProcessToken((int)Misc.GetProcessId(TRUSTED_INSTALLER)))
             {
                 Misc.GetWin32Error("OpenProcessToken");
                 return false;
@@ -208,14 +229,32 @@ namespace Tokenvator.Plugins.AccessTokens
             GetSystem();
             Console.WriteLine(" [+] Running as: {0}", WindowsIdentity.GetCurrent().Name);
 
+            /*
             Services services = new Services("TrustedInstaller");
             if (!services.StartService())
             {
                 Misc.GetWin32Error("StartService");
                 return false;
             }
+            */
 
-            if (!OpenProcessToken((int)services.GetServiceProcessId()))
+            using (PSExec psexec = new PSExec(TRUSTED_INSTALLER))
+            {
+                if (!psexec.Connect("."))
+                {
+                    return false;
+                }
+                if (!psexec.Open())
+                {
+                    return false;
+                }
+                if (!psexec.Start())
+                {
+                    return false;
+                }
+            }
+
+            if (!OpenProcessToken((int)Misc.GetProcessId(TRUSTED_INSTALLER)))
             {
                 return false;
             }

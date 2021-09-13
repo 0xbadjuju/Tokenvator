@@ -188,7 +188,6 @@
     <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\Winuser.cs" />
     <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\wudfwdm.cs" />
     <Compile Include="Plugins\Execution\PSExec.cs" />
-    <Compile Include="Plugins\Execution\Services.cs" />
     <Compile Include="Plugins\AccessTokens\TokenDriver.cs" />
     <Compile Include="Plugins\AccessTokens\TokenManipulation.cs" />
   </ItemGroup>

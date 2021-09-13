@@ -549,10 +549,22 @@ namespace Tokenvator
         ////////////////////////////////////////////////////////////////////////////////
         private static void _ListFilters()
         {
-            using (Filters filters = new Filters())
+            using (Filters f = new Filters())
             {
-                filters.First();
-                filters.Next();
+                if (!f.Load())
+                {
+                    return;
+                }
+
+                if (!f.First())
+                {
+                    return;
+                }
+
+                if (!f.Next())
+                {
+                    return;
+                }
             }
         }
 
@@ -568,10 +580,22 @@ namespace Tokenvator
                 return;
             }
 
-            using (FilterInstance filterInstance = new FilterInstance(filter))
+            using (FilterInstance fi = new FilterInstance(filter))
             {
-                filterInstance.First();
-                filterInstance.Next();
+                if (!fi.Load())
+                {
+                    return;
+                }
+
+                if (!fi.First())
+                {
+                    return;
+                }
+
+                if (!fi.Next())
+                {
+                    return;
+                }
             }
         }
 
