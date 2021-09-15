@@ -6,13 +6,13 @@ using System.Runtime.InteropServices;
 using System.Security;
 using System.Security.Principal;
 
+using DInvoke.DynamicInvoke;
+
 using Tokenvator.Resources;
 using Tokenvator.Plugins.Execution;
 
 using MonkeyWorks.Unmanaged.Headers;
 //using MonkeyWorks.Unmanaged.Libraries;
-
-using DInvoke.DynamicInvoke;
 
 namespace Tokenvator.Plugins.AccessTokens
 {
@@ -35,12 +35,14 @@ namespace Tokenvator.Plugins.AccessTokens
 
         private readonly IntPtr hNtOpenProcess;
         private readonly IntPtr hNtOpenProcessToken;
-        private readonly IntPtr hNtClose;
+        private static readonly IntPtr hNtClose = Generic.GetSyscallStub("NtClose");
 
+        ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
         /// Default constructor
         /// </summary>
         /// <param name="currentProcessToken"></param>
+        ////////////////////////////////////////////////////////////////////////////////
         public AccessTokens(IntPtr currentProcessToken)
         {        
             phNewToken = new IntPtr();
@@ -52,7 +54,21 @@ namespace Tokenvator.Plugins.AccessTokens
 
             hNtOpenProcess = Generic.GetSyscallStub("NtOpenProcess");
             hNtOpenProcessToken = Generic.GetSyscallStub("NtOpenProcessToken");
-            hNtClose = Generic.GetSyscallStub("NtClose");
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Alternative constructor for instances when OpenProcess/OpenProcessToken isn't called
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////
+        public AccessTokens()
+        {
+            phNewToken = new IntPtr();
+            hExistingToken = new IntPtr();
+            currentProcessToken = new IntPtr();
+
+            hWorkingToken = new IntPtr();
+            hWorkingThreadToken = new IntPtr();
         }
 
         #region Get/Set
@@ -117,7 +133,7 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         [SecurityCritical]
         [HandleProcessCorruptedStateExceptions]
-        public bool DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL impersonationLevel)
+        public bool DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL impersonationLevel, Winnt._TOKEN_TYPE tokenType)
         {
             IntPtr hNtDuplicateToken = Generic.GetSyscallStub("NtDuplicateToken");
             MonkeyWorks.ntdll.NtDuplicateToken fSyscallNtDuplicateToken = (MonkeyWorks.ntdll.NtDuplicateToken)Marshal.GetDelegateForFunctionPointer(hNtDuplicateToken, typeof(MonkeyWorks.ntdll.NtDuplicateToken));
@@ -127,7 +143,7 @@ namespace Tokenvator.Plugins.AccessTokens
             Winnt._SECURITY_QUALITY_OF_SERVICE securityContextTrackingMode = new Winnt._SECURITY_QUALITY_OF_SERVICE()
             {
                 Length = (uint)Marshal.SizeOf(typeof(Winnt._SECURITY_QUALITY_OF_SERVICE)),
-                ImpersonationLevel = Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,//SecurityAnonymous
+                ImpersonationLevel = impersonationLevel,//SecurityAnonymous
                 ContextTrackingMode = Winnt.SECURITY_CONTEXT_TRACKING_MODE.SECURITY_STATIC_TRACKING,
                 EffectiveOnly = Winnt.EFFECTIVE_ONLY.False
             };
@@ -149,7 +165,7 @@ namespace Tokenvator.Plugins.AccessTokens
 
             try
             {
-                ntRetVal = fSyscallNtDuplicateToken(hWorkingToken, (uint)Winnt.ACCESS_MASK.MAXIMUM_ALLOWED, hObjectAttributes.AddrOfPinnedObject(), false, Winnt._TOKEN_TYPE.TokenImpersonation, ref phNewToken);
+                ntRetVal = fSyscallNtDuplicateToken(hWorkingToken, (uint)Winnt.ACCESS_MASK.MAXIMUM_ALLOWED, hObjectAttributes.AddrOfPinnedObject(), false, tokenType, ref phNewToken);
             }
             catch (Exception ex)
             {
@@ -495,7 +511,7 @@ namespace Tokenvator.Plugins.AccessTokens
             // Winbase._SECURITY_ATTRIBUTES securityAttributes = new Winbase._SECURITY_ATTRIBUTES();
             // advapi32.DuplicateTokenEx(hWorkingToken, (uint)Winnt.ACCESS_MASK.MAXIMUM_ALLOWED, ref securityAttributes, Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation, Winnt._TOKEN_TYPE.TokenPrimary, out phNewToken)
             ////////////////////////////////////////////////////////////////////////////////
-            DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation);
+            DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation, Winnt._TOKEN_TYPE.TokenImpersonation);
 
             ////////////////////////////////////////////////////////////////////////////////
             // Impersonate a newly duplicated token
@@ -548,7 +564,7 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         [SecurityCritical]
         [HandleProcessCorruptedStateExceptions]
-        protected bool CloseHandle(IntPtr handle)
+        public static bool CloseHandle(IntPtr handle)
         {
             if (IntPtr.Zero == handle)
             {

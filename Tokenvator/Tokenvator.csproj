@@ -204,18 +204,6 @@
     <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\DInvoke\vaultcli.cs" />
     <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\DInvoke\wlanapi.cs" />
     <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\DInvoke\wtsapi32.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\PInvoke\advapi32.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\PInvoke\crypt32.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\PInvoke\dbghelp.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\PInvoke\fltlib.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\PInvoke\kernel32.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\PInvoke\netapi32.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\PInvoke\ntdll.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\PInvoke\secur32.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\PInvoke\user32.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\PInvoke\vaultcli.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\PInvoke\wlanapi.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\PInvoke\wtsapi32.cs" />
     <Compile Include="Resources\TabComplete.cs" />
   </ItemGroup>
   <ItemGroup>

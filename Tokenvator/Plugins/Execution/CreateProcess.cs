@@ -18,7 +18,7 @@ namespace Tokenvator.Plugins.Execution
     {
         ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
-        /// Wrapper for CreateProcessWithLogonW
+        /// Wrapper for CreateProcessWithLogonW - for use token impersonation.
         /// Converted to GetPebLdrModuleEntry/GetExportAddress
         /// </summary>
         /// <param name="phNewToken"></param>
@@ -44,8 +44,7 @@ namespace Tokenvator.Plugins.Execution
             }
             catch (Exception ex)
             {
-                Console.WriteLine("[-] ImpersonateLoggedOnUser Generated an Exception");
-                Console.WriteLine("[-] {0}", ex.Message);
+                Misc.GetExceptionMessage(ex, "ImpersonateLoggedOnUser");
                 return false;
             }
 
@@ -128,8 +127,7 @@ namespace Tokenvator.Plugins.Execution
             }
             catch (Exception ex)
             {
-                Console.WriteLine("[-] CreateProcessWithLogonW Generated an Exception");
-                Console.WriteLine("[-] {0}", ex.Message);
+                Misc.GetExceptionMessage(ex, "CreateProcessWithLogonW");
                 return false;
             }
 
@@ -142,8 +140,7 @@ namespace Tokenvator.Plugins.Execution
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("[-] RevertToSelf Generated an Exception");
-                    Console.WriteLine("[-] {0}", ex.Message);
+                    Misc.GetExceptionMessage(ex, "RevertToSelf");
                 }
 
                 return false;
@@ -161,6 +158,63 @@ namespace Tokenvator.Plugins.Execution
                 Console.WriteLine("[-] RevertToSelf Generated an Exception");
                 Console.WriteLine("[-] {0}", ex.Message);
             }
+            return true;
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Wrapper for CreateProcessWithLogonW - for use with explicit credentials
+        /// Converted to GetPebLdrModuleEntry/GetExportAddress
+        /// </summary>
+        /// <param name="phNewToken"></param>
+        /// <param name="name"></param>
+        /// <param name="arguments"></param>
+        /// <returns></returns>
+        ////////////////////////////////////////////////////////////////////////////////
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
+        public static bool CreateProcessWithLogonW(string username, string domain, string password, string command, string arguments)
+        {
+            IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
+            IntPtr hCreateProcessWithLogonW = Generic.GetExportAddress(hadvapi32, "CreateProcessWithLogonW");
+            MonkeyWorks.advapi32.CreateProcessWithLogonW fCreateProcessWithLogonW = (MonkeyWorks.advapi32.CreateProcessWithLogonW)Marshal.GetDelegateForFunctionPointer(hCreateProcessWithLogonW, typeof(MonkeyWorks.advapi32.CreateProcessWithLogonW));
+
+            Winbase._STARTUPINFO startupInfo = new Winbase._STARTUPINFO
+            {
+                cb = (uint)Marshal.SizeOf(typeof(Winbase._STARTUPINFO))
+            };
+            Winbase._PROCESS_INFORMATION processInformation;
+
+            bool retVal = false;
+            try
+            {
+                retVal = fCreateProcessWithLogonW(
+                    username, domain, password,
+                    Winbase.LOGON_FLAGS.LOGON_NETCREDENTIALS_ONLY,
+                    command,
+                    arguments,
+                    Winbase.CREATION_FLAGS.CREATE_NEW_PROCESS_GROUP,
+                    IntPtr.Zero,
+                    Environment.CurrentDirectory,
+                    ref startupInfo,
+                    out processInformation
+                );
+            }
+            catch (Exception ex)
+            {
+                Misc.GetExceptionMessage(ex, "CreateProcessWithLogonW");
+                return false;
+            }
+
+            if (!retVal)
+            {
+                Misc.GetWin32Error("CreateProcessWithLogonW");
+                return false;
+            }
+
+            Console.WriteLine("[+] Process ID: {0}", processInformation.dwProcessId);
+            Console.WriteLine("[+] Thread ID:  {0}", processInformation.dwThreadId);
+
             return true;
         }
 

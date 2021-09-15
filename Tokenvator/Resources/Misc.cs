@@ -3,12 +3,15 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Management;
-using MonkeyWorks.Unmanaged.Libraries;
+using System.Runtime.InteropServices;
+using DInvoke.DynamicInvoke;
 
 using Tokenvator.Plugins.Execution;
 
 namespace Tokenvator.Resources
 {
+    using MonkeyWorks = MonkeyWorks.Unmanaged.Libraries.DInvoke;
+
     static class Misc
     {
         ////////////////////////////////////////////////////////////////////////////////
@@ -71,7 +74,24 @@ namespace Tokenvator.Resources
         ////////////////////////////////////////////////////////////////////////////////
         public static void GetLsaNtError(string location, uint ntError)
         {
-            uint win32Error = advapi32.LsaNtStatusToWinError(ntError);
+            ////////////////////////////////////////////////////////////////////////////////
+            // uint win32Error = advapi32.LsaNtStatusToWinError(ntError);
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
+            IntPtr hLsaNtStatusToWinError = Generic.GetExportAddress(hadvapi32, "LsaNtStatusToWinError");
+            MonkeyWorks.advapi32.LsaNtStatusToWinError fLsaNtStatusToWinError = (MonkeyWorks.advapi32.LsaNtStatusToWinError)Marshal.GetDelegateForFunctionPointer(hLsaNtStatusToWinError, typeof(MonkeyWorks.advapi32.LsaNtStatusToWinError));
+
+            uint win32Error = 0;
+            try
+            {
+                win32Error = fLsaNtStatusToWinError(ntError);
+            }
+            catch (Exception ex)
+            {
+                GetExceptionMessage(ex, "LsaNtStatusToWinError");
+                return;
+            }
+
             Console.WriteLine(" [-] Function {0} failed: ", location);
             Console.WriteLine(" [-] {0}", new System.ComponentModel.Win32Exception((int)win32Error).Message);
         }
@@ -87,7 +107,7 @@ namespace Tokenvator.Resources
             else
             {
                 Console.WriteLine(" [-] Function {0} failed: ", location);
-                Console.WriteLine(" [-] {0}", (MonkeyWorks.Unmanaged.Libraries.DInvoke.netapi32.NET_API_STATUS)netError);
+                Console.WriteLine(" [-] {0}", (MonkeyWorks.netapi32.NET_API_STATUS)netError);
             }
         }
 
@@ -95,7 +115,25 @@ namespace Tokenvator.Resources
         ////////////////////////////////////////////////////////////////////////////////
         public static void GetNtError(string location, uint ntError)
         {
-            uint win32Error = ntdll.RtlNtStatusToDosError(ntError);
+            ////////////////////////////////////////////////////////////////////////////////
+            // uint win32Error = advapi32.LsaNtStatusToWinError(ntError);
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hntdll = Generic.GetPebLdrModuleEntry("ntdll.dll");
+            IntPtr hRtlNtStatusToDosError = Generic.GetExportAddress(hntdll, "RtlNtStatusToDosError");
+            MonkeyWorks.ntdll.RtlNtStatusToDosError fRtlNtStatusToDosError = (MonkeyWorks.ntdll.RtlNtStatusToDosError)Marshal.GetDelegateForFunctionPointer(hRtlNtStatusToDosError, typeof(MonkeyWorks.ntdll.RtlNtStatusToDosError));
+
+
+            uint win32Error;
+            try
+            {
+                win32Error = fRtlNtStatusToDosError(ntError);
+            }
+            catch (Exception ex)
+            {
+                GetExceptionMessage(ex, "RtlNtStatusToDosError");
+                return;
+            }
+
             Console.WriteLine(" [-] Function {0} failed: ", location);
             Console.WriteLine(" [-] {0} (0x{1})", new System.ComponentModel.Win32Exception((int)win32Error).Message, ntError.ToString("X4"));
         }
@@ -107,6 +145,13 @@ namespace Tokenvator.Resources
             Console.WriteLine(" [-] Function {0} failed: ", location);
             Console.WriteLine(" [-] {0}", new System.ComponentModel.Win32Exception(System.Runtime.InteropServices.Marshal.GetLastWin32Error()).Message);
         }
+
+        public static void GetExceptionMessage(Exception ex, string location)
+        {
+            Console.WriteLine("[-] {0} Generated an Exception", location);
+            Console.WriteLine("[-] {0}", ex.Message);
+        }
+
         #endregion
 
         ////////////////////////////////////////////////////////////////////////////////

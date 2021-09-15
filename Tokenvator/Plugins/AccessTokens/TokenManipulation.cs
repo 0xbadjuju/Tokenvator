@@ -35,6 +35,17 @@ namespace Tokenvator.Plugins.AccessTokens
 
         ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
+        /// Default Constructor
+        /// </summary>
+        /// <param name="currentProcessToken"></param>
+        ////////////////////////////////////////////////////////////////////////////////
+        internal TokenManipulation() : base()
+        {
+
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
         /// IDisposable to free the allocated pointers
         /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
@@ -82,7 +93,7 @@ namespace Tokenvator.Plugins.AccessTokens
                             hExistingToken = ti.GetWorkingToken();
 
                             SetWorkingTokenToRemote();
-                            if (!DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation))
+                            if (!DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation, Winnt._TOKEN_TYPE.TokenPrimary))
                             {
                                 continue;
                             }
@@ -199,7 +210,7 @@ namespace Tokenvator.Plugins.AccessTokens
             }
 
             SetWorkingTokenToRemote();
-            if (!DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation))
+            if (!DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation, Winnt._TOKEN_TYPE.TokenPrimary))
             {
                 Misc.GetWin32Error("DuplicateToken");
                 return false;
@@ -445,5 +456,33 @@ namespace Tokenvator.Plugins.AccessTokens
             return true;
         }
         #endregion
+
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Removes the thread token, causing the process to execute with the process 
+        /// token.
+        /// Converted to D/Invoke GetPebLdrModuleEntry/GetExportAddress
+        /// </summary>
+        /// <returns></returns>
+        ////////////////////////////////////////////////////////////////////////////////
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
+        public bool RevertToSelf()
+        {
+            IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
+            IntPtr hRevertToSelf = Generic.GetExportAddress(hadvapi32, "RevertToSelf");
+            MonkeyWorks.advapi32.RevertToSelf fRevertToSelf = (MonkeyWorks.advapi32.RevertToSelf)Marshal.GetDelegateForFunctionPointer(hRevertToSelf, typeof(MonkeyWorks.advapi32.RevertToSelf));
+
+            try
+            {
+                return fRevertToSelf();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] RevertToSelf Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+                return false;
+            }
+        }
     }
 }

