@@ -79,13 +79,14 @@ namespace Tokenvator
             {"", "", "", ""}
         };
 
-        private readonly CommandLineParsing cLP;
+        private CommandLineParsing cLP;
         private readonly TabComplete console;
         private readonly bool activateTabs;
 
         private Process process;
 
         private IntPtr currentProcessToken;
+        private readonly IntPtr currentProcessTokenBackup;
 
         public MainLoop(bool activateTabs)
         {
@@ -95,26 +96,31 @@ namespace Tokenvator
                 console = new TabComplete(context, options);
             }
 
-            cLP = new CommandLineParsing();
-        }
+            currentProcessToken = new IntPtr();
+            currentProcessTokenBackup = new IntPtr();
 
-        ////////////////////////////////////////////////////////////////////////////////
-        // Mainloop
-        ////////////////////////////////////////////////////////////////////////////////
-        internal void Run()
-        {
             ////////////////////////////////////////////////////////////////////////////////
             // Open a limited handle to the process via a syscall stub
             // IntPtr hProcess = kernel32.OpenProcess(ProcessThreadsApi.ProcessSecurityRights.PROCESS_QUERY_INFORMATION, false, (uint)processId);
-            ////////////////////////////////////////////////////////////////////////////////    
-            IntPtr hNtOpenProcessToken = Generic.GetSyscallStub("NtOpenProcessToken");
+            //////////////////////////////////////////////////////////////////////////////// 
+            IntPtr hNtOpenProcessToken;
+            try
+            {
+                hNtOpenProcessToken = Generic.GetSyscallStub("NtOpenProcessToken");
+            }
+            catch (Exception ex)
+            {
+                Misc.GetExceptionMessage(ex, "GetSyscallStub - NtOpenProcessToken");
+                return;
+            }
+
             var fSyscallNtOpenProcessToken = (MonkeyWorks.ntdll.NtOpenProcessToken)Marshal.GetDelegateForFunctionPointer(hNtOpenProcessToken, typeof(MonkeyWorks.ntdll.NtOpenProcessToken));
 
             uint ntRetVal = 0;
             try
             {
                 IntPtr hProcess = new IntPtr(-1);
-                ntRetVal = fSyscallNtOpenProcessToken(hProcess, Winnt.TOKEN_ALL_ACCESS, ref currentProcessToken);
+                ntRetVal = fSyscallNtOpenProcessToken(hProcess, Winnt.TOKEN_ALL_ACCESS, ref currentProcessTokenBackup);
             }
             catch (Exception ex)
             {
@@ -125,7 +131,16 @@ namespace Tokenvator
             {
                 Misc.GetNtError("NtOpenProcessToken", ntRetVal);
             }
+        }
 
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Mainloop
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////
+        internal void Run()
+        {
+            currentProcessToken = currentProcessTokenBackup;
 
             Console.Write(context);
             string input;
@@ -147,13 +162,11 @@ namespace Tokenvator
 
             string action = Misc.NextItem(ref input);
 
-            if (!string.Equals(action, input, StringComparison.OrdinalIgnoreCase))
+            cLP = new CommandLineParsing();
+            if (!cLP.Parse(input))
             {
-                if (!cLP.Parse(input))
-                {
-                    return;
-                }    
-            }
+                return;
+            }    
 
             try
             {
@@ -310,7 +323,7 @@ namespace Tokenvator
             }
             catch (Exception ex)
             {
-                Misc.GetExceptionMessage(ex, "MainLoop");
+                Console.WriteLine(ex);
                 Misc.GetWin32Error("MainLoop");
             }
             Console.WriteLine();

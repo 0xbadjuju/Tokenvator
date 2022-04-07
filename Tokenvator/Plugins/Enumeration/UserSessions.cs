@@ -8,9 +8,6 @@ using System.Runtime.InteropServices;
 using Tokenvator.Resources;
 using Tokenvator.Plugins.AccessTokens;
 
-//using MonkeyWorks.Unmanaged.Headers;
-//using MonkeyWorks.Unmanaged.Libraries;
-
 using DInvoke.DynamicInvoke;
 using System.Runtime.ExceptionServices;
 using System.Security;
@@ -23,6 +20,9 @@ namespace Tokenvator.Plugins.Enumeration
     {
         ////////////////////////////////////////////////////////////////////////////////
         // Lists interactive user sessions
+        /// <summary>
+        /// 
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
         [SecurityCritical]
         [HandleProcessCorruptedStateExceptions]
@@ -42,14 +42,13 @@ namespace Tokenvator.Plugins.Enumeration
             ////////////////////////////////////////////////////////////////////////////////
             //wtsapi32.WTSEnumerateSessions(IntPtr.Zero, 0, 1, ref ppSessionInfo, ref pCount);
             ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hWTSEnumerateSessionsW = Generic.GetExportAddress(hwtsapi32, "WTSEnumerateSessionsW");
+            var fWTSEnumerateSessionsW = (MonkeyWorks.wtsapi32.WTSEnumerateSessionsW)Marshal.GetDelegateForFunctionPointer(hWTSEnumerateSessionsW, typeof(MonkeyWorks.wtsapi32.WTSEnumerateSessionsW));
 
             Dictionary<string, uint> users = new Dictionary<string, uint>();
             IntPtr ppSessionInfo = new IntPtr();
             uint pCount = 0;
-            
-            IntPtr hWTSEnumerateSessionsW = Generic.GetExportAddress(hwtsapi32, "WTSEnumerateSessionsW");
-            MonkeyWorks.wtsapi32.WTSEnumerateSessionsW fWTSEnumerateSessionsW = (MonkeyWorks.wtsapi32.WTSEnumerateSessionsW)Marshal.GetDelegateForFunctionPointer(hWTSEnumerateSessionsW, typeof(MonkeyWorks.wtsapi32.WTSEnumerateSessionsW));
-            
+                        
             bool retVal = false;
             try
             {
@@ -264,11 +263,15 @@ namespace Tokenvator.Plugins.Enumeration
         public static Dictionary<string, uint> EnumerateTokens(bool findElevation)
         {
             Dictionary<string, uint> users = new Dictionary<string, uint>();
-            foreach (Process p in Process.GetProcesses())
+            using (TokenInformation ti = new TokenInformation(IntPtr.Zero))
             {
-                using (TokenInformation ti = new TokenInformation(IntPtr.Zero))
+                foreach (Process p in Process.GetProcesses())
                 {
-                    ti.OpenProcessToken(p.Id);
+                
+                    if (!ti.OpenProcessToken(p.Id, false))
+                    {
+                        continue;
+                    }
                     ti.SetWorkingTokenToRemote();
                     ti.GetTokenElevation(false);
                     if (findElevation)

@@ -83,39 +83,39 @@ namespace Tokenvator.Plugins.AccessTokens
 
             if (IntPtr.Zero != hTokenSource)
             {
-                Marshal.FreeHGlobal(hTokenSource);
+                //Marshal.FreeHGlobal(hTokenSource);
             }
             if (IntPtr.Zero != hTokenUser)
             {
-                Marshal.FreeHGlobal(hTokenUser);
+                //Marshal.FreeHGlobal(hTokenUser);
             }
             if (IntPtr.Zero != hTokenGroups)
             {
-                Marshal.FreeHGlobal(hTokenGroups);
+                //Marshal.FreeHGlobal(hTokenGroups);
             }
             if (IntPtr.Zero != hTokenPrivileges)
             {
-                Marshal.FreeHGlobal(hTokenPrivileges);
+                //Marshal.FreeHGlobal(hTokenPrivileges);
             }
             if (IntPtr.Zero != hTokenOwner)
             {
-                Marshal.FreeHGlobal(hTokenOwner);
+                //Marshal.FreeHGlobal(hTokenOwner);
             }
             if (IntPtr.Zero != hTokenPrimaryGroup)
             {
-                Marshal.FreeHGlobal(hTokenPrimaryGroup);
+                //Marshal.FreeHGlobal(hTokenPrimaryGroup);
             }
             if (IntPtr.Zero != hTokenDefaultDacl)
             {
-                Marshal.FreeHGlobal(hTokenDefaultDacl);
+                //Marshal.FreeHGlobal(hTokenDefaultDacl);
             }
             if (IntPtr.Zero != hTokenElevationType)
             {
-                Marshal.FreeHGlobal(hTokenElevationType);
+                //Marshal.FreeHGlobal(hTokenElevationType);
             }
             if (IntPtr.Zero != hTokenType)
             {
-                Marshal.FreeHGlobal(hTokenType);
+                //Marshal.FreeHGlobal(hTokenType);
             }
 
             base.Dispose();
@@ -377,7 +377,6 @@ namespace Tokenvator.Plugins.AccessTokens
             for (int i = 0; i < tokenGroups.GroupCount; i++)
             {
                 string sid, account;
-                sid = account = string.Empty;
                 ReadSidAndName(tokenGroups.Groups[i].Sid, out sid, out account);
                 Console.WriteLine("{0,-50} {1}", sid, account);
             }
@@ -765,6 +764,7 @@ namespace Tokenvator.Plugins.AccessTokens
             {
                 using(TokenManipulation tm = new TokenManipulation(hWorkingToken))
                 {
+                    tm.SetWorkingTokenToSelf();
                     if (!tm.SetTokenPrivilege(privilegeName, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED))
                     {
                         Console.WriteLine("[-] Unable to enable privilege {0}");
@@ -789,26 +789,35 @@ namespace Tokenvator.Plugins.AccessTokens
         [HandleProcessCorruptedStateExceptions]
         private IntPtr _GetTokenInformation(Winnt._TOKEN_INFORMATION_CLASS tokenInformationClass)
         {
-            MonkeyWorks.ntdll.NtQueryInformationToken fSyscallNtQueryInformationToken = (MonkeyWorks.ntdll.NtQueryInformationToken)Marshal.GetDelegateForFunctionPointer(hNtQueryInformationToken, typeof(MonkeyWorks.ntdll.NtQueryInformationToken));
+            var fSyscallNtQueryInformationToken = (MonkeyWorks.ntdll.NtQueryInformationToken)Marshal.GetDelegateForFunctionPointer(hNtQueryInformationToken, typeof(MonkeyWorks.ntdll.NtQueryInformationToken));
 
             IntPtr tokenInformation = IntPtr.Zero;
+            ulong returnLength = 0;
             try
             {
-                ulong returnLength = 0;
                 fSyscallNtQueryInformationToken(hWorkingToken, tokenInformationClass, tokenInformation, returnLength, ref returnLength);
-                tokenInformation = Marshal.AllocHGlobal((int)returnLength);
-
-                uint ntRetVal = fSyscallNtQueryInformationToken(hWorkingToken, tokenInformationClass, tokenInformation, returnLength, ref returnLength);
-                if (0 != ntRetVal)
-                {
-                    Misc.GetNtError("NtQueryInformationToken", ntRetVal);
-                    return IntPtr.Zero;
-                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine("[-] NtDuplicateToken Generated an Exception");
-                Console.WriteLine("[-] {0}", ex.Message);
+                Misc.GetExceptionMessage(ex, "NtQueryInformationToken");
+                return IntPtr.Zero;
+            }
+            tokenInformation = Marshal.AllocHGlobal((int)returnLength);
+
+            uint ntRetVal = 0;
+            try
+            {
+                ntRetVal = fSyscallNtQueryInformationToken(hWorkingToken, tokenInformationClass, tokenInformation, returnLength, ref returnLength);
+            }
+            catch (Exception ex)
+            {
+                Misc.GetExceptionMessage(ex, "NtQueryInformationToken");
+                return IntPtr.Zero;
+            }
+
+            if (0 != ntRetVal)
+            {
+                Misc.GetNtError("NtQueryInformationToken", ntRetVal);
                 return IntPtr.Zero;
             }
 

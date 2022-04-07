@@ -21,6 +21,7 @@ namespace Tokenvator.Resources
         public string PipeName { get; private set; }
         public bool Impersonation { get; private set; }
         public bool Legacy { get; private set; }
+        public uint PPID { get; private set; }
 
         public static List<string> Privileges = new List<string> { "SeAssignPrimaryTokenPrivilege",
             "SeAuditPrivilege", "SeBackupPrivilege", "SeChangeNotifyPrivilege", "SeCreateGlobalPrivilege",
@@ -42,6 +43,7 @@ namespace Tokenvator.Resources
             Remote = false;
             Impersonation = false;
             Legacy = false;
+            PPID = 0;
         }
 
         /// <summary>
@@ -184,15 +186,29 @@ namespace Tokenvator.Resources
                 }
             }
 
+            if (arguments.ContainsKey("ppid"))
+            {
+                object oppid;
+                if (arguments.TryGetValue("ppid", out oppid))
+                {
+                    uint uppid;
+                    if (uint.TryParse((string)oppid, out uppid))
+                    {
+                        PPID = uppid;
+                    }
+                }
+            }
+
             return true;
         }
-
+        ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
         /// 
         /// </summary>
         /// <param name="input"></param>
         /// <param name="output"></param>
         /// <returns></returns>
+        ////////////////////////////////////////////////////////////////////////////////
         public bool GetData<T>(string input, out T output)
         {
             object obj;
@@ -201,12 +217,14 @@ namespace Tokenvator.Resources
             return retVal;
         }
 
+        ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
         /// 
         /// </summary>
         /// <param name="input"></param>
         /// <param name="command"></param>
         /// <param name="arguments"></param>
+        ////////////////////////////////////////////////////////////////////////////////
         private static void _ParseCommand(string input, out string command, out string arguments)
         {
             string[] cmdAndArgs = input.Split(new string[] { " " }, StringSplitOptions.RemoveEmptyEntries);
@@ -219,12 +237,14 @@ namespace Tokenvator.Resources
             arguments = string.Join(" ", cmdAndArgs.Skip(1).Take(cmdAndArgs.Count() - 1).ToArray());
         }
 
+        ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
         /// 
         /// </summary>
         /// <param name="input"></param>
         /// <param name="output"></param>
         /// <returns></returns>
+        ////////////////////////////////////////////////////////////////////////////////
         private static bool _ParseProcessID(string input, out int output)
         {
             if (int.TryParse(input, out output))
@@ -273,14 +293,16 @@ namespace Tokenvator.Resources
 
             Console.WriteLine("[-] Unable to Parse Process ID with Data {0}", input);
             return false;
-        }      
+        }
 
+        ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
         /// 
         /// </summary>
         /// <param name="input"></param>
         /// <param name="output"></param>
         /// <returns></returns>
+        ////////////////////////////////////////////////////////////////////////////////
         private static bool _ParsePrivileges(string input, out string output)
         {
             //privileges.Any(s => s.Equals(input, StringComparison.OrdinalIgnoreCase))

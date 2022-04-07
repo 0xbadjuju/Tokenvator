@@ -261,6 +261,9 @@ namespace Tokenvator.Plugins.AccessTokens
 
             phNewToken = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(IntPtr)));
 
+            ////////////////////////////////////////////////////////////////////////////////
+            // NtCreateToken(out phNewToken, Winnt.TOKEN_ALL_ACCESS, ref objectAttributes, Winnt._TOKEN_TYPE.TokenPrimary, ref systemLuid, ref expirationTime, ref tokenUser, ref tokenGroups, ref tokenPrivileges, ref tokenOwner, ref tokenPrimaryGroup, ref tokenDefaultDacl, ref tokenSource);
+            ////////////////////////////////////////////////////////////////////////////////
             IntPtr hNtCreateToken = Generic.GetSyscallStub("NtCreateToken");
             MonkeyWorks.ntdll.NtCreateToken fSyscallNtCreateToken = (MonkeyWorks.ntdll.NtCreateToken)Marshal.GetDelegateForFunctionPointer(hNtCreateToken, typeof(MonkeyWorks.ntdll.NtCreateToken));
 
@@ -377,21 +380,28 @@ namespace Tokenvator.Plugins.AccessTokens
                 IntPtr hNtCreateToken = Generic.GetSyscallStub("NtCreateToken");
                 MonkeyWorks.ntdll.NtCreateToken fSyscallNtCreateToken = (MonkeyWorks.ntdll.NtCreateToken)Marshal.GetDelegateForFunctionPointer(hNtCreateToken, typeof(MonkeyWorks.ntdll.NtCreateToken));
 
-                ntRetVal = fSyscallNtCreateToken(
-                    out phNewToken,
-                    Winnt.TOKEN_ALL_ACCESS,
-                    ref objectAttributes,
-                    Winnt._TOKEN_TYPE.TokenPrimary,
-                    ref systemLuid,
-                    ref expirationTime,
-                    ref ti.tokenUser,
-                    ref ti.tokenGroups,
-                    ref ti.tokenPrivileges,
-                    ref ti.tokenOwner,
-                    ref ti.tokenPrimaryGroup,
-                    ref ti.tokenDefaultDacl,
-                    ref ti.tokenSource
-                );
+                try
+                {
+                    ntRetVal = fSyscallNtCreateToken(
+                        out phNewToken,
+                        Winnt.TOKEN_ALL_ACCESS,
+                        ref objectAttributes,
+                        Winnt._TOKEN_TYPE.TokenPrimary,
+                        ref systemLuid,
+                        ref expirationTime,
+                        ref ti.tokenUser,
+                        ref ti.tokenGroups,
+                        ref ti.tokenPrivileges,
+                        ref ti.tokenOwner,
+                        ref ti.tokenPrimaryGroup,
+                        ref ti.tokenDefaultDacl,
+                        ref ti.tokenSource
+                    );
+                }
+                catch (Exception ex)
+                {
+                    Misc.GetExceptionMessage(ex, "NtCreateToken");
+                }
             }
 
             if (0 != ntRetVal)

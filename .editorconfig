@@ -2,3 +2,6 @@
 
 # IDE1006: Naming Styles
 dotnet_diagnostic.IDE1006.severity = none
+
+# CS0414: The field 'NamedPipes.tokenType' is assigned but its value is never used
+dotnet_diagnostic.CS0414.severity = none

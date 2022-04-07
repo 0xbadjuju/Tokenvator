@@ -134,6 +134,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="MainLoop.Extentions.cs" />
     <Compile Include="Plugins\AccessTokens\AccessTokens.cs" />
     <Compile Include="Plugins\AccessTokens\CreateTokens.cs" />
     <Compile Include="Plugins\Execution\CreateProcess.cs" />

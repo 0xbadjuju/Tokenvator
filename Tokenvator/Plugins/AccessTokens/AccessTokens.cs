@@ -22,9 +22,9 @@ namespace Tokenvator.Plugins.AccessTokens
     {
         private bool Disposed = false;
 
-        protected IntPtr phNewToken;// { private get; set; }
-        protected IntPtr hExistingToken;// { private get; set; }
-        protected IntPtr currentProcessToken;// { private get; set; }
+        protected IntPtr phNewToken = IntPtr.Zero;// { private get; set; }
+        protected IntPtr hExistingToken = IntPtr.Zero;// { private get; set; }
+        protected IntPtr currentProcessToken = IntPtr.Zero;// { private get; set; }
 
         protected IntPtr hWorkingToken { get; private set; }
         protected IntPtr hWorkingThreadToken { get; private set; }
@@ -33,9 +33,8 @@ namespace Tokenvator.Plugins.AccessTokens
 
         internal delegate bool Create(IntPtr phNewToken, string newProcess, string arguments);
 
-        private readonly IntPtr hNtOpenProcess;
-        private readonly IntPtr hNtOpenProcessToken;
-        private static readonly IntPtr hNtClose = Generic.GetSyscallStub("NtClose");
+        private IntPtr hNtOpenProcess = IntPtr.Zero;
+        private IntPtr hNtOpenProcessToken = IntPtr.Zero;
 
         ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
@@ -51,9 +50,6 @@ namespace Tokenvator.Plugins.AccessTokens
 
             hWorkingToken = new IntPtr();
             hWorkingThreadToken = new IntPtr();
-
-            hNtOpenProcess = Generic.GetSyscallStub("NtOpenProcess");
-            hNtOpenProcessToken = Generic.GetSyscallStub("NtOpenProcessToken");
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -135,8 +131,18 @@ namespace Tokenvator.Plugins.AccessTokens
         [HandleProcessCorruptedStateExceptions]
         public bool DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL impersonationLevel, Winnt._TOKEN_TYPE tokenType)
         {
-            IntPtr hNtDuplicateToken = Generic.GetSyscallStub("NtDuplicateToken");
-            MonkeyWorks.ntdll.NtDuplicateToken fSyscallNtDuplicateToken = (MonkeyWorks.ntdll.NtDuplicateToken)Marshal.GetDelegateForFunctionPointer(hNtDuplicateToken, typeof(MonkeyWorks.ntdll.NtDuplicateToken));
+            IntPtr hNtDuplicateToken;
+            try
+            {
+                hNtDuplicateToken = Generic.GetSyscallStub("NtDuplicateToken");
+            }
+            catch (Exception ex)
+            {
+                Misc.GetExceptionMessage(ex, "GetSyscallStub - NtDuplicateToken");
+                return false;
+            }
+
+            var fSyscallNtDuplicateToken = (MonkeyWorks.ntdll.NtDuplicateToken)Marshal.GetDelegateForFunctionPointer(hNtDuplicateToken, typeof(MonkeyWorks.ntdll.NtDuplicateToken));
 
             uint ntRetVal = 0;
 
@@ -169,13 +175,13 @@ namespace Tokenvator.Plugins.AccessTokens
             }
             catch (Exception ex)
             {
-                Console.WriteLine("[-] NtDuplicateToken Generated an Exception");
-                Console.WriteLine("[-] {0}", ex.Message);
+                Misc.GetExceptionMessage(ex, "NtDuplicateToken");
                 return false;
             }
             finally
             {
                 hObjectAttributes.Free();
+                Marshal.FreeHGlobal(hSecurityContextTrackingMode);
             }
 
             if (0 != ntRetVal)
@@ -190,6 +196,94 @@ namespace Tokenvator.Plugins.AccessTokens
 
         ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
+        /// List all threads for a given process
+        /// Converted to D/Invoke GetPebLdrModuleEntry/GetExportAddress
+        /// </summary>
+        /// <param name="processId"></param>
+        /// <returns>Returns true if successful, returns false if an error or exception was generated</returns>
+        ////////////////////////////////////////////////////////////////////////////////
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
+        public bool ListThreads(int processId)
+        {
+            if (0 == processId)
+            {
+                processId = Process.GetCurrentProcess().Id;
+            }
+
+            ////////////////////////////////////////////////////////////////////////////////
+            // Create a snapshot of all system threads that can be walked through
+            // IntPtr hSnapshot = kernel32.CreateToolhelp32Snapshot(TiHelp32.TH32CS_SNAPTHREAD, 0);
+            ////////////////////////////////////////////////////////////////////////////////
+
+            IntPtr hKernel32 = Generic.GetPebLdrModuleEntry("kernel32.dll");
+            IntPtr hCreateToolhelp32Snapshot = Generic.GetExportAddress(hKernel32, "CreateToolhelp32Snapshot");
+            var fCreateToolhelp32Snapshot = (MonkeyWorks.kernel32.CreateToolhelp32Snapshot)Marshal.GetDelegateForFunctionPointer(hCreateToolhelp32Snapshot, typeof(MonkeyWorks.kernel32.CreateToolhelp32Snapshot));
+            
+            IntPtr hSnapshot;
+            try
+            {
+                hSnapshot = fCreateToolhelp32Snapshot(TiHelp32.TH32CS_SNAPTHREAD, 0);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] CreateToolhelp32Snapshot Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+                return false;
+            }
+
+            if (IntPtr.Zero == hSnapshot)
+            {
+                Misc.GetWin32Error("CreateToolhelp32Snapshot");
+                CloseHandle(hKernel32);
+                return false;
+            }
+
+            ////////////////////////////////////////////////////////////////////////////////
+            // Iterate through the first snapshot instance
+            // kernel32.Thread32First(hSnapshot, ref threadEntry32);
+            ////////////////////////////////////////////////////////////////////////////////
+
+            IntPtr hThread32First = Generic.GetExportAddress(hKernel32, "Thread32First");
+            var fThread32First = (MonkeyWorks.kernel32.Thread32First)Marshal.GetDelegateForFunctionPointer(hThread32First, typeof(MonkeyWorks.kernel32.Thread32First));
+
+            TiHelp32.tagTHREADENTRY32 threadEntry32 = new TiHelp32.tagTHREADENTRY32()
+            {
+                dwSize = (uint)Marshal.SizeOf(typeof(TiHelp32.tagTHREADENTRY32))
+            };
+
+            if (!fThread32First(hSnapshot, ref threadEntry32))
+            {
+                Misc.GetWin32Error("Thread32First");
+                return false;
+            }
+
+            if (threadEntry32.th32OwnerProcessID == processId)
+            {
+                threads.Add(threadEntry32.th32ThreadID);
+            }
+
+            ////////////////////////////////////////////////////////////////////////////////
+            // Iterate through the remainder of the snapshot instances
+            // kernel32.Thread32First(hSnapshot, ref threadEntry32);
+            ////////////////////////////////////////////////////////////////////////////////
+
+            IntPtr hThread32Next = Generic.GetExportAddress(hKernel32, "Thread32Next");
+            var fThread32Next = (MonkeyWorks.kernel32.Thread32Next)Marshal.GetDelegateForFunctionPointer(hThread32Next, typeof(MonkeyWorks.kernel32.Thread32Next));
+
+            while (fThread32Next(hSnapshot, ref threadEntry32))
+            {
+                if (threadEntry32.th32OwnerProcessID == processId)
+                {
+                    threads.Add(threadEntry32.th32ThreadID);
+                }
+            }
+
+            return true;
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
         /// Opens a process Token
         /// Converted to Dinvoke Syscalls 
         /// </summary>
@@ -198,13 +292,27 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         [SecurityCritical]
         [HandleProcessCorruptedStateExceptions]
-        public virtual bool OpenProcessToken(int processId, bool showOutput = true)
+        public bool OpenProcessToken(int processId, bool showOutput = true)
         {
             ////////////////////////////////////////////////////////////////////////////////
             // Open a limited handle to the process via a syscall stub
             // IntPtr hProcess = kernel32.OpenProcess(ProcessThreadsApi.ProcessSecurityRights.PROCESS_QUERY_INFORMATION, false, (uint)processId);
-            ////////////////////////////////////////////////////////////////////////////////    
-            MonkeyWorks.ntdll.NtOpenProcess fSyscallNtOpenProcess = (MonkeyWorks.ntdll.NtOpenProcess)Marshal.GetDelegateForFunctionPointer(hNtOpenProcess, typeof(MonkeyWorks.ntdll.NtOpenProcess));
+            ////////////////////////////////////////////////////////////////////////////////  
+            #region NtOpenProcess
+            if (IntPtr.Zero == hNtOpenProcess)
+            {
+                try
+                {
+                    hNtOpenProcess = Generic.GetSyscallStub("NtOpenProcess");
+                }
+                catch (Exception ex)
+                {
+                    Misc.GetExceptionMessage(ex, "GetSyscallStub - NtOpenProcess");
+                    return false;
+                }
+            }
+
+            var fSyscallNtOpenProcess = (MonkeyWorks.ntdll.NtOpenProcess)Marshal.GetDelegateForFunctionPointer(hNtOpenProcess, typeof(MonkeyWorks.ntdll.NtOpenProcess));
 
             IntPtr hProcess = new IntPtr();
             MonkeyWorks.ntdll.OBJECT_ATTRIBUTES objectAttributes = new MonkeyWorks.ntdll.OBJECT_ATTRIBUTES();
@@ -238,21 +346,38 @@ namespace Tokenvator.Plugins.AccessTokens
             {
                 Console.WriteLine("[*] Recieved Process Handle 0x{0}", hProcess.ToString("X4"));
             }
+            #endregion
 
             ////////////////////////////////////////////////////////////////////////////////
             // Open a handle to the process token
             // bool retVal = kernel32.OpenProcessToken(hProcess, (ulong)Winnt.TOKEN_ALL_ACCESS, out hExistingToken)
-            ////////////////////////////////////////////////////////////////////////////////       
-            MonkeyWorks.ntdll.NtOpenProcessToken fSyscallNtOpenProcessToken = (MonkeyWorks.ntdll.NtOpenProcessToken)Marshal.GetDelegateForFunctionPointer(hNtOpenProcessToken, typeof(MonkeyWorks.ntdll.NtOpenProcessToken));
+            //////////////////////////////////////////////////////////////////////////////// 
+            #region NtOpenProcessToken
+            if (IntPtr.Zero == hNtOpenProcessToken)
+            {
+                try
+                {
+                    hNtOpenProcessToken = Generic.GetSyscallStub("NtOpenProcessToken");
+                }
+                catch (Exception ex)
+                {
+                    Misc.GetExceptionMessage(ex, "GetSyscallStub - NtOpenProcessToken");
+                    return false;
+                }
+            }
 
+            var fSyscallNtOpenProcessToken = (MonkeyWorks.ntdll.NtOpenProcessToken)Marshal.GetDelegateForFunctionPointer(hNtOpenProcessToken, typeof(MonkeyWorks.ntdll.NtOpenProcessToken));
+
+            ////////////////////////////////////////////////////////////////////////////////
+            // Open Token with TOKEN_ALL_ACCESS
+            ////////////////////////////////////////////////////////////////////////////////
             try
             {
                 ntRetVal = fSyscallNtOpenProcessToken(hProcess, Winnt.TOKEN_ALL_ACCESS, ref hExistingToken);
             }
             catch (Exception ex)
             {
-                Console.WriteLine("[-] NtOpenProcessToken Generated an Exception");
-                Console.WriteLine("[-] {0}", ex.Message);
+                Misc.GetExceptionMessage(ex, "NtOpenProcessToken");
                 return false;
             }
 
@@ -263,14 +388,17 @@ namespace Tokenvator.Plugins.AccessTokens
                     Misc.GetNtError("NtOpenProcessToken", ntRetVal);
                 }
 
+                ////////////////////////////////////////////////////////////////////////////////
+                // Retry by Opening Token with MAXIMUM_ALLOWED
+                ////////////////////////////////////////////////////////////////////////////////
+                Console.WriteLine(" [*] TOKEN_ALL_ACCESS Failed, Retrying with {0}", Winnt.ACCESS_MASK.MAXIMUM_ALLOWED);
                 try
                 {
                     ntRetVal = fSyscallNtOpenProcessToken(hProcess, (uint)Winnt.ACCESS_MASK.MAXIMUM_ALLOWED, ref hExistingToken);
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("[-] NtOpenProcessToken Generated an Exception");
-                    Console.WriteLine("[-] {0}", ex.Message);
+                    Misc.GetExceptionMessage(ex, "NtOpenProcessToken");
                     return false;
                 }
 
@@ -290,95 +418,9 @@ namespace Tokenvator.Plugins.AccessTokens
             {
                 Console.WriteLine("[*] Recieved Token Handle 0x{0}", hExistingToken.ToString("X4"));
             }
+            #endregion
 
             CloseHandle(hProcess);
-            return true;
-        }
-
-        ////////////////////////////////////////////////////////////////////////////////
-        /// <summary>
-        /// List all threads for a given process
-        /// Converted to D/Invoke GetPebLdrModuleEntry/GetExportAddress
-        /// </summary>
-        /// <param name="processId"></param>
-        /// <returns>Returns true if successful, returns false if an error or exception was generated</returns>
-        ////////////////////////////////////////////////////////////////////////////////
-        [SecurityCritical]
-        [HandleProcessCorruptedStateExceptions]
-        public bool ListThreads(int processId)
-        {
-            if (0 == processId)
-            {
-                processId = Process.GetCurrentProcess().Id;
-            }
-
-            ////////////////////////////////////////////////////////////////////////////////
-            // Create a snapshot of all system threads that can be walked through
-            // IntPtr hSnapshot = kernel32.CreateToolhelp32Snapshot(TiHelp32.TH32CS_SNAPTHREAD, 0);
-            ////////////////////////////////////////////////////////////////////////////////
-
-            IntPtr hKernel32 = Generic.GetPebLdrModuleEntry("kernel32.dll");
-            IntPtr hCreateToolhelp32Snapshot = Generic.GetExportAddress(hKernel32, "CreateToolhelp32Snapshot");
-            MonkeyWorks.kernel32.CreateToolhelp32Snapshot fCreateToolhelp32Snapshot = (MonkeyWorks.kernel32.CreateToolhelp32Snapshot)Marshal.GetDelegateForFunctionPointer(hCreateToolhelp32Snapshot, typeof(MonkeyWorks.kernel32.CreateToolhelp32Snapshot));
-            
-            IntPtr hSnapshot;
-            try
-            {
-                hSnapshot = fCreateToolhelp32Snapshot(TiHelp32.TH32CS_SNAPTHREAD, 0);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("[-] OpenWindowStationW Generated an Exception");
-                Console.WriteLine("[-] {0}", ex.Message);
-                return false;
-            }
-
-            if (IntPtr.Zero == hSnapshot)
-            {
-                Misc.GetWin32Error("CreateToolhelp32Snapshot");
-                CloseHandle(hKernel32);
-                return false;
-            }
-
-            ////////////////////////////////////////////////////////////////////////////////
-            // Iterate through the first snapshot instance
-            // kernel32.Thread32First(hSnapshot, ref threadEntry32);
-            ////////////////////////////////////////////////////////////////////////////////
-
-            TiHelp32.tagTHREADENTRY32 threadEntry32 = new TiHelp32.tagTHREADENTRY32()
-            {
-                dwSize = (uint)Marshal.SizeOf(typeof(TiHelp32.tagTHREADENTRY32))
-            };
-
-            IntPtr hThread32First = Generic.GetExportAddress(hKernel32, "Thread32First");
-            MonkeyWorks.kernel32.Thread32First fThread32First = (MonkeyWorks.kernel32.Thread32First)Marshal.GetDelegateForFunctionPointer(hThread32First, typeof(MonkeyWorks.kernel32.Thread32First));
-            if (!fThread32First(hSnapshot, ref threadEntry32))
-            {
-                Misc.GetWin32Error("Thread32First");
-                return false;
-            }
-
-            if (threadEntry32.th32OwnerProcessID == processId)
-            {
-                threads.Add(threadEntry32.th32ThreadID);
-            }
-
-            ////////////////////////////////////////////////////////////////////////////////
-            // Iterate through the remainder of the snapshot instances
-            // kernel32.Thread32First(hSnapshot, ref threadEntry32);
-            ////////////////////////////////////////////////////////////////////////////////
-
-            IntPtr hThread32Next = Generic.GetExportAddress(hKernel32, "Thread32Next");
-            MonkeyWorks.kernel32.Thread32Next fThread32Next = (MonkeyWorks.kernel32.Thread32Next)Marshal.GetDelegateForFunctionPointer(hThread32Next, typeof(MonkeyWorks.kernel32.Thread32Next));
-
-            while (fThread32Next(hSnapshot, ref threadEntry32))
-            {
-                if (threadEntry32.th32OwnerProcessID == processId)
-                {
-                    threads.Add(threadEntry32.th32ThreadID);
-                }
-            }
-
             return true;
         }
 
@@ -401,7 +443,7 @@ namespace Tokenvator.Plugins.AccessTokens
             ////////////////////////////////////////////////////////////////////////////////
 
             IntPtr hNtOpenThread = Generic.GetSyscallStub("NtOpenThread");
-            MonkeyWorks.ntdll.NtOpenThread fSyscallNtOpenThread = (MonkeyWorks.ntdll.NtOpenThread)Marshal.GetDelegateForFunctionPointer(hNtOpenThread, typeof(MonkeyWorks.ntdll.NtOpenThread));
+            var fSyscallNtOpenThread = (MonkeyWorks.ntdll.NtOpenThread)Marshal.GetDelegateForFunctionPointer(hNtOpenThread, typeof(MonkeyWorks.ntdll.NtOpenThread));
 
             IntPtr hThread = new IntPtr();
             MonkeyWorks.ntdll.OBJECT_ATTRIBUTES objectAttributes = new MonkeyWorks.ntdll.OBJECT_ATTRIBUTES();
@@ -436,7 +478,7 @@ namespace Tokenvator.Plugins.AccessTokens
             ////////////////////////////////////////////////////////////////////////////////
 
             IntPtr hNtOpenThreadToken = Generic.GetSyscallStub("NtOpenThreadToken");
-            MonkeyWorks.ntdll.NtOpenThreadToken fSyscallNtOpenThreadToken = (MonkeyWorks.ntdll.NtOpenThreadToken)Marshal.GetDelegateForFunctionPointer(hNtOpenThreadToken, typeof(MonkeyWorks.ntdll.NtOpenThreadToken));
+            var fSyscallNtOpenThreadToken = (MonkeyWorks.ntdll.NtOpenThreadToken)Marshal.GetDelegateForFunctionPointer(hNtOpenThreadToken, typeof(MonkeyWorks.ntdll.NtOpenThreadToken));
 
             try
             {
@@ -482,10 +524,15 @@ namespace Tokenvator.Plugins.AccessTokens
         {
             Create createProcess;
             if (0 == Process.GetCurrentProcess().SessionId)
+            {
                 createProcess = CreateProcess.CreateProcessWithLogonW;
+            }
             else
+            {
                 createProcess = CreateProcess.CreateProcessWithTokenW;
-            string arguments = string.Empty;
+            }
+
+            string arguments;
             Misc.FindExe(ref newProcess, out arguments);
 
             if (!createProcess(hWorkingToken, newProcess, arguments))
@@ -510,22 +557,35 @@ namespace Tokenvator.Plugins.AccessTokens
             // Duplicate an existing token
             // Winbase._SECURITY_ATTRIBUTES securityAttributes = new Winbase._SECURITY_ATTRIBUTES();
             // advapi32.DuplicateTokenEx(hWorkingToken, (uint)Winnt.ACCESS_MASK.MAXIMUM_ALLOWED, ref securityAttributes, Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation, Winnt._TOKEN_TYPE.TokenPrimary, out phNewToken)
+            // This used to work with Winnt._TOKEN_PRIMARY, another MS silent patch
             ////////////////////////////////////////////////////////////////////////////////
-            DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation, Winnt._TOKEN_TYPE.TokenImpersonation);
+            if (!DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation, Winnt._TOKEN_TYPE.TokenImpersonation))
+            {
+                return false;
+            }
 
             ////////////////////////////////////////////////////////////////////////////////
             // Impersonate a newly duplicated token
             // advapi32.ImpersonateLoggedOnUser(phNewToken)            
             ////////////////////////////////////////////////////////////////////////////////
-
-            IntPtr hNtSetInformationThread = Generic.GetSyscallStub("NtSetInformationThread");
-            MonkeyWorks.ntdll.NtSetInformationThread fSyscallNtSetInformationThread = (MonkeyWorks.ntdll.NtSetInformationThread)Marshal.GetDelegateForFunctionPointer(hNtSetInformationThread, typeof(MonkeyWorks.ntdll.NtSetInformationThread));
-
+            
             IntPtr hkernel32 = Generic.GetPebLdrModuleEntry("kernel32.dll");
             IntPtr hGetCurrentThread = Generic.GetExportAddress(hkernel32, "GetCurrentThread");
-            MonkeyWorks.kernel32.GetCurrentThread fGetCurrentThread = (MonkeyWorks.kernel32.GetCurrentThread)Marshal.GetDelegateForFunctionPointer(hGetCurrentThread, typeof(MonkeyWorks.kernel32.GetCurrentThread));
+            var fGetCurrentThread = (MonkeyWorks.kernel32.GetCurrentThread)Marshal.GetDelegateForFunctionPointer(hGetCurrentThread, typeof(MonkeyWorks.kernel32.GetCurrentThread));
 
-            IntPtr hThread = fGetCurrentThread();
+            IntPtr hThread = IntPtr.Zero;
+            try
+            {
+                hThread = fGetCurrentThread();
+            }
+            catch (Exception ex)
+            {
+                Misc.GetExceptionMessage(ex, "GetCurrentThread");
+                return false;
+            }
+
+            IntPtr hNtSetInformationThread = Generic.GetSyscallStub("NtSetInformationThread");
+            var fSyscallNtSetInformationThread = (MonkeyWorks.ntdll.NtSetInformationThread)Marshal.GetDelegateForFunctionPointer(hNtSetInformationThread, typeof(MonkeyWorks.ntdll.NtSetInformationThread));
 
             uint ntRetVal = 0;
             try
@@ -546,7 +606,6 @@ namespace Tokenvator.Plugins.AccessTokens
             if (0 != ntRetVal)
             {
                 Misc.GetNtError("NtSetInformationThread", ntRetVal);
-                Console.ReadKey();
                 return false;
             }
 
@@ -564,19 +623,21 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         [SecurityCritical]
         [HandleProcessCorruptedStateExceptions]
-        public static bool CloseHandle(IntPtr handle)
+        public bool CloseHandle(IntPtr handle)
         {
+            IntPtr hkernel32 = Generic.GetPebLdrModuleEntry("kernel32.dll");
+            IntPtr hCloseHandle = Generic.GetExportAddress(hkernel32, "CloseHandle");
+            var fCloseHandle = (MonkeyWorks.kernel32.CloseHandle)Marshal.GetDelegateForFunctionPointer(hCloseHandle, typeof(MonkeyWorks.kernel32.CloseHandle));
+
             if (IntPtr.Zero == handle)
             {
                 return true;
             }
 
-            MonkeyWorks.ntdll.NtClose fSyscallhNtClose = (MonkeyWorks.ntdll.NtClose)Marshal.GetDelegateForFunctionPointer(hNtClose, typeof(MonkeyWorks.ntdll.NtClose));
-
-            uint ntRetVal = 0;
+            bool retVal = false;
             try
             {
-                ntRetVal = fSyscallhNtClose(handle);
+                retVal = fCloseHandle(handle);
             }
             catch (Exception ex)
             {
@@ -590,7 +651,7 @@ namespace Tokenvator.Plugins.AccessTokens
                 return true;
             }
 
-            if (0 != ntRetVal)
+            if (!retVal)
             {
                 //Misc.GetNtError("NtClose", ntRetVal);
                 //Console.WriteLine("[-] {0}", (new StackTrace()).GetFrame(1).GetMethod().Name);
@@ -623,12 +684,12 @@ namespace Tokenvator.Plugins.AccessTokens
             if (IntPtr.Zero != phNewToken)
             {
                 //Console.WriteLine("phNewToken");
-                CloseHandle(phNewToken);
+                //CloseHandle(phNewToken);
             }
             if (IntPtr.Zero != hExistingToken)
             {
                 //Console.WriteLine("hExistingToken");
-                CloseHandle(hExistingToken);
+                //CloseHandle(hExistingToken);
             }
             /*
             This should be covered by the other closed handles
@@ -641,7 +702,7 @@ namespace Tokenvator.Plugins.AccessTokens
             if (IntPtr.Zero != hWorkingThreadToken)
             {
                 //Console.WriteLine("hWorkingThreadToken");
-                CloseHandle(hWorkingThreadToken);
+                //CloseHandle(hWorkingThreadToken);
             }
 
             Disposed = true;

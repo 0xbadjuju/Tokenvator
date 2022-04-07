@@ -29,7 +29,10 @@ namespace Tokenvator.Plugins.NamedPipes
 
         private delegate bool Create(IntPtr phNewToken, string newProcess, string arguments);
 
+#pragma warning disable IDE0052 
         private Winnt._TOKEN_TYPE tokenType;
+#pragma warning restore IDE0052
+
         private readonly AccessTokens.AccessTokens accessTokens;
 
         ////////////////////////////////////////////////////////////////////////////////
