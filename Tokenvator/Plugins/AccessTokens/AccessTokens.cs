@@ -523,12 +523,13 @@ namespace Tokenvator.Plugins.AccessTokens
         public bool StartProcessAsUser(string newProcess)
         {
             Create createProcess;
-            if (0 == Process.GetCurrentProcess().SessionId)
+            if (0 == Process.GetCurrentProcess().SessionId || WindowsIdentity.GetCurrent().Owner == WindowsIdentity.GetCurrent().User)
             {
                 createProcess = CreateProcess.CreateProcessWithLogonW;
             }
             else
             {
+                //This seems to require Admin privileges
                 createProcess = CreateProcess.CreateProcessWithTokenW;
             }
 
