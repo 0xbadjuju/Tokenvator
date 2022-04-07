@@ -2,3 +2,7 @@
 	path = Tokenvator/Resources/MonkeyWorks
 	url = https://github.com/0xbadjuju/MonkeyWorks.git
 	branch = master
+[submodule "Tokenvator/DInvoke"]
+	path = Tokenvator/Resources/DInvoke
+	url = https://github.com/TheWover/DInvoke.git
+	branch = dev
