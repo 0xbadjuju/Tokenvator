@@ -7,7 +7,7 @@ https://github.com/0xbadjuju/Tokenvator/wiki
 Building instructions can be found here:<br>
 https://github.com/0xbadjuju/Tokenvator/wiki/Building-Tokenvator
 
-This project now utilizes [MonkeyWorks](https://github.com/NetSPI/MonkeyWorks) and a modified verson of [DInvoke](https://github.com/0xbadjuju/DInvoke) ([Original](https://github.com/TheWover/DInvoke)). To clone issue the following command:<br>
+This project now utilizes [MonkeyWorks](https://github.com/NetSPI/MonkeyWorks) and a modified verson of [DInvoke](https://github.com/0xbadjuju/DInvoke) ([Original](https://github.com/TheWover/DInvoke)) via SubModules. To clone issue the following command:<br>
 **git clone _--recursive_ https://github.com/0xbadjuju/Tokenvator.git**
 
 ### Author, Contributors, and License
