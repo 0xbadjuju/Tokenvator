@@ -4,5 +4,5 @@
 	branch = master
 [submodule "Tokenvator/DInvoke"]
 	path = Tokenvator/Resources/DInvoke
-	url = https://github.com/TheWover/DInvoke.git
+	url = https://github.com/0xbadjuju/DInvoke.git
 	branch = dev
