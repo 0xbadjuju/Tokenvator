@@ -35,6 +35,8 @@ namespace Tokenvator.Plugins.AccessTokens
 
         private IntPtr hNtOpenProcess = IntPtr.Zero;
         private IntPtr hNtOpenProcessToken = IntPtr.Zero;
+        private IntPtr hNtOpenThread = IntPtr.Zero;
+        private IntPtr hNtOpenThreadToken = IntPtr.Zero;
 
         ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
@@ -211,6 +213,8 @@ namespace Tokenvator.Plugins.AccessTokens
                 processId = Process.GetCurrentProcess().Id;
             }
 
+            threads.Clear();
+
             ////////////////////////////////////////////////////////////////////////////////
             // Create a snapshot of all system threads that can be walked through
             // IntPtr hSnapshot = kernel32.CreateToolhelp32Snapshot(TiHelp32.TH32CS_SNAPTHREAD, 0);
@@ -328,8 +332,7 @@ namespace Tokenvator.Plugins.AccessTokens
             }
             catch (Exception ex)
             {
-                Console.WriteLine("[-] NtOpenProcess Generated an Exception");
-                Console.WriteLine("[-] {0}", ex.Message);
+                Misc.GetExceptionMessage(ex, "GetSyscallStub - NtOpenProcess");
                 return false;
             }
 
@@ -391,7 +394,11 @@ namespace Tokenvator.Plugins.AccessTokens
                 ////////////////////////////////////////////////////////////////////////////////
                 // Retry by Opening Token with MAXIMUM_ALLOWED
                 ////////////////////////////////////////////////////////////////////////////////
-                Console.WriteLine(" [*] TOKEN_ALL_ACCESS Failed, Retrying with {0}", Winnt.ACCESS_MASK.MAXIMUM_ALLOWED);
+                if (showOutput)
+                {
+                    Console.WriteLine(" [*] TOKEN_ALL_ACCESS Failed, Retrying with {0}", Winnt.ACCESS_MASK.MAXIMUM_ALLOWED);
+                }
+
                 try
                 {
                     ntRetVal = fSyscallNtOpenProcessToken(hProcess, (uint)Winnt.ACCESS_MASK.MAXIMUM_ALLOWED, ref hExistingToken);
@@ -435,14 +442,24 @@ namespace Tokenvator.Plugins.AccessTokens
         ////////////////////////////////////////////////////////////////////////////////
         [SecurityCritical]
         [HandleProcessCorruptedStateExceptions]
-        public bool OpenThreadToken(uint threadId, uint permissions)
+        public bool OpenThreadToken(uint threadId, uint permissions, bool showOutput = true)
         {
             ////////////////////////////////////////////////////////////////////////////////
             // Open a limited handle to the thread via a syscall stub
             // IntPtr hThread = kernel32.OpenThread(ProcessThreadsApi.ThreadSecurityRights.THREAD_QUERY_INFORMATION, false, threadId);
             ////////////////////////////////////////////////////////////////////////////////
-
-            IntPtr hNtOpenThread = Generic.GetSyscallStub("NtOpenThread");
+            if (IntPtr.Zero == hNtOpenThread)
+            {
+                try
+                {
+                    hNtOpenThread = Generic.GetSyscallStub("NtOpenThread");
+                }
+                catch (Exception ex)
+                {
+                    Misc.GetExceptionMessage(ex, "GetSyscallStub - NtOpenThread");
+                    return false;
+                }
+            }
             var fSyscallNtOpenThread = (MonkeyWorks.ntdll.NtOpenThread)Marshal.GetDelegateForFunctionPointer(hNtOpenThread, typeof(MonkeyWorks.ntdll.NtOpenThread));
 
             IntPtr hThread = new IntPtr();
@@ -460,12 +477,11 @@ namespace Tokenvator.Plugins.AccessTokens
             }
             catch (Exception ex)
             {
-                Console.WriteLine("[-] NtOpenThread Generated an Exception");
-                Console.WriteLine("[-] {0}", ex.Message);
+                Misc.GetExceptionMessage(ex, "NtOpenThread");
                 return false;
             }
 
-            if (0 != ntRetVal)
+            if (0 != ntRetVal && showOutput)
             {
                 Misc.GetNtError("NtOpenThread", ntRetVal);
                 return false;
@@ -476,8 +492,18 @@ namespace Tokenvator.Plugins.AccessTokens
             // Open a handle to the thread token
             // bool retVal = kernel32.OpenThreadToken(hThread, permissions, false, ref hWorkingThreadToken);
             ////////////////////////////////////////////////////////////////////////////////
-
-            IntPtr hNtOpenThreadToken = Generic.GetSyscallStub("NtOpenThreadToken");
+            if (IntPtr.Zero == hNtOpenThreadToken)
+            {
+                try
+                {
+                    hNtOpenThreadToken = Generic.GetSyscallStub("NtOpenThreadToken");
+                }
+                catch (Exception ex)
+                {
+                    Misc.GetExceptionMessage(ex, "GetSyscallStub - NtOpenThreadToken");
+                    return false;
+                }
+            }
             var fSyscallNtOpenThreadToken = (MonkeyWorks.ntdll.NtOpenThreadToken)Marshal.GetDelegateForFunctionPointer(hNtOpenThreadToken, typeof(MonkeyWorks.ntdll.NtOpenThreadToken));
 
             try
@@ -486,8 +512,7 @@ namespace Tokenvator.Plugins.AccessTokens
             }
             catch (Exception ex)
             {
-                Console.WriteLine("[-] NtOpenThreadToken Generated an Exception");
-                Console.WriteLine("[-] {0}", ex.Message);
+                Misc.GetExceptionMessage(ex, "NtOpenThreadToken");
                 return false;
             }
             finally
@@ -500,15 +525,17 @@ namespace Tokenvator.Plugins.AccessTokens
             if (0 != ntRetVal)
             {
                 //Skip error message if no token exists
-                if (3221225596 != ntRetVal)
+                if (3221225596 != ntRetVal && showOutput)
                 {
-                    Console.WriteLine(" [-] Unable to Open Process Token");
-                    Misc.GetNtError("NtOpenProcessToken", ntRetVal);
+                    Console.WriteLine(" [-] Unable to Open Thread Token");
+                    Misc.GetNtError("NtOpenThreadToken", ntRetVal);
                 }
                 return false;
             }
-
-            Console.WriteLine("[*] Recieved Token Handle 0x{0}", hWorkingThreadToken.ToString("X4"));
+            if (showOutput)
+            { 
+                Console.WriteLine("[*] Recieved Token Handle 0x{0}", hWorkingThreadToken.ToString("X4"));
+            }
             return true;
         }
 

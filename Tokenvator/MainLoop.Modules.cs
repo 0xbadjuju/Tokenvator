@@ -806,6 +806,32 @@ namespace Tokenvator
 
         ////////////////////////////////////////////////////////////////////////////////
         /// <summary>
+        /// 
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////
+        private void _ListAllTokens()
+        {
+            using (TokenInformation ti = new TokenInformation(currentProcessToken))
+            {
+                foreach (var p in Process.GetProcesses())
+                {
+                Console.WriteLine("\n[*] {0,-8} {1}", p.Id, p.ProcessName);
+                
+                    if (!ti.OpenProcessToken(p.Id, false))
+                    {
+                        continue;   
+                    }
+                    ti.SetWorkingTokenToRemote();
+
+                    Console.WriteLine(ti.GetTokenUser(false));
+                    ti.ListThreads(p.Id);
+                    ti.GetThreadUsers(false);
+                }
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
         /// Logs on a user, can be used with virtual service accounts
         /// No conversions required
         /// QA OK

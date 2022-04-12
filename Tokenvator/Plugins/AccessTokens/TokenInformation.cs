@@ -128,17 +128,23 @@ namespace Tokenvator.Plugins.AccessTokens
         /// No Conversions Required 
         /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        public void GetThreadUsers()
+        public void GetThreadUsers(bool showOutput = true)
         {
             foreach (uint t in threads)
             {
-                Console.WriteLine("[*] Thread ID: " + t);
-                if (OpenThreadToken(t, Winnt.TOKEN_QUERY))
+                if (showOutput)
                 {
-                    using (TokenInformation ti = new TokenInformation(hWorkingThreadToken))
+                    Console.WriteLine("[*] Thread ID: " + t);
+                }
+
+                if (OpenThreadToken(t, Winnt.TOKEN_QUERY, showOutput))
+                {
+                    SetWorkingTokenToThreadToken();
+                    string user = GetTokenUser(showOutput);
+
+                    if (!showOutput)
                     {
-                        ti.SetWorkingTokenToSelf();
-                        ti.GetTokenUser();
+                        Console.WriteLine("[*] Thread: {0} - {1}", t, user);
                     }
                 }
             }

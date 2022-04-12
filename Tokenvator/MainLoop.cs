@@ -43,6 +43,7 @@ namespace Tokenvator
             {"Sample_Processes_WMI", "-", "-", "Sample_Processes_WMI"},
             {"Find_User_Processes", "-", "User", "Find_User_Processes /User:Administrator"},
             {"Find_User_Processes_WMI", "-", "User", "Find_User_Processes_WMI /User:Administrator"},
+            {"List_All_Tokens", "-", "-", "List_All_Tokens"},
             {"", "", "", ""},
 
             {"List_Filters", "-", "-", "List_Filters"},
@@ -248,6 +249,9 @@ namespace Tokenvator
                         break;
                     case "list_privileges":
                         _ListPrivileges();
+                        break;
+                    case "list_all_tokens":
+                        _ListAllTokens();
                         break;
                     case "logon_user":
                         _LogonUser();
