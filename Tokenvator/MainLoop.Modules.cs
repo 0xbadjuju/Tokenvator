@@ -320,7 +320,7 @@ namespace Tokenvator
             using (TokenInformation ti = new TokenInformation(currentProcessToken))
             {
                 ti.SetWorkingTokenToSelf();
-                if (!ti.CheckTokenPrivilege(Winnt.SE_DEBUG_NAME))
+                if (!ti.CheckTokenPrivilege(Winnt.SE_DEBUG_NAME) || cLP.Legacy)
                 {
                     using (NamedPipes np = new NamedPipes())
                     {
@@ -632,7 +632,7 @@ namespace Tokenvator
                 var fSyscallNtOpenProcess = (MonkeyWorks.ntdll.NtOpenProcess)Marshal.GetDelegateForFunctionPointer(hNtOpenProcess, typeof(MonkeyWorks.ntdll.NtOpenProcess));
 
                 MonkeyWorks.ntdll.OBJECT_ATTRIBUTES objectAttributes = new MonkeyWorks.ntdll.OBJECT_ATTRIBUTES();
-                MonkeyWorks.ntdll.CLIENT_ID clientId = new MonkeyWorks.ntdll.CLIENT_ID
+                ntbasic.CLIENT_ID clientId = new ntbasic.CLIENT_ID
                 {
                     UniqueProcess = new IntPtr(cLP.ProcessID)
                 };
@@ -1048,7 +1048,7 @@ namespace Tokenvator
                 MonkeyWorks.ntdll.NtOpenProcess fSyscallNtOpenProcess = (MonkeyWorks.ntdll.NtOpenProcess)Marshal.GetDelegateForFunctionPointer(hNtOpenProcess, typeof(MonkeyWorks.ntdll.NtOpenProcess));
 
                 MonkeyWorks.ntdll.OBJECT_ATTRIBUTES objectAttributes = new MonkeyWorks.ntdll.OBJECT_ATTRIBUTES();
-                MonkeyWorks.ntdll.CLIENT_ID clientId = new MonkeyWorks.ntdll.CLIENT_ID
+                ntbasic.CLIENT_ID clientId = new ntbasic.CLIENT_ID
                 {
                     UniqueProcess = new IntPtr(cLP.ProcessID)
                 };
@@ -1341,7 +1341,7 @@ namespace Tokenvator
             var fSyscallNtOpenProcess = (MonkeyWorks.ntdll.NtOpenProcess)Marshal.GetDelegateForFunctionPointer(hNtOpenProcess, typeof(MonkeyWorks.ntdll.NtOpenProcess));
 
             MonkeyWorks.ntdll.OBJECT_ATTRIBUTES objectAttributes = new MonkeyWorks.ntdll.OBJECT_ATTRIBUTES();
-            MonkeyWorks.ntdll.CLIENT_ID clientId = new MonkeyWorks.ntdll.CLIENT_ID
+            ntbasic.CLIENT_ID clientId = new ntbasic.CLIENT_ID
             {
                 UniqueProcess = new IntPtr(cLP.ProcessID)
             };
