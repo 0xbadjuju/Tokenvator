@@ -5,11 +5,10 @@ using System.ServiceProcess;
 
 namespace Tokenvator.Plugins.Execution
 {
-    class Services
+    sealed class Services
     {
         private ServiceController service;
         private string serviceName;
-        private uint ProcessId;
 
         ////////////////////////////////////////////////////////////////////////////////
         ////////////////////////////////////////////////////////////////////////////////
@@ -98,34 +97,6 @@ namespace Tokenvator.Plugins.Execution
                 Console.WriteLine("Unable to stop service");
                 return false;
             }
-        }
-
-        ////////////////////////////////////////////////////////////////////////////////
-        ////////////////////////////////////////////////////////////////////////////////
-        public uint GetServiceProcessId()
-        {
-            List<ManagementObject> systemProcesses = new List<ManagementObject>();
-            ManagementScope scope = new ManagementScope("\\\\.\\root\\cimv2");
-            scope.Connect();
-            if (!scope.IsConnected)
-            {
-                Console.WriteLine("[-] Failed to connect to WMI");
-            }
-
-            Console.WriteLine(" [*] Querying for service: " + serviceName);
-            ObjectQuery query = new ObjectQuery("SELECT * FROM Win32_Service WHERE Name = \'" + serviceName + "\'");
-            ManagementObjectSearcher objectSearcher = new ManagementObjectSearcher(scope, query);
-            ManagementObjectCollection objectCollection = objectSearcher.Get();
-            if (objectCollection == null)
-            {
-                Console.WriteLine("ManagementObjectCollection");
-            }
-            foreach (ManagementObject managementObject in objectCollection)
-            {
-                ProcessId = (uint)managementObject["ProcessId"];
-            }
-            Console.WriteLine(" [+] Returned PID: " + ProcessId);
-            return ProcessId;
         }
     }
 }

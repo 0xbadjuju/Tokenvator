@@ -25,7 +25,7 @@ namespace Tokenvator
 
         private readonly List<string> flags = new List<string>()
         { 
-            "All", "Command", "Filter", "Force", "Groups", "Impersonation", "Password", "Path", "Privilege", "Process", "ServiceName", "State", "Thread", "Username"        
+            "All", "Command:", "Filter:", "Force", "Groups:", "Impersonation", "Legacy", "Password:", "Path:", "PPID:", "Privilege:", "Process:", "ServiceName:", "State:", "Thread:", "Username:"        
         };
 
 
@@ -189,7 +189,7 @@ namespace Tokenvator
                 switch (flag)
                 {
                     case "privilege":
-                        candidate = CommandLineParsing.privileges.FirstOrDefault(i => i != item && i.StartsWith(item, true, System.Globalization.CultureInfo.InvariantCulture));
+                        candidate = CommandLineParsing.Privileges.FirstOrDefault(i => i != item && i.StartsWith(item, true, System.Globalization.CultureInfo.InvariantCulture));
                         string[] j = input.Split(new string[] { ":" }, StringSplitOptions.None);
                         string k = string.Join(":", j.Take(j.Length - 1));
                         ResetLine();

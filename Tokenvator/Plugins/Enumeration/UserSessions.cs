@@ -4,36 +4,97 @@ using System.Diagnostics;
 using System.Linq;
 using System.Management;
 using System.Runtime.InteropServices;
-using System.Text;
 
 using Tokenvator.Resources;
 using Tokenvator.Plugins.AccessTokens;
 
-using MonkeyWorks.Unmanaged.Headers;
-using MonkeyWorks.Unmanaged.Libraries;
+using DInvoke.DynamicInvoke;
+using System.Runtime.ExceptionServices;
+using System.Security;
 
 namespace Tokenvator.Plugins.Enumeration
 {
-    class UserSessions
+    using MonkeyWorks = MonkeyWorks.Unmanaged.Libraries.DInvoke;
+
+    sealed class UserSessions
     {
         ////////////////////////////////////////////////////////////////////////////////
         // Lists interactive user sessions
+        /// <summary>
+        /// 
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
         public static void EnumerateInteractiveUserSessions()
         {
+            IntPtr hwtsapi32 = Generic.GetPebLdrModuleEntry("wtsapi32.dll");
+            if (IntPtr.Zero == hwtsapi32)
+            {
+                hwtsapi32 = Generic.LoadModuleFromDisk("wtsapi32.dll");
+                if (IntPtr.Zero == hwtsapi32)
+                {
+                    Console.WriteLine("Unable to load wtsapi32.dll");
+                    return;
+                }
+            }
+
+            ////////////////////////////////////////////////////////////////////////////////
+            //wtsapi32.WTSEnumerateSessions(IntPtr.Zero, 0, 1, ref ppSessionInfo, ref pCount);
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hWTSEnumerateSessionsW = Generic.GetExportAddress(hwtsapi32, "WTSEnumerateSessionsW");
+            var fWTSEnumerateSessionsW = (MonkeyWorks.wtsapi32.WTSEnumerateSessionsW)Marshal.GetDelegateForFunctionPointer(hWTSEnumerateSessionsW, typeof(MonkeyWorks.wtsapi32.WTSEnumerateSessionsW));
+
             Dictionary<string, uint> users = new Dictionary<string, uint>();
             IntPtr ppSessionInfo = new IntPtr();
-            int pCount = 0;
-            wtsapi32.WTSEnumerateSessions(IntPtr.Zero, 0, 1, ref ppSessionInfo, ref pCount);
+            uint pCount = 0;
+                        
+            bool retVal = false;
+            try
+            {
+                retVal = fWTSEnumerateSessionsW(IntPtr.Zero, 0, 1, ref ppSessionInfo, ref pCount);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] IsWow64Proces Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+                return;
+            }
+
+            if (!retVal)
+            {
+                Misc.GetWin32Error("WTSEnumerateSessionsW");
+                return;
+            }
+
+            ////////////////////////////////////////////////////////////////////////////////
+            // Iterate through the returned count
+            // wtsapi32.WTSQuerySessionInformationW(IntPtr.Zero, wtsSessionInfo.SessionId, wtsapi32._WTS_INFO_CLASS.WTSUserName, out ppBuffer, out pBytesReturned)
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hWTSQuerySessionInformationW = Generic.GetExportAddress(hwtsapi32, "WTSQuerySessionInformationW");
+            MonkeyWorks.wtsapi32.WTSQuerySessionInformationW fWTSQuerySessionInformationW = (MonkeyWorks.wtsapi32.WTSQuerySessionInformationW)Marshal.GetDelegateForFunctionPointer(hWTSQuerySessionInformationW, typeof(MonkeyWorks.wtsapi32.WTSQuerySessionInformationW));
+
             for (int i = 0; i < pCount; i++)
             {
-                IntPtr j = new IntPtr(ppSessionInfo.ToInt64() + (i * Marshal.SizeOf(typeof(wtsapi32._WTS_SESSION_INFO))));
-                wtsapi32._WTS_SESSION_INFO wtsSessionInfo = (wtsapi32._WTS_SESSION_INFO)Marshal.PtrToStructure(j, typeof(wtsapi32._WTS_SESSION_INFO));
+                IntPtr j = new IntPtr(ppSessionInfo.ToInt64() + (i * Marshal.SizeOf(typeof(MonkeyWorks.wtsapi32._WTS_SESSION_INFO))));
+                MonkeyWorks.wtsapi32._WTS_SESSION_INFO wtsSessionInfo = (MonkeyWorks.wtsapi32._WTS_SESSION_INFO)Marshal.PtrToStructure(j, typeof(MonkeyWorks.wtsapi32._WTS_SESSION_INFO));
                 IntPtr ppBuffer, pBytesReturned;
                 ppBuffer = pBytesReturned = IntPtr.Zero;
-                if (!wtsapi32.WTSQuerySessionInformationW(IntPtr.Zero, wtsSessionInfo.SessionId, wtsapi32._WTS_INFO_CLASS.WTSUserName, out ppBuffer, out pBytesReturned))
+
+                try
                 {
-                    Console.WriteLine("[-] {0}", Marshal.GetLastWin32Error());
+                    retVal = fWTSQuerySessionInformationW(IntPtr.Zero, wtsSessionInfo.SessionId, MonkeyWorks.wtsapi32._WTS_INFO_CLASS.WTSUserName, ref ppBuffer, ref pBytesReturned);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("[-] WTSQuerySessionInformationW Generated an Exception");
+                    Console.WriteLine("[-] {0}", ex.Message);
+                    continue;
+                }
+
+                if (!retVal)
+                {
+                    Misc.GetWin32Error("WTSQuerySessionInformationW");
                     continue;
                 }
 
@@ -43,6 +104,8 @@ namespace Tokenvator.Plugins.Enumeration
                     users.Add(userName, (uint)wtsSessionInfo.SessionId);
                 }
             }
+
+            Console.WriteLine();
             Console.WriteLine("{0,-30}{1,-30}", "User", "SessionID");
             Console.WriteLine("{0,-30}{1,-30}", "----", "---------");
             foreach (string name in users.Keys)
@@ -52,146 +115,95 @@ namespace Tokenvator.Plugins.Enumeration
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Converts a TokenStatistics Pointer array to User Name
+        /// <summary>
+        /// Emulates tasklist /v
+        /// Borrowed from Sharpire
+        /// Converted to D/Invoke GetPebLdrModuleEntry/GetExportAddress
+        /// Not converting the WMI calls
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        private static bool ConvertTokenStatisticsToUsername(Winnt._TOKEN_STATISTICS tokenStatistics, ref string userName)
-        {
-            IntPtr lpLuid = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(Winnt._LUID)));
-            Marshal.StructureToPtr(tokenStatistics.AuthenticationId, lpLuid, false);
-            if (IntPtr.Zero == lpLuid)
-            {
-                return false;
-            }
-
-            IntPtr ppLogonSessionData = new IntPtr();
-            if (0 != secur32.LsaGetLogonSessionData(lpLuid, out ppLogonSessionData))
-            {
-                Misc.GetWin32Error("LsaGetLogonSessionData");
-                return false;
-            }
-
-            if (IntPtr.Zero == ppLogonSessionData)
-            {
-                return false;
-            }
-
-            ntsecapi._SECURITY_LOGON_SESSION_DATA securityLogonSessionData = (ntsecapi._SECURITY_LOGON_SESSION_DATA)Marshal.PtrToStructure(ppLogonSessionData, typeof(ntsecapi._SECURITY_LOGON_SESSION_DATA));
-            if (IntPtr.Zero == securityLogonSessionData.Sid || IntPtr.Zero == securityLogonSessionData.UserName.Buffer || IntPtr.Zero == securityLogonSessionData.LogonDomain.Buffer)
-            {
-                return false;
-            }
-            
-            string usernameBuffer = Marshal.PtrToStringUni(securityLogonSessionData.UserName.Buffer);
-
-            if (Environment.MachineName+"$" == usernameBuffer && ConvertSidToName(securityLogonSessionData.Sid, out userName))
-            {
-                return true;
-
-            }
-
-            userName = string.Format("{0}\\{1}", Marshal.PtrToStringUni(securityLogonSessionData.LogonDomain.Buffer), usernameBuffer);
-            return true;
-        }
-
-        ////////////////////////////////////////////////////////////////////////////////
-        // Converts a SID Byte array to User Name
-        ////////////////////////////////////////////////////////////////////////////////
-        internal static bool ConvertSidToName(IntPtr sid, out string userName)
-        {
-            StringBuilder sbUserName = new StringBuilder();
-
-            string lpSystemName = string.Empty;
-            StringBuilder lpName = new StringBuilder();
-            uint cchName = (uint)lpName.Capacity;
-            StringBuilder lpReferencedDomainName = new StringBuilder();
-            uint cchReferencedDomainName = (uint)lpReferencedDomainName.Capacity;
-            Winnt._SID_NAME_USE sidNameUse = new Winnt._SID_NAME_USE();
-            advapi32.LookupAccountSid(lpSystemName, sid, lpName, ref cchName, lpReferencedDomainName, ref cchReferencedDomainName, out sidNameUse);
-
-            lpName.EnsureCapacity((int)cchName + 1);
-            lpReferencedDomainName.EnsureCapacity((int)cchReferencedDomainName + 1);
-
-            byte[] bsid = new byte[16];
-            Marshal.Copy(sid, bsid, 0, 16);
-            bool retVal = advapi32.LookupAccountSid(lpSystemName, sid, lpName, ref cchName, lpReferencedDomainName, ref cchReferencedDomainName, out sidNameUse);
-
-            if (!retVal && 0 == lpName.Length)
-            {
-                Misc.GetWin32Error("LookupAccountSid");
-            }
-
-            if (lpReferencedDomainName.Length > 0)
-            {
-                sbUserName.Append(lpReferencedDomainName);
-            }
-
-            if (sbUserName.Length > 0)
-            {
-                sbUserName.Append(@"\");
-            }
-
-            if (lpName.Length > 0)
-            {
-                sbUserName.Append(lpName);
-            }
-
-            userName = sbUserName.ToString();
-
-            if (string.IsNullOrEmpty(userName))
-            {
-                return false;
-            }
-            else
-            {
-                return true;
-            }
-        }
-
-        ////////////////////////////////////////////////////////////////////////////////
-        // Borrowed from Sharpire
-        ////////////////////////////////////////////////////////////////////////////////
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
         internal static void Tasklist()
         {
+            ////////////////////////////////////////////////////////////////////////////////
+            // kernel32.IsWow64Process(process.Handle, out isWow64Process);
+            ////////////////////////////////////////////////////////////////////////////////
+
+            IntPtr hKernel32 = Generic.GetPebLdrModuleEntry("kernel32.dll");
+            IntPtr hIsWow64Process = Generic.GetExportAddress(hKernel32, "IsWow64Process");
+            MonkeyWorks.kernel32.IsWow64Process fIsWow64Process = (MonkeyWorks.kernel32.IsWow64Process)Marshal.GetDelegateForFunctionPointer(hIsWow64Process, typeof(MonkeyWorks.kernel32.IsWow64Process));
+
+            Console.WriteLine("[*] Running");
+
+            ////////////////////////////////////////////////////////////////////////////////
+            // Query WMI for a list of all running processes and get's the process owner
+            ////////////////////////////////////////////////////////////////////////////////
             Dictionary<int, string> owners = new Dictionary<int, string>();
-            ManagementScope scope = new ManagementScope("\\\\.\\root\\cimv2");
+            ManagementScope scope = new ManagementScope(@"\\.\root\cimv2");
             scope.Connect();
             ObjectQuery query = new ObjectQuery("SELECT * FROM Win32_Process");
-            ManagementObjectSearcher objectSearcher = new ManagementObjectSearcher(scope, query);
-            ManagementObjectCollection objectCollection = objectSearcher.Get();
-            foreach (ManagementObject managementObject in objectCollection)
+            using (ManagementObjectSearcher objectSearcher = new ManagementObjectSearcher(scope, query))
             {
-                string name = "";
-                string[] owner = new string[2];
-                managementObject.InvokeMethod("GetOwner", (object[])owner);
-                if (owner[0] != null)
+                using (ManagementObjectCollection objectCollection = objectSearcher.Get())
                 {
-                    name = owner[1] + "\\" + owner[0];
+                    foreach (ManagementObject managementObject in objectCollection)
+                    {
+                        Console.Write(".");
+                        string name = "";
+                        string[] owner = new string[2];
+                        try
+                        {
+                            managementObject.InvokeMethod("GetOwner", (object[])owner);
+                            if (owner[0] != null)
+                            {
+                                name = owner[1] + "\\" + owner[0];
+                            }
+                            else
+                            {
+                                name = "N/A";
+                            }
+                            managementObject.InvokeMethod("GetOwner", (object[])owner);
+                        }
+                        catch (Exception ex)
+                        {
+                            if (!ex.Message.Equals("Not found", StringComparison.OrdinalIgnoreCase))
+                            {
+                                Console.WriteLine("[-] InvokeMethod Generated an Exception");
+                                Console.WriteLine("[-] {0}", ex);
+                            }
+                            name = "N/A";
+                        }
+                        owners[Convert.ToInt32(managementObject["Handle"])] = name;
+                    }
                 }
-                else
-                {
-                    name = "N/A";
-                }
-                managementObject.InvokeMethod("GetOwner", (object[])owner);
-                owners[Convert.ToInt32(managementObject["Handle"])] = name;
             }
+            Console.WriteLine();
 
+            ////////////////////////////////////////////////////////////////////////////////
+            // Get the list of processes and query if it is a x86 or x64 process
+            ////////////////////////////////////////////////////////////////////////////////
             List<string[]> lines = new List<string[]>();
             foreach (Process process in Process.GetProcesses())
             {
-                string architecture;
+                string architecture = "N/A";
                 int workingSet;
-                bool isWow64Process;
+                bool isWow64Process = false;
                 try
                 {
-                    kernel32.IsWow64Process(process.Handle, out isWow64Process);
+                    fIsWow64Process(process.Handle, ref isWow64Process);
                     if (isWow64Process)
                         architecture = "x64";
                     else
                         architecture = "x86";
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
-                    architecture = "N/A";
+                    if (!ex.Message.Equals("Access is denied", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Console.WriteLine("[-] IsWow64Proces Generated an Exception");
+                        Console.WriteLine("[-] {0}", ex);
+                    }
                 }
                 workingSet = (int)(process.WorkingSet64 / 1000000);
 
@@ -201,9 +213,9 @@ namespace Tokenvator.Plugins.Enumeration
                     if (!owners.TryGetValue(process.Id, out userName))
                         userName = "False";
                 }
-                catch
+                catch (Exception ex)
                 {
-                    userName = "<Exception>";
+                    userName = ex.Message;
                 }
 
                 lines.Add(
@@ -218,12 +230,21 @@ namespace Tokenvator.Plugins.Enumeration
             }
             string[][] linesArray = lines.ToArray();
 
-            //https://stackoverflow.com/questions/232395/how-do-i-sort-a-two-dimensional-array-in-c
-            Comparer<int> comparer = Comparer<int>.Default;
-            Array.Sort<String[]>(linesArray, (x, y) => comparer.Compare(Convert.ToInt32(x[1]), Convert.ToInt32(y[1])));
+            ////////////////////////////////////////////////////////////////////////////////
+            // Sort the data
+            // https://stackoverflow.com/questions/232395/how-do-i-sort-a-two-dimensional-array-in-c
+            ////////////////////////////////////////////////////////////////////////////////
 
+            Comparer<int> comparer = Comparer<int>.Default;
+            Array.Sort<string[]>(linesArray, (x, y) => comparer.Compare(Convert.ToInt32(x[1]), Convert.ToInt32(y[1])));
+
+            ////////////////////////////////////////////////////////////////////////////////
+            // Print the sorted and formated information
+            ////////////////////////////////////////////////////////////////////////////////
             List<string> sortedLines = new List<string>();
             string[] headerArray = { "ProcessName", "PID", "Arch", "UserName", "MemUsage" };
+            sortedLines.Add(string.Format("{0,-30} {1,-8} {2,-6} {3,-28} {4,8}", headerArray));
+            headerArray = new string[] { "-----------", "---", "----", "--------", "--------" };
             sortedLines.Add(string.Format("{0,-30} {1,-8} {2,-6} {3,-28} {4,8}", headerArray));
             foreach (string[] line in linesArray)
             {
@@ -233,73 +254,57 @@ namespace Tokenvator.Plugins.Enumeration
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Finds a process per user discovered
-        // ToDo: check if token is a primary token
+        /// <summary>
+        /// Finds a process per user discovered
+        /// </summary>
+        /// <param name="findElevation"></param>
+        /// <returns></returns>
         ////////////////////////////////////////////////////////////////////////////////
         public static Dictionary<string, uint> EnumerateTokens(bool findElevation)
         {
             Dictionary<string, uint> users = new Dictionary<string, uint>();
-            foreach (Process p in Process.GetProcesses())
+            using (TokenInformation ti = new TokenInformation(IntPtr.Zero))
             {
-                IntPtr hProcess = kernel32.OpenProcess(ProcessThreadsApi.ProcessSecurityRights.PROCESS_QUERY_LIMITED_INFORMATION, true, (uint)p.Id);
-                if (IntPtr.Zero == hProcess)
+                foreach (Process p in Process.GetProcesses())
                 {
-                    continue;
-                }
-                IntPtr hToken;
-                if (!kernel32.OpenProcessToken(hProcess, (uint)Winnt.ACCESS_MASK.MAXIMUM_ALLOWED, out hToken))
-                {
-                    continue;
-                }
-                kernel32.CloseHandle(hProcess);
-                if (findElevation)
-                {
-                    if (!TokenInformation.CheckElevation(hToken))
+                
+                    if (!ti.OpenProcessToken(p.Id, false))
                     {
                         continue;
                     }
-                }
-
-                uint dwLength = 0;
-                Winnt._TOKEN_STATISTICS tokenStatistics = new Winnt._TOKEN_STATISTICS();
-                //Split up impersonation and primary tokens
-                if (Winnt._TOKEN_TYPE.TokenImpersonation == tokenStatistics.TokenType)
-                {
-                    continue;
-                }
-
-                if (!advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenStatistics, ref tokenStatistics, dwLength, out dwLength))
-                {
-                    if (!advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenStatistics, ref tokenStatistics, dwLength, out dwLength))
+                    ti.SetWorkingTokenToRemote();
+                    ti.GetTokenElevation(false);
+                    if (findElevation)
                     {
-                        Console.WriteLine("GetTokenInformation: {0}", Marshal.GetLastWin32Error());
-                        continue;
+                        if (!ti.GetTokenElevation(false))
+                        {
+                            continue;
+                        }
                     }
-                }
-                kernel32.CloseHandle(hToken);
+                    string userName = ti.GetTokenUser(false);
 
-                string userName = string.Empty;
-                if (!ConvertTokenStatisticsToUsername(tokenStatistics, ref userName))
-                {
-                    continue;
-                }
-
-                if (!users.ContainsKey(userName))
-                {
-                    users.Add(userName, (uint)p.Id);
+                    if (!users.ContainsKey(userName))
+                    {
+                        users.Add(userName, (uint)p.Id);
+                    }
                 }
             }
             return users;
         }
 
         /////////////////////////////////////////////////////////////////////////////
-        // Lists tokens via WMI
+        /// <summary>
+        /// Lists tokens via WMI
+        /// Could built in .Net Methods
+        /// No plans to convert
+        /// </summary>
+        /// <returns>Return a unique list of users on the system</returns>
         ////////////////////////////////////////////////////////////////////////////////
         public static Dictionary<string, uint> EnumerateTokensWMI()
         {
             Dictionary<string, uint> users = new Dictionary<string, uint>();
             List<ManagementObject> systemProcesses = new List<ManagementObject>();
-            ManagementScope scope = new ManagementScope("\\\\.\\root\\cimv2");
+            ManagementScope scope = new ManagementScope(@"\\.\root\cimv2");
             scope.Connect();
             if (!scope.IsConnected)
             {
@@ -330,60 +335,30 @@ namespace Tokenvator.Plugins.Enumeration
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Find processes for a user via Tokens
+        /// <summary>
+        /// Find processes for a user via Tokens
+        /// Being phased out
+        /// P/Invokes removed and pulls from TokenInformation instead
+        /// </summary>
+        /// <param name="targetAccount"></param>
+        /// <returns></returns>
         ////////////////////////////////////////////////////////////////////////////////
-        public static Dictionary<uint, string> EnumerateUserProcesses(bool findElevation, string targetAccount)
+        public static Dictionary<uint, string> EnumerateUserProcesses(string targetAccount)
         {
             Dictionary<uint, string> users = new Dictionary<uint, string>();
             Process[] pids = Process.GetProcesses();
             Console.WriteLine("[*] Examining {0} processes", pids.Length);
-            foreach (Process p in pids)
+
+            using (TokenInformation ti = new TokenInformation(IntPtr.Zero))
             {
-                IntPtr hProcess = kernel32.OpenProcess(ProcessThreadsApi.ProcessSecurityRights.PROCESS_QUERY_LIMITED_INFORMATION, true, (uint)p.Id);
-                if (IntPtr.Zero == hProcess)
+                foreach (Process p in pids)
                 {
-                    continue;
-                }
-                IntPtr hToken;
-                if (!kernel32.OpenProcessToken(hProcess, (uint)Winnt.ACCESS_MASK.MAXIMUM_ALLOWED, out hToken))
-                {
-                    continue;
-                }
-                kernel32.CloseHandle(hProcess);
-
-                if (findElevation && !TokenInformation.CheckElevation(hToken))
-                {
-                    continue;
-                }
-
-                uint dwLength = 0;
-                Winnt._TOKEN_STATISTICS tokenStatistics = new Winnt._TOKEN_STATISTICS();
-                if (!advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenStatistics, ref tokenStatistics, dwLength, out dwLength))
-                {
-                    if (!advapi32.GetTokenInformation(hToken, Winnt._TOKEN_INFORMATION_CLASS.TokenStatistics, ref tokenStatistics, dwLength, out dwLength))
+                    ti.OpenProcessToken(p.Id, false);
+                    ti.SetWorkingTokenToRemote();
+                    string userName = ti.GetTokenUser(false);
+                    if (userName.Contains(targetAccount, StringComparison.OrdinalIgnoreCase))
                     {
-                        continue;
-                    }
-                }
-                kernel32.CloseHandle(hToken);
-
-                if (Winnt._TOKEN_TYPE.TokenImpersonation == tokenStatistics.TokenType)
-                {
-                    continue;
-                }
-
-
-                string userName = string.Empty;
-                if (!ConvertTokenStatisticsToUsername(tokenStatistics, ref userName))
-                {
-                    continue;
-                }
-                if (userName.Contains(targetAccount, StringComparison.OrdinalIgnoreCase))
-                {
-                    users.Add((uint)p.Id, p.ProcessName);
-                    if (findElevation)
-                    {
-                        return users;
+                        users.Add((uint)p.Id, p.ProcessName);
                     }
                 }
             }
@@ -399,7 +374,12 @@ namespace Tokenvator.Plugins.Enumeration
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Find processes for user via WMI
+        /// <summary>
+        /// Find processes for user via WMI
+        /// Not converting the WMI calls
+        /// </summary>
+        /// <param name="userAccount"></param>
+        /// <returns></returns>
         ////////////////////////////////////////////////////////////////////////////////
         public static Dictionary<uint, string> EnumerateUserProcessesWMI(string userAccount)
         {

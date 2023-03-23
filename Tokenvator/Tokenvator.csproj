@@ -1,7 +1,9 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Configuration Condition=" '$(Configuration)' == '' ">
+      <legacyCorruptedStateExceptionsPolicy enabled="true" />
+    </Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>9.0.30729</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
@@ -37,50 +39,6 @@
     <UseApplicationTrust>false</UseApplicationTrust>
     <BootstrapperEnabled>true</BootstrapperEnabled>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <Prefer32Bit>false</Prefer32Bit>
-    <LangVersion>5</LangVersion>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <Prefer32Bit>false</Prefer32Bit>
-    <LangVersion>5</LangVersion>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug-Net45|AnyCPU'">
-    <OutputPath>bin\Debug-Net45\</OutputPath>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
-    <DefineConstants>TRACE</DefineConstants>
-    <Optimize>true</Optimize>
-    <DebugType>pdbonly</DebugType>
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <ErrorReport>prompt</ErrorReport>
-    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
-    <LangVersion>5</LangVersion>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release-Net45|AnyCPU'">
-    <OutputPath>bin\Release-Net45\</OutputPath>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
-    <DefineConstants>TRACE</DefineConstants>
-    <Optimize>true</Optimize>
-    <DebugType>pdbonly</DebugType>
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <ErrorReport>prompt</ErrorReport>
-    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
-    <LangVersion>5</LangVersion>
-    <Prefer32Bit>false</Prefer32Bit>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
     <DebugSymbols>true</DebugSymbols>
     <OutputPath>bin\x64\Debug\</OutputPath>
@@ -92,7 +50,6 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
     <OutputPath>bin\x64\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
     <Optimize>true</Optimize>
     <DebugType>pdbonly</DebugType>
     <PlatformTarget>x64</PlatformTarget>
@@ -105,18 +62,17 @@
     <Optimize>true</Optimize>
     <DebugType>pdbonly</DebugType>
     <PlatformTarget>x64</PlatformTarget>
-    <LangVersion>5</LangVersion>
+    <LangVersion>6</LangVersion>
     <ErrorReport>prompt</ErrorReport>
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
     <Prefer32Bit>true</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release-Net45|x64'">
     <OutputPath>bin\x64\Release-Net45\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
     <Optimize>true</Optimize>
     <DebugType>pdbonly</DebugType>
     <PlatformTarget>x64</PlatformTarget>
-    <LangVersion>5</LangVersion>
+    <LangVersion>6</LangVersion>
     <ErrorReport>prompt</ErrorReport>
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
@@ -128,10 +84,11 @@
     <Reference Include="System.ServiceProcess" />
     <Reference Include="System.Management.Automation, Version=1.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\..\..\Windows\assembly\GAC_MSIL\System.Management.Automation\1.0.0.0__31bf3856ad364e35\System.Management.Automation.dll</HintPath>
+      <HintPath>..\..\..\..\..\..\..\Windows\Microsoft.NET\assembly\GAC_MSIL\System.Management.Automation\v4.0_3.0.0.0__31bf3856ad364e35\System.Management.Automation.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="MainLoop.Extentions.cs" />
     <Compile Include="Plugins\AccessTokens\AccessTokens.cs" />
     <Compile Include="Plugins\AccessTokens\CreateTokens.cs" />
     <Compile Include="Plugins\Execution\CreateProcess.cs" />
@@ -142,11 +99,26 @@
     <Compile Include="MainLoop.cs" />
     <Compile Include="MainLoop.Modules.cs" />
     <Compile Include="Resources\CommandLineParsing.cs" />
+    <Compile Include="Resources\DInvoke\DInvoke\DInvoke\DynamicInvoke\Generic.cs" />
+    <Compile Include="Resources\DInvoke\DInvoke\DInvoke\DynamicInvoke\Native.cs" />
+    <Compile Include="Resources\DInvoke\DInvoke\DInvoke\DynamicInvoke\Win32.cs" />
+    <Compile Include="Resources\DInvoke\DInvoke\DInvoke\Injection\Allocation.cs" />
+    <Compile Include="Resources\DInvoke\DInvoke\DInvoke\Injection\Execution.cs" />
+    <Compile Include="Resources\DInvoke\DInvoke\DInvoke\Injection\Injector.cs" />
+    <Compile Include="Resources\DInvoke\DInvoke\DInvoke\Injection\Payload.cs" />
+    <Compile Include="Resources\DInvoke\DInvoke\DInvoke\ManualMap\Map.cs" />
+    <Compile Include="Resources\DInvoke\DInvoke\DInvoke\ManualMap\Overload.cs" />
+    <Compile Include="Resources\DInvoke\DInvoke\DInvoke\SharedData\Native.cs" />
+    <Compile Include="Resources\DInvoke\DInvoke\DInvoke\SharedData\PE.cs" />
+    <Compile Include="Resources\DInvoke\DInvoke\DInvoke\SharedData\Win32.cs" />
+    <Compile Include="Resources\DInvoke\DInvoke\DInvoke\SharedUtilities\Utilities.cs" />
     <Compile Include="Resources\Misc.cs" />
     <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\Accctrl.cs" />
     <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\lmaccess.cs" />
     <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\lsalookup.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\ntbasic.cs" />
     <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\Ntdef.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\ntlpcapi.cs" />
     <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\SecurityBaseApi.cs" />
     <Compile Include="Plugins\NamedPipes\NamedPipes.cs" />
     <Compile Include="Plugins\AccessTokens\TokenInformation.cs" />
@@ -171,26 +143,25 @@
     <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\Winsvc.cs" />
     <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\Winternl.cs" />
     <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\Winuser.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\Wnf.cs" />
     <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Headers\wudfwdm.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\advapi32.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\crypt32.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\dbghelp.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\fltlib.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\kernel32.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\netapi32.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\ntdll.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\secur32.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\user32.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\vaultcli.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\wlanapi.cs" />
-    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\wtsapi32.cs" />
     <Compile Include="Plugins\Execution\PSExec.cs" />
-    <Compile Include="Plugins\AccessTokens\RestrictedToken.cs" />
-    <Compile Include="Plugins\Execution\Services.cs" />
     <Compile Include="Plugins\AccessTokens\TokenDriver.cs" />
     <Compile Include="Plugins\AccessTokens\TokenManipulation.cs" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\DInvoke\advapi32.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\DInvoke\crypt32.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\DInvoke\dbghelp.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\DInvoke\fltlib.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\DInvoke\kernel32.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\DInvoke\netapi32.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\DInvoke\ntdll.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\DInvoke\secur32.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\DInvoke\user32.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\DInvoke\vaultcli.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\DInvoke\wlanapi.cs" />
+    <Compile Include="Resources\MonkeyWorks\MonkeyWorks\Unmanaged\Libraries\DInvoke\wtsapi32.cs" />
     <Compile Include="Resources\TabComplete.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -198,9 +169,17 @@
       <Link>.editorconfig</Link>
     </None>
     <None Include="app.config" />
+    <None Include="Resources\DInvoke\.github\workflows\DInvoke.NetFramework.CI.Package.yml" />
+    <None Include="Resources\DInvoke\.github\workflows\DInvoke.NetFramework.CI.yml" />
+    <None Include="Resources\DInvoke\DInvoke\DInvoke\obj\Debug\DesignTimeResolveAssemblyReferencesInput.cache" />
+    <None Include="Resources\DInvoke\DInvoke\DInvoke\obj\Debug\DInvoke.csprojAssemblyReference.cache" />
+    <None Include="Resources\DInvoke\LICENSE" />
+    <None Include="Resources\DInvoke\README.md" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Plugins\Ownership\" />
+    <Folder Include="Resources\DInvoke\DInvoke\DInvoke\obj\Debug\TempPE\" />
+    <Folder Include="Resources\DInvoke\DInvoke\DInvoke\Properties\" />
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include="Microsoft.Net.Framework.3.5.SP1">
@@ -208,6 +187,9 @@
       <ProductName>.NET Framework 3.5 SP1</ProductName>
       <Install>false</Install>
     </BootstrapperPackage>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Resources\DInvoke\.gitignore" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

