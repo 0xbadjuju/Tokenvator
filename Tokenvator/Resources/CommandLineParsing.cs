@@ -47,6 +47,13 @@ namespace Tokenvator.Resources
         /// <param name="input"></param>
         public bool Parse(string input)
         {
+            input = Regex.Replace(input, @"'(.*)'", match =>
+            {
+                string commandArgs = match.Groups[1].Value;
+                string modified = commandArgs.Replace("/", "\0");
+                return modified;
+            });
+            
             //Console.WriteLine();
             //Console.WriteLine(input);
             input = Regex.Replace(input, "(\"[^\"]*)(\\/)+([^\"]*[^:](?!\\\\)\")", "$1\0$3");
